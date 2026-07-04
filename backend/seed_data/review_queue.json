@@ -1,0 +1,609 @@
+[
+  {
+    "recipe_id": "honey-sriracha-wings",
+    "name": "Honey Sriracha Wings",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": null,
+      "unit": "servings"
+    },
+    "components": [],
+    "steps": [],
+    "extraction_confidence": 0.4,
+    "extraction_flags": [
+      "prose_format_source",
+      "requires_manual_segmentation"
+    ],
+    "needs_human_review": true,
+    "review_reason": "Prose-format source has no reliable ingredient/step delimiters; heuristic extractor cannot safely segment this record."
+  },
+  {
+    "recipe_id": "keto-bread",
+    "name": "Keto bread",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": null,
+      "unit": "servings"
+    },
+    "components": [],
+    "steps": [],
+    "extraction_confidence": 0.4,
+    "extraction_flags": [
+      "prose_format_source",
+      "requires_manual_segmentation"
+    ],
+    "needs_human_review": true,
+    "review_reason": "Prose-format source has no reliable ingredient/step delimiters; heuristic extractor cannot safely segment this record."
+  },
+  {
+    "recipe_id": "beer-batter-shrimp",
+    "name": "Beer Batter Shrimp",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": 18.0,
+      "unit": "pieces"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": []
+      },
+      {
+        "component_name": "for the cake",
+        "ingredients": [
+          {
+            "ingredient_id": "2487",
+            "name": "Large prawns or shrimp",
+            "amount": 18.0,
+            "unit": "piece",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "9458",
+            "name": "Corn flour (cornstarch)",
+            "amount": 0.5,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "5faa",
+            "name": "Vegetable oil for deep frying",
+            "amount": 2.0,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "eefe",
+            "name": "Sea salt",
+            "amount": 1.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "bbc4",
+            "name": "Plain flour (all-purpose flour)",
+            "amount": 150.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "d801",
+            "name": "Corn flour (cornstarch)",
+            "amount": 50.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "d5b7",
+            "name": "Sea salt",
+            "amount": 1.0,
+            "unit": "tsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "719b",
+            "name": "Baking powder",
+            "amount": 1.0,
+            "unit": "tsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "bb80",
+            "name": "Cold beer",
+            "amount": 320.0,
+            "unit": "ml",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": "for the cake",
+        "instruction": "Ensure the prawns, flour, and beer are all cold and taken straight from the fridge just before cooking.",
+        "component_ref_is_guess": true
+      },
+      {
+        "step_number": 2,
+        "component_ref": "for the cake",
+        "instruction": "For the spicy mayo, combine the ingredients and set aside until ready to serve.",
+        "component_ref_is_guess": true
+      },
+      {
+        "step_number": 3,
+        "component_ref": "for the cake",
+        "instruction": "Prepare the batter ingredients by placing the plain flour, corn flour, salt and baking powder in a large bowl.",
+        "component_ref_is_guess": true
+      },
+      {
+        "step_number": 4,
+        "component_ref": "for the cake",
+        "instruction": "Place the \u00bd cup of corn flour onto a plate or tray.",
+        "component_ref_is_guess": true
+      },
+      {
+        "step_number": 5,
+        "component_ref": "for the cake",
+        "instruction": "When ready to serve, heat enough vegetable oil to deep\u2013fry in a large, deep frying pan or wok over high heat.",
+        "component_ref_is_guess": true
+      },
+      {
+        "step_number": 6,
+        "component_ref": "for the cake",
+        "instruction": "When the oil is nearly hot, take your beer from the fridge and pour it into the flour mixture. Whisk until smooth.",
+        "component_ref_is_guess": true
+      },
+      {
+        "step_number": 7,
+        "component_ref": "for the cake",
+        "instruction": "When the oil is hot (a wooden chopstick should start to bubble when dipped into the hot oil), coat each prawn in the corn flour. Shake off the excess and then dip the prawn into the batter before gently placing it into the hot oil.",
+        "component_ref_is_guess": true
+      },
+      {
+        "step_number": 8,
+        "component_ref": "for the cake",
+        "instruction": "Repeat with remaining prawns (do this in batches if necessary). Cook for 2-3 minutes or until each prawn is golden, crisp and cooked through. Drain on the paper towel. Serve immediately with the spicy mayo.",
+        "component_ref_is_guess": true
+      }
+    ],
+    "extraction_confidence": 0.65,
+    "extraction_flags": [
+      "multi_component_recipe"
+    ],
+    "needs_human_review": true,
+    "review_reason": "Multi-component recipe: step-to-component mapping is a heuristic guess and requires human approval before commit."
+  },
+  {
+    "recipe_id": "pie-plate-cheesecake",
+    "name": "pie plate Cheesecake",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": 16.0,
+      "unit": "servings"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": []
+      },
+      {
+        "component_name": "for the crust",
+        "ingredients": [
+          {
+            "ingredient_id": "5be6",
+            "name": "Graham cracker crumbs",
+            "amount": 375.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "f01c",
+            "name": "Toasted walnuts",
+            "amount": 110.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "e062",
+            "name": "Sugar",
+            "amount": 40.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "84ec",
+            "name": "Salt",
+            "amount": 3.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "8787",
+            "name": "Flour",
+            "amount": 30.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "b290",
+            "name": "Unsalted butter melted",
+            "amount": 200.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      },
+      {
+        "component_name": "for the cheesecake",
+        "ingredients": [
+          {
+            "ingredient_id": "918d",
+            "name": "\"Cream cheese",
+            "amount": 900.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "abd4",
+            "name": "\"Goat cheese",
+            "amount": 225.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "1e3f",
+            "name": "Sour cream / heavy cream",
+            "amount": 125.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "f027",
+            "name": "Sugar",
+            "amount": 240.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "a43d",
+            "name": "Salt",
+            "amount": 5.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "ce7f",
+            "name": "Corn starch",
+            "amount": 30.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "9299",
+            "name": "Zest of 1 lemon",
+            "amount": 1.0,
+            "unit": "piece",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "3fc1",
+            "name": "Pure vanilla extract",
+            "amount": 1.0,
+            "unit": "tsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "5c02",
+            "name": "\"Large eggs",
+            "amount": 6.0,
+            "unit": "piece",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": "for the cheesecake",
+        "instruction": "To make the crust: Butter a 9-inch springform pan.",
+        "component_ref_is_guess": true
+      }
+    ],
+    "extraction_confidence": 0.65,
+    "extraction_flags": [
+      "multi_component_recipe"
+    ],
+    "needs_human_review": true,
+    "review_reason": "Multi-component recipe: step-to-component mapping is a heuristic guess and requires human approval before commit."
+  },
+  {
+    "recipe_id": "chicken-chaap",
+    "name": "Chicken Chaap",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": 2.0,
+      "unit": "pieces"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": []
+      },
+      {
+        "component_name": "marinade",
+        "ingredients": [
+          {
+            "ingredient_id": "7e09",
+            "name": "Chicken",
+            "amount": 2.0,
+            "unit": "Leg pieces",
+            "gram_equivalent": null,
+            "non_standard_unit": true
+          },
+          {
+            "ingredient_id": "a35b",
+            "name": "Onion Paste",
+            "amount": 2.0,
+            "unit": "tbsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      },
+      {
+        "component_name": "gravy",
+        "ingredients": [
+          {
+            "ingredient_id": "6b0c",
+            "name": "Ghee",
+            "amount": 0.25,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "494e",
+            "name": "Vegetable Oil",
+            "amount": 0.25,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": "gravy",
+        "instruction": "At first, clean the Chicken and then make some Slits.",
+        "component_ref_is_guess": true
+      }
+    ],
+    "extraction_confidence": 0.65,
+    "extraction_flags": [
+      "multi_component_recipe"
+    ],
+    "needs_human_review": true,
+    "review_reason": "Multi-component recipe: step-to-component mapping is a heuristic guess and requires human approval before commit."
+  },
+  {
+    "recipe_id": "misti-doi",
+    "name": "Misti Doi",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": null,
+      "unit": "servings"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": [
+          {
+            "ingredient_id": "de47",
+            "name": "Whole milk ricotta cheese",
+            "amount": 32.0,
+            "unit": "oz",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "efa0",
+            "name": "Cardamom powder",
+            "amount": 0.5,
+            "unit": "tsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": null,
+        "instruction": "Mix cheese with spices and sugar. Set aside.",
+        "component_ref_is_guess": false
+      }
+    ],
+    "extraction_confidence": 0.65,
+    "extraction_flags": [
+      "base_servings_not_detected"
+    ],
+    "needs_human_review": true,
+    "review_reason": "Base servings scale could not be confidently detected."
+  },
+  {
+    "recipe_id": "mutton-kosha",
+    "name": "Mutton Kosha",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": null,
+      "unit": "servings"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": [
+          {
+            "ingredient_id": "4cd4",
+            "name": "Mutton pieces",
+            "amount": 2.0,
+            "unit": "lb",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": null,
+        "instruction": "Make a paste with papaya, onion, garlic, ginger, green chillis.",
+        "component_ref_is_guess": false
+      }
+    ],
+    "extraction_confidence": 0.65,
+    "extraction_flags": [
+      "base_servings_not_detected"
+    ],
+    "needs_human_review": true,
+    "review_reason": "Base servings scale could not be confidently detected."
+  },
+  {
+    "recipe_id": "nolen-gurer-rasogolla",
+    "name": "Nolen Gurer Rasogolla",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": null,
+      "unit": "servings"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": [
+          {
+            "ingredient_id": "5399",
+            "name": "Whole Milk",
+            "amount": 0.5,
+            "unit": "Gal",
+            "gram_equivalent": null,
+            "non_standard_unit": true
+          },
+          {
+            "ingredient_id": "87d9",
+            "name": "Vinegar + Water (1:1)",
+            "amount": 0.5,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "8317",
+            "name": "Sugar",
+            "amount": 1.0,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": null,
+        "instruction": "Boil sugar and water together and let it come to a boil.",
+        "component_ref_is_guess": false
+      }
+    ],
+    "extraction_confidence": 0.65,
+    "extraction_flags": [
+      "base_servings_not_detected"
+    ],
+    "needs_human_review": true,
+    "review_reason": "Base servings scale could not be confidently detected."
+  },
+  {
+    "recipe_id": "rasmalai",
+    "name": "Rasmalai",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": null,
+      "unit": "servings"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": [
+          {
+            "ingredient_id": "3610",
+            "name": "Whole milk ricotta cheese",
+            "amount": 32.0,
+            "unit": "oz",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "a1c1",
+            "name": "Cardamom powder",
+            "amount": 0.5,
+            "unit": "tsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": null,
+        "instruction": "Mix cheese with spices and sugar. Set aside.",
+        "component_ref_is_guess": false
+      }
+    ],
+    "extraction_confidence": 0.65,
+    "extraction_flags": [
+      "base_servings_not_detected"
+    ],
+    "needs_human_review": true,
+    "review_reason": "Base servings scale could not be confidently detected."
+  }
+]

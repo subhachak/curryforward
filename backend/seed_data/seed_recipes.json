@@ -1,0 +1,616 @@
+[
+  {
+    "recipe_id": "american-buttercream",
+    "name": "American Buttercream",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": 1.0,
+      "unit": "batch"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": [
+          {
+            "ingredient_id": "3d3b",
+            "name": "Vanilla",
+            "amount": 1.0,
+            "unit": "tbsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "69ce",
+            "name": "Confectioner's sugar",
+            "amount": 1.0,
+            "unit": "lb",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "97ba",
+            "name": "\"Unsalted butter",
+            "amount": 1.0,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "72ac",
+            "name": "Heavy whipping cream",
+            "amount": 3.0,
+            "unit": "tbsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "91bc",
+            "name": "Salt",
+            "amount": 0.5,
+            "unit": "tsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": null,
+        "instruction": "Whip the butter and salt for about a minute using a stand mixer fitted with a paddle attachment. You can use a hand mixer instead if needed.",
+        "component_ref_is_guess": false
+      },
+      {
+        "step_number": 2,
+        "component_ref": null,
+        "instruction": "Sift in the confectioner's sugar in several batches beating on low after each addition. Scrape the bowl down and repeat the process.",
+        "component_ref_is_guess": false
+      },
+      {
+        "step_number": 3,
+        "component_ref": null,
+        "instruction": "Add a tablespoon of the cream while mixing on low then add the vanilla. Beat until you have an even, fluffy consistency. You can add more cream or milk if desired for a thinner consistency.",
+        "component_ref_is_guess": false
+      }
+    ],
+    "extraction_confidence": 0.85,
+    "extraction_flags": [],
+    "needs_human_review": false,
+    "review_reason": null
+  },
+  {
+    "recipe_id": "bonde",
+    "name": "Bonde",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": 1.0,
+      "unit": "batch"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": [
+          {
+            "ingredient_id": "aa6c",
+            "name": "Besan",
+            "amount": 200.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "8eb1",
+            "name": "Baking soda",
+            "amount": null,
+            "unit": "tsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "3774",
+            "name": "Rice flour",
+            "amount": null,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "5a8a",
+            "name": "Water",
+            "amount": 1.0,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "1eab",
+            "name": "Salt",
+            "amount": 1.0,
+            "unit": "tsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "2878",
+            "name": "\"Red",
+            "amount": 3.0,
+            "unit": "drop",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "ebb2",
+            "name": "Sugar",
+            "amount": 3.0,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "929b",
+            "name": "Water",
+            "amount": 3.0,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "2058",
+            "name": "Vegetable oil",
+            "amount": 3.0,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": null,
+        "instruction": "Shift besan, baking soda and rice flour in a bowl. Add water to make a batter. It should be of such consistency that it coats the back of a spoon with a thin layer of film. Keep aside for 30 mins.",
+        "component_ref_is_guess": false
+      },
+      {
+        "step_number": 2,
+        "component_ref": null,
+        "instruction": "Make a sugar syrup with equal parts of sugar and water.",
+        "component_ref_is_guess": false
+      },
+      {
+        "step_number": 3,
+        "component_ref": null,
+        "instruction": "Divide the batter in 3 parts - 80:10:10, add yellow, red and green food color in them respectively and mix well.",
+        "component_ref_is_guess": false
+      },
+      {
+        "step_number": 4,
+        "component_ref": null,
+        "instruction": "Heat oil to 350F. Using a jhara drop the batter on the hot oil. Fry for 3-4 minutes and drop them in the sugar syrup. Do not crowd the oil. Rinse and dry the jhara between every batch. If the droplets are creatging tails, the batter is too thick, add few drops of water and try again. Of the bondes are becoming flat, the batter is too thin, add bit of besan and try again.",
+        "component_ref_is_guess": false
+      }
+    ],
+    "extraction_confidence": 0.85,
+    "extraction_flags": [],
+    "needs_human_review": false,
+    "review_reason": null
+  },
+  {
+    "recipe_id": "chicken-biriyani",
+    "name": "Chicken Biriyani",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": 3.0,
+      "unit": "people"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": [
+          {
+            "ingredient_id": "a1ce",
+            "name": "Chicken",
+            "amount": 650.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "8beb",
+            "name": "Yoghurt",
+            "amount": 65.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "6cc5",
+            "name": "Salt",
+            "amount": 5.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "a1dd",
+            "name": "Chili powder",
+            "amount": 5.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "e136",
+            "name": "Biriyani masala powder",
+            "amount": 20.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "7ba4",
+            "name": "Fried onion",
+            "amount": 150.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "3477",
+            "name": "Oil",
+            "amount": 20.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "f527",
+            "name": "Ginger garlic paste",
+            "amount": 50.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "70ac",
+            "name": "Potatoes",
+            "amount": 2.0,
+            "unit": "piece",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "d1b2",
+            "name": "Rice",
+            "amount": 1.0,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "54ad",
+            "name": "Water",
+            "amount": 5.0,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "594d",
+            "name": "Eggs",
+            "amount": 2.0,
+            "unit": "piece",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": null,
+        "instruction": "Marinate the chicken with yogurt, ginger garlic paste, salt, red chili powder, biriyani masala and 3 Tablespoons of oil.",
+        "component_ref_is_guess": false
+      }
+    ],
+    "extraction_confidence": 0.85,
+    "extraction_flags": [],
+    "needs_human_review": false,
+    "review_reason": null
+  },
+  {
+    "recipe_id": "jaynagarer-moa",
+    "name": "Jaynagarer Moa",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": 12.0,
+      "unit": "pieces"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": [
+          {
+            "ingredient_id": "aca0",
+            "name": "Khoi",
+            "amount": 200.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "d5e3",
+            "name": "Khejur Gur (Patali Gur)",
+            "amount": 2.0,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "4a16",
+            "name": "Water",
+            "amount": 3.0,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "cae3",
+            "name": "Sugar",
+            "amount": 1.0,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "e335",
+            "name": "Khoa",
+            "amount": 200.0,
+            "unit": "g",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "3971",
+            "name": "Condensed milk",
+            "amount": 3.0,
+            "unit": "tbsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "3c36",
+            "name": "Ghee",
+            "amount": 2.0,
+            "unit": "tbsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "56ae",
+            "name": "Cardamom powder",
+            "amount": 2.0,
+            "unit": "tsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "90dd",
+            "name": "Raisins",
+            "amount": 0.5,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": null,
+        "instruction": "Check the khoi for husks and sort them out.",
+        "component_ref_is_guess": false
+      }
+    ],
+    "extraction_confidence": 0.85,
+    "extraction_flags": [],
+    "needs_human_review": false,
+    "review_reason": null
+  },
+  {
+    "recipe_id": "macher-chop",
+    "name": "Macher Chop",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": 10.0,
+      "unit": "pieces"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": [
+          {
+            "ingredient_id": "3f37",
+            "name": "Fish",
+            "amount": 0.66,
+            "unit": "lb",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "8bce",
+            "name": "Medium potatoes",
+            "amount": 2.0,
+            "unit": "piece",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "1b40",
+            "name": "Large onion",
+            "amount": 1.0,
+            "unit": "piece",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": null,
+        "instruction": "Heat 1 tbsp of mustard oil in a pan on medium heat.",
+        "component_ref_is_guess": false
+      }
+    ],
+    "extraction_confidence": 0.85,
+    "extraction_flags": [],
+    "needs_human_review": false,
+    "review_reason": null
+  },
+  {
+    "recipe_id": "mutton-biriyani",
+    "name": "Mutton Biriyani",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": 3.0,
+      "unit": "people"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": [
+          {
+            "ingredient_id": "799d",
+            "name": "Mutton",
+            "amount": 1.5,
+            "unit": "lb",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "ff90",
+            "name": "Yoghurt",
+            "amount": 3.0,
+            "unit": "tbsp",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": null,
+        "instruction": "Marinate the mutton with yogurt, ginger garlic paste, salt.",
+        "component_ref_is_guess": false
+      }
+    ],
+    "extraction_confidence": 0.85,
+    "extraction_flags": [],
+    "needs_human_review": false,
+    "review_reason": null
+  },
+  {
+    "recipe_id": "payesh",
+    "name": "Payesh",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": 10.0,
+      "unit": "pieces"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": [
+          {
+            "ingredient_id": "88e4",
+            "name": "Milk",
+            "amount": 4.5,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "f288",
+            "name": "Gobindo bhog rice",
+            "amount": 0.5,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": null,
+        "instruction": "Take 1/4 cup of gobindo bhog rice in a bowl.",
+        "component_ref_is_guess": false
+      }
+    ],
+    "extraction_confidence": 0.85,
+    "extraction_flags": [],
+    "needs_human_review": false,
+    "review_reason": null
+  },
+  {
+    "recipe_id": "sondesh",
+    "name": "Sondesh",
+    "source": "seed",
+    "is_recipe": true,
+    "base_servings": {
+      "amount": 6.0,
+      "unit": "people"
+    },
+    "components": [
+      {
+        "component_name": "main",
+        "ingredients": [
+          {
+            "ingredient_id": "96fd",
+            "name": "Whole Milk",
+            "amount": 4.0,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          },
+          {
+            "ingredient_id": "26d3",
+            "name": "Nolen Gur",
+            "amount": 1.0,
+            "unit": "cup",
+            "gram_equivalent": null,
+            "non_standard_unit": false
+          }
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "component_ref": null,
+        "instruction": "Take a pan add little water in it and then add the milk.",
+        "component_ref_is_guess": false
+      }
+    ],
+    "extraction_confidence": 0.85,
+    "extraction_flags": [],
+    "needs_human_review": false,
+    "review_reason": null
+  }
+]
