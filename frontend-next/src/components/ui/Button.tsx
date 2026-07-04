@@ -1,12 +1,14 @@
 import { ButtonHTMLAttributes, forwardRef } from "react";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "accent" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md";
 
 const variantClasses: Record<Variant, string> = {
-  primary: "bg-brand text-white hover:bg-brand-hover disabled:bg-brand/50",
-  secondary: "bg-surface text-foreground border border-border hover:bg-stone-50 disabled:opacity-50",
-  ghost: "bg-transparent text-foreground hover:bg-stone-100 disabled:opacity-50",
+  // Dark text on the gold brand color reads better than white (better contrast).
+  primary: "bg-brand text-ink hover:bg-brand-hover disabled:bg-brand/50",
+  accent: "bg-accent text-white hover:bg-accent-hover disabled:bg-accent/50",
+  secondary: "bg-surface text-foreground border border-border hover:bg-surface-muted disabled:opacity-50",
+  ghost: "bg-transparent text-foreground hover:bg-surface-muted disabled:opacity-50",
   danger: "bg-danger text-white hover:bg-danger/90 disabled:bg-danger/50",
 };
 

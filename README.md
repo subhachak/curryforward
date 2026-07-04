@@ -66,8 +66,8 @@ secret never sits in `localStorage` or gets attached to every request.
 
 | Role | How | Can do |
 |---|---|---|
-| **Admin** (you) | Log in at `/login` with the `ADMIN_TOKEN` value | Fork recipes, persist chat customizations as new versions, approve/reject the review queue, persist newly generated recipes |
-| **Guest** (anyone else) | Not logged in | Browse all recipes, use chat to customize, generate new recipes — but the result is a **session-only preview**: not saved, not forkable, gone on refresh |
+| **Admin** (you) | Click the small icon near the footer, or go to `/login`, with the `ADMIN_TOKEN` value | Fork/edit/delete recipes, persist chat customizations as new versions, draft and save new recipes conversationally, approve/reject the review queue |
+| **Guest** (anyone else) | Not logged in | Browse all recipes, use the assistant to search or customize a recipe — but the result is a **session-only preview**: not saved, not forkable, gone on refresh |
 
 Enforced server-side (`app/auth.py`), not just hidden in the UI — a guest hitting
 the API directly gets a `403` on fork/review-decide, not just a missing button.
@@ -126,9 +126,46 @@ curryforward/
 │   └── .env.example
 ├── frontend-next/             # Next.js (TypeScript, Tailwind, App Router)
 │   └── src/
-│       ├── app/               # /, /login, /recipe routes
-│       ├── components/        # NavBar, RecipeCard, ChatPanel, ui/ design system
-│       ├── context/           # AuthContext, ToastContext
-│       └── lib/                # api client, shared types
+│       ├── app/               # / (marketing), /recipes (browse), /recipe, /login
+│       ├── components/        # NavBar, RecipeCard, NutritionCard, assistant/, ui/ design system
+│       ├── context/           # AuthContext, ToastContext, RecipesContext, AssistantContext
+│       └── lib/                # api client, shared types, assistant NL heuristics
 └── README.md
 ```
+
+## Frontend tour
+
+- **`/`** — marketing/intro page: what Curryforward is, what's new, no recipe
+  grid (that's `/recipes`).
+- **`/recipes`** — browse all recipes, filter by category/cuisine tag, search.
+  Admins get a **+ New recipe** button (manual form, `/recipe/edit`).
+- **`/recipe?id=`** — a single recipe: ingredients, steps, and a Nutrition
+  Facts panel styled like a real product label (calories, per-serving macros,
+  rough %DV, ingredient list), sticky in the right column on desktop. Admins
+  get **Edit** (manual form), **Fork**, and **Delete** (with a confirm step —
+  deletion is permanent) buttons.
+- **The search bar *is* the assistant** (`components/assistant/AssistantSearchBar.tsx`,
+  lives in the nav) — type a search, a customization request, or a whole
+  recipe draft into the same box; a dropdown below it carries the
+  conversation. Off a recipe page it searches recipes (client-side keyword
+  match) and, for admins, drafts a new recipe conversationally. On a recipe
+  page it's automatically focused on that recipe and forwards messages to
+  `/api/recipes/{id}/chat` — guests get a session-only preview, admins get a
+  persisted new version. There's no backend intent-classifier; routing
+  between search/customize/create is light keyword heuristics in
+  `lib/assistantHeuristics.ts`.
+- **Conversational recipe drafting** (admin only): paste a messy recipe you
+  found somewhere, or just name a dish, into the search bar. It's sent to
+  `POST /api/recipes/draft`, which structures/invents a recipe (web search
+  for grounding when you just gave a dish name) — nothing is saved yet. Keep
+  refining in the same conversation ("make it vegan", "double the servings")
+  and click **Save recipe** in the chat once you're happy; that calls the
+  regular `POST /api/recipes` create endpoint.
+- **Every AI conversation carries full history** — both the per-recipe
+  customize chat and the recipe-drafting chat send prior turns
+  (`ChatHistoryTurn[]`) with each request, so "actually make that lime zest
+  instead" correctly resolves against what you asked for two messages ago,
+  not just the latest message in isolation.
+- **Admin access is deliberately subtle**: a small icon near the footer
+  (`components/AuthFooterControl.tsx`), not a nav badge — click it to log in
+  or (if already admin) log out.

@@ -1,9 +1,10 @@
 import type {
+  ChatHistoryTurn,
   ChatResult,
-  GenerateRequest,
-  GenerateResult,
+  DraftRecipeResult,
   RecipeDetail,
   RecipeSummary,
+  RecipeUpsertRequest,
   ReviewQueueItem,
   Role,
 } from "./types";
@@ -41,15 +42,21 @@ export const api = {
   getHistory: (recipeId: string) => apiFetch<RecipeDetail[]>(`/recipes/${recipeId}/history`),
   forkRecipe: (recipeId: string) =>
     apiFetch<RecipeDetail>(`/recipes/${recipeId}/fork`, { method: "POST" }),
-  chat: (recipeId: string, message: string) =>
+  createRecipe: (req: RecipeUpsertRequest) =>
+    apiFetch<RecipeDetail>("/recipes", { method: "POST", body: JSON.stringify(req) }),
+  updateRecipe: (recipeId: string, req: RecipeUpsertRequest) =>
+    apiFetch<RecipeDetail>(`/recipes/${recipeId}`, { method: "PUT", body: JSON.stringify(req) }),
+  deleteRecipe: (recipeId: string) =>
+    apiFetch<{ deleted: string }>(`/recipes/${recipeId}`, { method: "DELETE" }),
+  chat: (recipeId: string, message: string, history: ChatHistoryTurn[] = []) =>
     apiFetch<ChatResult>(`/recipes/${recipeId}/chat`, {
       method: "POST",
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, history }),
     }),
-  generateRecipe: (req: GenerateRequest) =>
-    apiFetch<GenerateResult>("/recipes/generate", {
+  draftRecipe: (message: string, history: ChatHistoryTurn[] = [], draft: DraftRecipeResult | null = null) =>
+    apiFetch<DraftRecipeResult>("/recipes/draft", {
       method: "POST",
-      body: JSON.stringify(req),
+      body: JSON.stringify({ message, history, draft }),
     }),
 
   reviewQueue: () => apiFetch<ReviewQueueItem[]>("/review-queue"),

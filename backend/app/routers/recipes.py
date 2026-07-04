@@ -8,15 +8,32 @@ from sqlalchemy.orm import Session
 
 from ..auth import get_role, require_admin
 from ..db import get_db
-from ..llm_agent import customize_recipe, generate_recipe_for_gap, is_configured
+from ..llm_agent import (
+    customize_recipe,
+    draft_recipe_from_conversation,
+    generate_recipe_for_gap,
+    is_configured,
+)
 from ..models import RecipeVersion, ReviewQueueItem
 from ..nutrition import compute_nutrition
 
 router = APIRouter(prefix="/api")
 
 
+class HistoryTurn(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
 class ChatRequest(BaseModel):
     message: str
+    history: list[HistoryTurn] = []
+
+
+class DraftRequest(BaseModel):
+    message: str
+    history: list[HistoryTurn] = []
+    draft: dict | None = None  # the in-progress recipe from a prior turn, if any
 
 
 class GenerateRequest(BaseModel):
@@ -28,6 +45,18 @@ class GenerateRequest(BaseModel):
 
 class ReviewDecision(BaseModel):
     approved: bool
+
+
+class RecipeUpsertRequest(BaseModel):
+    """Manual (no-AI) create/edit — admin types everything in directly."""
+
+    name: str
+    category: str | None = None
+    cuisine_tags: list[str] = []
+    base_servings_amount: float | None = None
+    base_servings_unit: str = "servings"
+    components: list[dict] = []
+    steps: list[dict] = []
 
 
 @router.get("/recipes")
@@ -44,8 +73,10 @@ def list_recipes(db: Session = Depends(get_db)):
             "version_id": r.version_id,
             "name": r.name,
             "category": r.category,
+            "cuisine_tags": r.cuisine_tags or [],
             "lineage": r.lineage,
             "source": r.source,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
         }
         for r in heads
     ]
@@ -74,6 +105,116 @@ def get_history(recipe_id: str, db: Session = Depends(get_db)):
     return [v.to_dict() for v in versions]
 
 
+@router.post("/recipes")
+def create_recipe(
+    req: RecipeUpsertRequest,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
+    """Manual creation — admin enters every field directly, no AI involved.
+    New recipe_id, own lineage (distinct from 'generated' or 'seed')."""
+    nutrition = compute_nutrition(req.components)
+    recipe_id = f"manual-{uuid.uuid4().hex[:8]}"
+    version = RecipeVersion(
+        recipe_id=recipe_id,
+        parent_version_id=None,
+        lineage="manual",
+        name=req.name,
+        category=req.category,
+        cuisine_tags=req.cuisine_tags,
+        base_servings_amount=req.base_servings_amount,
+        base_servings_unit=req.base_servings_unit,
+        components=req.components,
+        steps=req.steps,
+        nutrition=nutrition,
+        source="manual",
+        is_current_head=True,
+    )
+    db.add(version)
+    db.commit()
+    return version.to_dict()
+
+
+@router.put("/recipes/{recipe_id}")
+def update_recipe(
+    recipe_id: str,
+    req: RecipeUpsertRequest,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
+    """Manual edit — admin-supplied fields become a new version of the same
+    recipe_id (same linear-history pattern as chat customization, just
+    without the LLM in the loop)."""
+    current = (
+        db.query(RecipeVersion)
+        .filter(RecipeVersion.recipe_id == recipe_id, RecipeVersion.is_current_head == True)  # noqa: E712
+        .first()
+    )
+    if not current:
+        raise HTTPException(404, "Recipe not found")
+
+    nutrition = compute_nutrition(req.components)
+    current.is_current_head = False
+    new_version = RecipeVersion(
+        recipe_id=recipe_id,
+        parent_version_id=current.version_id,
+        lineage="edit",
+        name=req.name,
+        category=req.category,
+        cuisine_tags=req.cuisine_tags,
+        base_servings_amount=req.base_servings_amount,
+        base_servings_unit=req.base_servings_unit,
+        components=req.components,
+        steps=req.steps,
+        nutrition=nutrition,
+        source="manual_edit",
+        is_current_head=True,
+    )
+    db.add(new_version)
+    db.commit()
+    return new_version.to_dict()
+
+
+@router.delete("/recipes/{recipe_id}")
+def delete_recipe(
+    recipe_id: str,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
+    """Permanently deletes every version of this recipe_id. Forks made from
+    it keep their own copied data (no live reference), so they're unaffected."""
+    versions = db.query(RecipeVersion).filter(RecipeVersion.recipe_id == recipe_id).all()
+    if not versions:
+        raise HTTPException(404, "Recipe not found")
+    for v in versions:
+        db.delete(v)
+    db.commit()
+    return {"deleted": recipe_id}
+
+
+@router.post("/recipes/draft")
+def draft_recipe(req: DraftRequest, role: str = Depends(require_admin)):
+    """
+    Conversational, admin-only recipe drafting — the create-time counterpart
+    to /recipes/{id}/chat. Paste a natural-language draft, name a dish idea
+    (web search fills in technique), or ask to refine the `draft` from a
+    prior turn. Never touches the database; once satisfied, the admin saves
+    the result with a separate POST /api/recipes call.
+    """
+    if not is_configured():
+        raise HTTPException(400, "ANTHROPIC_API_KEY not set — add it to backend/.env")
+
+    try:
+        result = draft_recipe_from_conversation(
+            req.message,
+            history=[h.model_dump() for h in req.history],
+            current_draft=req.draft,
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Recipe drafting failed: {e}")
+    return result
+
+
 @router.post("/recipes/{recipe_id}/chat")
 def chat_customize(
     recipe_id: str,
@@ -99,7 +240,9 @@ def chat_customize(
         raise HTTPException(400, "ANTHROPIC_API_KEY not set — add it to backend/.env")
 
     try:
-        result = customize_recipe(current.to_dict(), req.message)
+        result = customize_recipe(
+            current.to_dict(), req.message, history=[h.model_dump() for h in req.history]
+        )
     except Exception as e:
         raise HTTPException(500, f"LLM customization failed: {e}")
 

@@ -33,8 +33,10 @@ export interface RecipeSummary {
   version_id: string;
   name: string;
   category: string | null;
+  cuisine_tags: string[];
   lineage: string;
   source: string;
+  created_at: string | null;
 }
 
 export interface RecipeDetail {
@@ -71,14 +73,27 @@ export interface ChatResult {
   note?: string;
 }
 
-export interface GenerateRequest {
-  dish_name: string;
-  dietary: string[];
-  cuisine_style?: string;
-  flavor_profile: string[];
+export interface RecipeUpsertRequest {
+  name: string;
+  category: string | null;
+  cuisine_tags: string[];
+  base_servings_amount: number | null;
+  base_servings_unit: string;
+  components: RecipeComponent[];
+  steps: RecipeStep[];
 }
 
-export interface GenerateResult extends RecipeDetail {
-  persisted: boolean;
-  note?: string;
+export interface ChatHistoryTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface DraftRecipeResult {
+  name: string;
+  category: string | null;
+  cuisine_tags: string[];
+  base_servings: { amount: number | null; unit: string };
+  components: RecipeComponent[];
+  steps: RecipeStep[];
+  change_summary: string;
 }
