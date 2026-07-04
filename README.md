@@ -10,36 +10,69 @@ Excel/Sheet seed → recipe-pipeline (normalization + human review gate)
         → Recipe Store (versioned: fork = new lineage, edit = new version)
         → Nutrition Engine (heuristic v0, per-version snapshot)
         → LLM Agent (chat customization + web-search-informed generation)
-    → Frontend (single-file HTML/JS, no build step)
+        → Auth (signed httpOnly session cookie via a real /login form)
+    → Frontend (Next.js/TypeScript/Tailwind, App Router)
 ```
 
 ## Run it locally
+
+Two processes in dev — the backend API and the Next.js dev server, which proxies
+`/api/*` to the backend so the browser only ever talks to one origin (needed for
+the session cookie to work without extra CORS config).
+
+**Backend** (terminal 1):
 
 ```bash
 cd backend
 pip install -r requirements.txt
 cp .env.example .env
 # Edit .env: add ANTHROPIC_API_KEY (for chat/generate) and set ADMIN_TOKEN
-# to any secret string of your choosing.
+# to any secret string of your choosing — that's also your /login password.
 
 uvicorn app.main:app --reload
 ```
 
-Then open **http://127.0.0.1:8000** in your browser. That's it — one command, one process, serves both API and frontend.
+**Frontend** (terminal 2):
+
+```bash
+cd frontend-next
+npm install
+npm run dev
+```
+
+Then open **http://localhost:3000**.
+
+### Production / single-process
+
+Build the frontend and let FastAPI serve it (no separate Node process needed):
+
+```bash
+cd frontend-next && npm install && npm run build   # writes frontend-next/out/
+cd ../backend && uvicorn app.main:app
+```
+
+Open **http://127.0.0.1:8000** — FastAPI serves the exported static site at `/`
+and the API at `/api`, same origin, so the session cookie and relative
+`fetch("/api/...")` calls both just work.
 
 ## Access model
 
-This is single-shared-secret, not multi-user accounts — appropriate for
-"I'm running this on my own laptop and might let family/friends try it,"
-not a production auth system.
+Still single-shared-secret (`ADMIN_TOKEN`), not multi-user accounts — appropriate
+for "I'm running this on my own laptop and might let family/friends try it," not
+a production auth system. What changed from v0: instead of pasting that secret
+into a token field on every visit, there's a real **/login** page. It exchanges
+the secret for a signed, httpOnly session cookie (`app/auth.py`), so the raw
+secret never sits in `localStorage` or gets attached to every request.
 
 | Role | How | Can do |
 |---|---|---|
-| **Admin** (you) | Enter the `ADMIN_TOKEN` value in the app's token field | Fork recipes, persist chat customizations as new versions, approve/reject the review queue, persist newly generated recipes |
-| **Guest** (anyone else) | No token, or wrong token | Browse all recipes, use chat to customize — but the result is a **session-only preview**: not saved, not forkable, gone on refresh |
+| **Admin** (you) | Log in at `/login` with the `ADMIN_TOKEN` value | Fork recipes, persist chat customizations as new versions, approve/reject the review queue, persist newly generated recipes |
+| **Guest** (anyone else) | Not logged in | Browse all recipes, use chat to customize, generate new recipes — but the result is a **session-only preview**: not saved, not forkable, gone on refresh |
 
 Enforced server-side (`app/auth.py`), not just hidden in the UI — a guest hitting
 the API directly gets a `403` on fork/review-decide, not just a missing button.
+The old `X-Admin-Token` header still works too (useful for scripts/tests), checked
+alongside the session cookie.
 
 ## What's seeded
 
@@ -79,7 +112,8 @@ Both are locked in as regression tests in `recipe-pipeline/tests/test_pipeline.p
 curryforward/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py           # FastAPI entrypoint, mounts frontend + API
+│   │   ├── main.py           # FastAPI entrypoint, mounts frontend export + API
+│   │   ├── auth.py           # role model + /api/auth/login, /api/auth/logout
 │   │   ├── models.py         # RecipeVersion, ReviewQueueItem (SQLAlchemy)
 │   │   ├── db.py             # SQLite engine/session
 │   │   ├── nutrition.py      # heuristic nutrition engine (v0)
@@ -90,7 +124,11 @@ curryforward/
 │   ├── scripts/run_extraction.py
 │   ├── requirements.txt
 │   └── .env.example
-├── frontend/
-│   └── index.html            # single-file, no build step
+├── frontend-next/             # Next.js (TypeScript, Tailwind, App Router)
+│   └── src/
+│       ├── app/               # /, /login, /recipe routes
+│       ├── components/        # NavBar, RecipeCard, ChatPanel, ui/ design system
+│       ├── context/           # AuthContext, ToastContext
+│       └── lib/                # api client, shared types
 └── README.md
 ```

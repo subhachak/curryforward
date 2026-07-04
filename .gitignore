@@ -5,3 +5,9 @@ __pycache__/
 .venv/
 venv/
 .DS_Store
+
+# Next.js frontend
+frontend-next/node_modules/
+frontend-next/.next/
+frontend-next/out/
+frontend-next/next-env.d.ts
