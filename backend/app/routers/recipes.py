@@ -1,23 +1,48 @@
 from __future__ import annotations
 
+import logging
 import uuid
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..auth import get_role, require_admin
 from ..db import get_db
 from ..llm_agent import (
+    LLMInvalidResponseError,
     customize_recipe,
     draft_recipe_from_conversation,
     generate_recipe_for_gap,
     is_configured,
 )
-from ..models import RecipeVersion, ReviewQueueItem
+from ..models import RecipeAnalytics, RecipeVersion, ReviewQueueItem
 from ..nutrition import compute_nutrition
+from ..recipe_export import render_markdown
+from ..schemas import RecipeDetailResponse, RecipeSummaryResponse, RecipeUpsertRequest
+from ..services.recipe_versions import (
+    create_chat_edit_version,
+    create_manual_recipe,
+    current_head_query,
+    fork_recipe_version,
+)
 
 router = APIRouter(prefix="/api")
+logger = logging.getLogger(__name__)
+
+
+def _increment_analytics(db: Session, recipe_id: str, field: str) -> None:
+    """Get-or-create-then-increment. Non-atomic (read-modify-write) — fine
+    for a single-admin local SQLite app with no concurrent writers; a lost
+    update under a race would just undercount by one, never corrupt state."""
+    row = db.query(RecipeAnalytics).filter(RecipeAnalytics.recipe_id == recipe_id).first()
+    if row is None:
+        row = RecipeAnalytics(recipe_id=recipe_id)
+        db.add(row)
+        db.flush()
+    setattr(row, field, getattr(row, field) + 1)
+    db.commit()
 
 
 class HistoryTurn(BaseModel):
@@ -47,26 +72,19 @@ class ReviewDecision(BaseModel):
     approved: bool
 
 
-class RecipeUpsertRequest(BaseModel):
-    """Manual (no-AI) create/edit — admin types everything in directly."""
-
-    name: str
-    category: str | None = None
-    cuisine_tags: list[str] = []
-    base_servings_amount: float | None = None
-    base_servings_unit: str = "servings"
-    components: list[dict] = []
-    steps: list[dict] = []
-
-
-@router.get("/recipes")
-def list_recipes(db: Session = Depends(get_db)):
-    """Returns the current-head version of every distinct recipe_id."""
-    heads = (
-        db.query(RecipeVersion)
-        .filter(RecipeVersion.is_current_head == True)  # noqa: E712
-        .all()
+@router.get("/recipes", response_model=list[RecipeSummaryResponse], response_model_exclude_none=True)
+def list_recipes(db: Session = Depends(get_db), role: str = Depends(get_role)):
+    """Returns the current-head version of every distinct recipe_id. Draft
+    (unpublished, e.g. still-in-research) and soft-deleted recipes are
+    invisible to guests; admins see drafts too (with `status` attached) but
+    never soft-deleted ones — those only appear via GET /api/admin/recipes/trash."""
+    query = db.query(RecipeVersion).filter(
+        RecipeVersion.is_current_head == True,  # noqa: E712
+        RecipeVersion.deleted_at.is_(None),
     )
+    if role != "admin":
+        query = query.filter(RecipeVersion.status == "published")
+    heads = query.all()
     return [
         {
             "recipe_id": r.recipe_id,
@@ -76,26 +94,53 @@ def list_recipes(db: Session = Depends(get_db)):
             "cuisine_tags": r.cuisine_tags or [],
             "lineage": r.lineage,
             "source": r.source,
+            "hero_image_url": r.hero_image_url,
             "created_at": r.created_at.isoformat() if r.created_at else None,
+            **({"status": r.status or "published"} if role == "admin" else {}),
         }
         for r in heads
     ]
 
 
-@router.get("/recipes/{recipe_id}")
-def get_recipe(recipe_id: str, db: Session = Depends(get_db)):
-    version = (
-        db.query(RecipeVersion)
-        .filter(RecipeVersion.recipe_id == recipe_id, RecipeVersion.is_current_head == True)  # noqa: E712
-        .first()
-    )
-    if not version:
+@router.get("/recipes/{recipe_id}", response_model=RecipeDetailResponse)
+def get_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
+    version = current_head_query(db, recipe_id).first()
+    # 404 (not 403) for a guest hitting a draft — don't confirm it exists.
+    if not version or ((version.status or "published") != "published" and role != "admin"):
         raise HTTPException(404, "Recipe not found")
+    if role != "admin":
+        # Guest-only, so the admin's own edit/preview traffic doesn't inflate
+        # the count shown on the dashboard.
+        _increment_analytics(db, recipe_id, "view_count")
     return version.to_dict()
 
 
-@router.get("/recipes/{recipe_id}/history")
-def get_history(recipe_id: str, db: Session = Depends(get_db)):
+@router.get("/recipes/{recipe_id}/download")
+def download_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
+    version = (
+        db.query(RecipeVersion)
+        .filter(
+            RecipeVersion.recipe_id == recipe_id,
+            RecipeVersion.is_current_head == True,  # noqa: E712
+            RecipeVersion.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if not version or ((version.status or "published") != "published" and role != "admin"):
+        raise HTTPException(404, "Recipe not found")
+    if role != "admin":
+        _increment_analytics(db, recipe_id, "download_count")
+    text = render_markdown(version.to_dict())
+    slug = "".join(c if c.isalnum() or c in " -" else "" for c in version.name).strip().replace(" ", "-").lower()
+    return Response(
+        content=text,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{slug or "recipe"}.md"'},
+    )
+
+
+@router.get("/recipes/{recipe_id}/history", response_model=list[RecipeDetailResponse])
+def get_history(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(require_admin)):
     versions = (
         db.query(RecipeVersion)
         .filter(RecipeVersion.recipe_id == recipe_id)
@@ -112,24 +157,10 @@ def create_recipe(
     role: str = Depends(require_admin),
 ):
     """Manual creation — admin enters every field directly, no AI involved.
-    New recipe_id, own lineage (distinct from 'generated' or 'seed')."""
-    nutrition = compute_nutrition(req.components)
-    recipe_id = f"manual-{uuid.uuid4().hex[:8]}"
-    version = RecipeVersion(
-        recipe_id=recipe_id,
-        parent_version_id=None,
-        lineage="manual",
-        name=req.name,
-        category=req.category,
-        cuisine_tags=req.cuisine_tags,
-        base_servings_amount=req.base_servings_amount,
-        base_servings_unit=req.base_servings_unit,
-        components=req.components,
-        steps=req.steps,
-        nutrition=nutrition,
-        source="manual",
-        is_current_head=True,
-    )
+    New recipe_id, own lineage (distinct from 'generated' or 'seed'). Starts
+    as a draft — same "everything starts as a draft, publish explicitly when
+    ready" rule as fork and research, rather than going instantly live."""
+    version = create_manual_recipe(req)
     db.add(version)
     db.commit()
     return version.to_dict()
@@ -142,37 +173,12 @@ def update_recipe(
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
-    """Manual edit — admin-supplied fields become a new version of the same
-    recipe_id (same linear-history pattern as chat customization, just
-    without the LLM in the loop)."""
-    current = (
-        db.query(RecipeVersion)
-        .filter(RecipeVersion.recipe_id == recipe_id, RecipeVersion.is_current_head == True)  # noqa: E712
-        .first()
-    )
+    """Manual edit has been retired. Use the agentic research workspace for
+    recipe changes so there is one editing path and one publish/draft model."""
+    current = current_head_query(db, recipe_id).first()
     if not current:
         raise HTTPException(404, "Recipe not found")
-
-    nutrition = compute_nutrition(req.components)
-    current.is_current_head = False
-    new_version = RecipeVersion(
-        recipe_id=recipe_id,
-        parent_version_id=current.version_id,
-        lineage="edit",
-        name=req.name,
-        category=req.category,
-        cuisine_tags=req.cuisine_tags,
-        base_servings_amount=req.base_servings_amount,
-        base_servings_unit=req.base_servings_unit,
-        components=req.components,
-        steps=req.steps,
-        nutrition=nutrition,
-        source="manual_edit",
-        is_current_head=True,
-    )
-    db.add(new_version)
-    db.commit()
-    return new_version.to_dict()
+    raise HTTPException(410, "Manual recipe edits have been removed. Use the agentic editor.")
 
 
 @router.delete("/recipes/{recipe_id}")
@@ -181,13 +187,18 @@ def delete_recipe(
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
-    """Permanently deletes every version of this recipe_id. Forks made from
-    it keep their own copied data (no live reference), so they're unaffected."""
-    versions = db.query(RecipeVersion).filter(RecipeVersion.recipe_id == recipe_id).all()
-    if not versions:
+    """Soft-deletes the current-head version: sets deleted_at, hiding it from
+    every list (guest and admin) while keeping the row — and full version
+    history — intact in the DB. Only allowed while the recipe is a draft; a
+    published recipe must be unpublished first. Permanent removal is a
+    separate action, POST /api/admin/recipes/{id}/purge, reachable only from
+    Trash once this soft-delete has already happened."""
+    current = current_head_query(db, recipe_id).first()
+    if not current:
         raise HTTPException(404, "Recipe not found")
-    for v in versions:
-        db.delete(v)
+    if (current.status or "published") != "draft":
+        raise HTTPException(400, "Unpublish this recipe before deleting it.")
+    current.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return {"deleted": recipe_id}
 
@@ -229,12 +240,8 @@ def chat_customize(
       written to the database. Refreshing the page loses it, and there is
       no way for a guest to make it permanent (no fork, no save).
     """
-    current = (
-        db.query(RecipeVersion)
-        .filter(RecipeVersion.recipe_id == recipe_id, RecipeVersion.is_current_head == True)  # noqa: E712
-        .first()
-    )
-    if not current:
+    current = current_head_query(db, recipe_id).first()
+    if not current or ((current.status or "published") != "published" and role != "admin"):
         raise HTTPException(404, "Recipe not found")
     if not is_configured():
         raise HTTPException(400, "ANTHROPIC_API_KEY not set — add it to backend/.env")
@@ -243,8 +250,14 @@ def chat_customize(
         result = customize_recipe(
             current.to_dict(), req.message, history=[h.model_dump() for h in req.history]
         )
-    except Exception as e:
-        raise HTTPException(500, f"LLM customization failed: {e}")
+    except LLMInvalidResponseError as e:
+        raise HTTPException(502, str(e))
+    except Exception:
+        logger.exception("Unexpected recipe customization failure")
+        raise HTTPException(
+            500,
+            "The assistant could not apply that recipe edit. Try again or ask for a smaller change.",
+        )
 
     nutrition = compute_nutrition(result["components"])
 
@@ -262,25 +275,9 @@ def chat_customize(
                 "source": "guest_session_only",
             },
             "persisted": False,
-            "note": "You're in guest mode — this change is only visible for your current session and cannot be saved or forked.",
         }
 
-    current.is_current_head = False
-    new_version = RecipeVersion(
-        recipe_id=recipe_id,
-        parent_version_id=current.version_id,
-        lineage="edit",
-        name=current.name,
-        category=current.category,
-        cuisine_tags=current.cuisine_tags,
-        base_servings_amount=current.base_servings_amount,
-        base_servings_unit=current.base_servings_unit,
-        components=result["components"],
-        steps=result["steps"],
-        nutrition=nutrition,
-        source="user_customized",
-        is_current_head=True,
-    )
+    new_version = create_chat_edit_version(current, result)
     db.add(new_version)
     db.commit()
     return {"change_summary": result.get("change_summary", ""), "new_version": new_version.to_dict(), "persisted": True}
@@ -290,32 +287,15 @@ def chat_customize(
 def fork_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(require_admin)):
     """
     Fork: NEW recipe_id, independent history, parent_version_id points back
-    to the version it was forked from. Does not affect the original's history.
+    to the version it was forked from. Does not affect the original's
+    history. Starts as a draft — "copy a recipe to start a new draft" —
+    rather than instantly publishing a duplicate.
     """
-    current = (
-        db.query(RecipeVersion)
-        .filter(RecipeVersion.recipe_id == recipe_id, RecipeVersion.is_current_head == True)  # noqa: E712
-        .first()
-    )
+    current = current_head_query(db, recipe_id).first()
     if not current:
         raise HTTPException(404, "Recipe not found")
 
-    new_recipe_id = f"{recipe_id}-fork-{uuid.uuid4().hex[:6]}"
-    forked = RecipeVersion(
-        recipe_id=new_recipe_id,
-        parent_version_id=current.version_id,
-        lineage="fork",
-        name=f"{current.name} (fork)",
-        category=current.category,
-        cuisine_tags=current.cuisine_tags,
-        base_servings_amount=current.base_servings_amount,
-        base_servings_unit=current.base_servings_unit,
-        components=current.components,
-        steps=current.steps,
-        nutrition=current.nutrition,
-        source="seed",
-        is_current_head=True,
-    )
+    forked = fork_recipe_version(current)
     db.add(forked)
     db.commit()
     return forked.to_dict()
@@ -354,13 +334,14 @@ def generate_recipe(
             "category": result.get("category", "main"),
             "cuisine_tags": result.get("cuisine_tags", []),
             "base_servings": result["base_servings"],
+            "serving_size": result.get("serving_size") or {"amount": None, "unit": None},
             "components": result["components"],
             "steps": result["steps"],
             "nutrition": nutrition,
             "lineage": "session_preview",
             "source": "guest_session_only",
             "persisted": False,
-            "note": "Guest mode — this generated recipe isn't saved and can't be forked.",
+            "note": "This generated recipe isn't saved and can't be forked.",
         }
 
     recipe_id = f"gen-{uuid.uuid4().hex[:8]}"
@@ -373,6 +354,8 @@ def generate_recipe(
         cuisine_tags=result.get("cuisine_tags", []),
         base_servings_amount=result["base_servings"]["amount"],
         base_servings_unit=result["base_servings"]["unit"],
+        serving_size_amount=(result.get("serving_size") or {}).get("amount"),
+        serving_size_unit=(result.get("serving_size") or {}).get("unit"),
         components=result["components"],
         steps=result["steps"],
         nutrition=nutrition,
@@ -390,7 +373,7 @@ def whoami(role: str = Depends(get_role)):
 
 
 @router.get("/review-queue")
-def get_review_queue(db: Session = Depends(get_db)):
+def get_review_queue(db: Session = Depends(get_db), role: str = Depends(require_admin)):
     items = db.query(ReviewQueueItem).filter(ReviewQueueItem.status == "pending").all()
     return [i.to_dict() for i in items]
 

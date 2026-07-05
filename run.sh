@@ -7,7 +7,14 @@ cd "$(dirname "$0")"
 
 if [ ! -d backend/.venv ]; then
   echo "Setting up backend virtualenv..."
-  python3 -m venv backend/.venv
+  # Pinned to python3.11 specifically, not bare `python3` — the auto-research
+  # feature depends on crewai, which requires Python >=3.10,<3.14, and
+  # Homebrew's `python3` default has drifted to 3.14 (too new) on dev machines.
+  if ! command -v python3.11 >/dev/null 2>&1; then
+    echo "python3.11 is required (crewai doesn't support 3.14+). Install it with: brew install python@3.11"
+    exit 1
+  fi
+  python3.11 -m venv backend/.venv
   backend/.venv/bin/pip install -r backend/requirements.txt
 fi
 

@@ -13,7 +13,10 @@
     {
       "name": "frontend",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "cd frontend-next && npm run dev"],
+      "runtimeArgs": [
+        "-c",
+        "cd frontend-next && npm run dev"
+      ],
       "port": 3000
     }
   ]

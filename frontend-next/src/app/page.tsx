@@ -22,8 +22,8 @@ const FEATURES = [
     body: "Skip the scrolling. Tell the assistant what you're in the mood for, or ask it to customize a recipe on the spot.",
   },
   {
-    title: "Fork instead of losing the original",
-    body: "Want a different direction for a recipe? Fork it into its own lineage — the source recipe stays untouched.",
+    title: "Copy instead of losing the original",
+    body: "Want a different direction for a recipe? Copy it into its own lineage — the source recipe stays untouched.",
   },
 ];
 
@@ -74,8 +74,7 @@ export default function HomePage() {
                 &ldquo;Make this dessert dairy-free&rdquo;
               </li>
               <li className="rounded-lg bg-surface-muted px-3 py-2">
-                &ldquo;Create a new Thai green curry recipe&rdquo;{" "}
-                <span className="text-xs text-muted">(admin)</span>
+                &ldquo;Create a new Thai green curry recipe&rdquo;
               </li>
             </ul>
           </Card>

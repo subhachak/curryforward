@@ -2,32 +2,22 @@
 
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/context/ToastContext";
 
 // Deliberately subtle: earlier this was a prominent nav badge + button.
-// Now it's just an icon near the footer — admin access is there if you know
-// to look, but it doesn't compete with the assistant/search for attention.
+// Now it's just an icon near the footer, and it never announces role in
+// its own label — it's just a doorway to /login or /admin. Logging out
+// lives inside the /admin section, not on this icon.
 export function AuthFooterControl() {
-  const { isAdmin, loading, logout } = useAuth();
-  const { push } = useToast();
+  const { isAdmin, loading } = useAuth();
   const router = useRouter();
 
   if (loading) return null;
 
-  async function handleClick() {
-    if (isAdmin) {
-      await logout();
-      push("Logged out", "info");
-    } else {
-      router.push("/login");
-    }
-  }
-
   return (
     <button
-      onClick={handleClick}
-      title={isAdmin ? "Admin — click to log out" : "Admin log in"}
-      aria-label={isAdmin ? "Log out of admin" : "Admin log in"}
+      onClick={() => router.push(isAdmin ? "/admin" : "/login")}
+      title={isAdmin ? "Admin" : "Log in"}
+      aria-label={isAdmin ? "Admin" : "Log in"}
       className={`inline-flex h-6 w-6 items-center justify-center rounded-full transition-colors ${
         isAdmin ? "text-brand-hover hover:text-accent" : "text-muted/60 hover:text-muted"
       }`}

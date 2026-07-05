@@ -54,6 +54,11 @@ def test_guest_cannot_decide_review_queue():
     assert r.status_code == 403
 
 
+def test_guest_cannot_read_review_queue():
+    r = client.get("/api/review-queue")
+    assert r.status_code == 403
+
+
 def test_forking_original_recipe_leaves_it_unchanged():
     before = client.get("/api/recipes/bonde").json()
     client.post("/api/recipes/bonde/fork", headers=ADMIN_HEADERS)
@@ -89,3 +94,24 @@ def test_admin_session_cookie_authorizes_fork():
     r = session_client.post("/api/recipes/bonde/fork")
     assert r.status_code == 200
     assert r.json()["lineage"] == "fork"
+
+
+def test_upload_rejects_declared_image_with_invalid_body():
+    r = client.post(
+        "/api/uploads",
+        headers=ADMIN_HEADERS,
+        files={"file": ("fake.png", b"not actually a png", "image/png")},
+    )
+    assert r.status_code == 400
+    assert "not a valid supported image" in r.json()["detail"]
+
+
+def test_upload_rejects_content_type_mismatch():
+    png_body = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+    r = client.post(
+        "/api/uploads",
+        headers=ADMIN_HEADERS,
+        files={"file": ("fake.jpg", png_body, "image/jpeg")},
+    )
+    assert r.status_code == 400
+    assert "does not match" in r.json()["detail"]

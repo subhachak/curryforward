@@ -1,17 +1,11 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RecipeCard } from "@/components/RecipeCard";
-import { ReviewQueuePanel } from "@/components/ReviewQueuePanel";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/context/ToastContext";
 import { useRecipes } from "@/context/RecipesContext";
-import { api, ApiError } from "@/lib/api";
-import type { ReviewQueueItem } from "@/lib/types";
 
 function FilterChip({
   label,
@@ -37,35 +31,13 @@ function FilterChip({
 }
 
 function RecipesInner() {
-  const { isAdmin } = useAuth();
-  const { push } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { recipes, categories, tags, loading, reload } = useRecipes();
+  const { recipes, categories, tags, loading } = useRecipes();
 
   const query = (searchParams.get("q") || "").trim().toLowerCase();
   const category = searchParams.get("category") || "";
   const tag = searchParams.get("tag") || "";
-
-  const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>([]);
-
-  const loadReviewQueue = useCallback(async () => {
-    if (!isAdmin) {
-      setReviewQueue([]);
-      return;
-    }
-    try {
-      setReviewQueue(await api.reviewQueue());
-    } catch (e) {
-      push(e instanceof ApiError ? e.message : "Failed to load review queue", "error");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadReviewQueue();
-  }, [loadReviewQueue]);
 
   function setFilter(key: "category" | "tag", value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -91,16 +63,9 @@ function RecipesInner() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">All recipes</h1>
-          <p className="text-sm text-muted">Browse by category, cuisine, or search by name.</p>
-        </div>
-        {isAdmin && (
-          <Button size="sm" onClick={() => router.push("/recipe/edit")}>
-            + New recipe
-          </Button>
-        )}
+      <div>
+        <h1 className="text-2xl font-bold">All recipes</h1>
+        <p className="text-sm text-muted">Browse by category, cuisine, or search by name.</p>
       </div>
 
       {(categories.length > 0 || tags.length > 0) && (
@@ -127,8 +92,6 @@ function RecipesInner() {
           )}
         </div>
       )}
-
-      {isAdmin && <ReviewQueuePanel items={reviewQueue} onDecided={() => { reload(); loadReviewQueue(); }} />}
 
       {loading ? (
         <PageSpinner label="Loading recipes…" />

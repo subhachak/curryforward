@@ -1,0 +1,421 @@
+"use client";
+
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AutoResearchPanel } from "@/components/research/AutoResearchPanel";
+import { ModelPicker } from "@/components/research/ModelPicker";
+import { ResearchChatPanel, type DisplayMessage } from "@/components/research/ResearchChatPanel";
+import { ResearchDocumentPreview } from "@/components/research/ResearchDocumentPreview";
+import { Card, CardBody } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { PageSpinner } from "@/components/ui/Spinner";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
+import { useRecipes } from "@/context/RecipesContext";
+import { api, ApiError } from "@/lib/api";
+import { reconstructTranscript } from "@/lib/researchTranscript";
+import type { ResearchPatchPayload, ResearchTurnResult, RecipeResearchDetail } from "@/lib/types";
+
+function ResearchWorkspaceInner() {
+  const { isAdmin, loading: authLoading } = useAuth();
+  const { push } = useToast();
+  const { reload: reloadRecipes } = useRecipes();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const recipeId = searchParams.get("id");
+
+  const [recipe, setRecipe] = useState<RecipeResearchDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [messages, setMessages] = useState<DisplayMessage[]>([]);
+  const [pendingProposal, setPendingProposal] = useState<{ query: string; tool_use_id: string } | null>(null);
+  const [notesSuggestion, setNotesSuggestion] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [deciding, setDeciding] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+  const [previewMode, setPreviewMode] = useState(false);
+  const [confirmingPublish, setConfirmingPublish] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [mode, setMode] = useState<"guided" | "auto">("auto");
+
+  const nextId = useRef(0);
+  const kickedOff = useRef(false);
+  const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const promptTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function addMessage(role: DisplayMessage["role"], kind: DisplayMessage["kind"], text: string) {
+    setMessages((prev) => [...prev, { id: nextId.current++, role, kind, text }]);
+  }
+
+  const load = useCallback(async () => {
+    if (!recipeId) {
+      setError("No recipe specified.");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await api.getResearchRecipe(recipeId);
+      setRecipe(r);
+      const conversation = (r.research_conversation as {
+        messages?: unknown;
+        pending_tool_use?: { id: string; query: string } | null;
+      }) || {};
+      const transcript = reconstructTranscript(conversation.messages);
+      setMessages(transcript.map((t) => ({ id: nextId.current++, ...t })));
+      if (conversation.pending_tool_use) {
+        setPendingProposal({
+          query: conversation.pending_tool_use.query,
+          tool_use_id: conversation.pending_tool_use.id,
+        });
+      }
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to load this recipe");
+    } finally {
+      setLoading(false);
+    }
+  }, [recipeId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [load]);
+
+  const applyTurnResult = useCallback((result: ResearchTurnResult) => {
+    if (result.type === "search_proposal") {
+      setPendingProposal({ query: result.query, tool_use_id: result.tool_use_id });
+      return;
+    }
+    addMessage("assistant", "text", result.reply);
+    setRecipe(result.recipe);
+    setSaveStatus("saved");
+    if (result.notes_suggestion) setNotesSuggestion(result.notes_suggestion);
+  }, []);
+
+  const handleSend = useCallback(
+    async (message: string) => {
+      if (!recipeId) return;
+      addMessage("user", "text", message);
+      setSending(true);
+      try {
+        const result = await api.researchChat(recipeId, { message });
+        applyTurnResult(result);
+      } catch (e) {
+        addMessage("assistant", "text", e instanceof ApiError ? e.message : "Something went wrong.");
+      } finally {
+        setSending(false);
+      }
+    },
+    [recipeId, applyTurnResult]
+  );
+
+  // Kick off the guided-chat conversation automatically the first time the
+  // admin views that tab with a brand-new (no history yet) session, so they
+  // don't have to type the first message themselves. Gated on mode==="guided"
+  // — auto-research is the default landing tab now, and firing off a chat
+  // turn nobody looks at would just be a wasted LLM call.
+  useEffect(() => {
+    if (mode === "guided" && recipe && !kickedOff.current && messages.length === 0 && !pendingProposal) {
+      kickedOff.current = true;
+      handleSend(`Help me research and build a complete recipe for "${recipe.name}".`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recipe, mode]);
+
+  async function handleDecision(approved: boolean) {
+    if (!recipeId || !pendingProposal) return;
+    setDeciding(true);
+    if (approved) addMessage("assistant", "search", pendingProposal.query);
+    const { tool_use_id, query } = pendingProposal;
+    setPendingProposal(null);
+    try {
+      const result = await api.researchChat(recipeId, { tool_use_id, query, approved });
+      applyTurnResult(result);
+    } catch (e) {
+      addMessage("assistant", "text", e instanceof ApiError ? e.message : "Something went wrong.");
+    } finally {
+      setDeciding(false);
+    }
+  }
+
+  async function handleCommit(patch: ResearchPatchPayload) {
+    if (!recipeId) return;
+    setSaveStatus("saving");
+    try {
+      const updated = await api.patchResearch(recipeId, patch);
+      setRecipe(updated);
+      setSaveStatus("saved");
+    } catch (e) {
+      setSaveStatus("error");
+      push(e instanceof ApiError ? e.message : "Save failed", "error");
+    }
+  }
+
+  function handleModelChange(model: string) {
+    setRecipe((prev) => (prev ? { ...prev, research_model: model } : prev));
+    handleCommit({ model });
+  }
+
+  function handleAutoComplete(updated: RecipeResearchDetail) {
+    setRecipe(updated);
+    setSaveStatus("saved");
+    push("Auto-research complete — review the document on the right", "success");
+  }
+
+  function handleStartingPromptChange(value: string) {
+    setRecipe((prev) => (prev ? { ...prev, starting_prompt: value } : prev));
+    if (promptTimer.current) clearTimeout(promptTimer.current);
+    promptTimer.current = setTimeout(() => handleCommit({ starting_prompt: value }), 800);
+  }
+
+  async function handleRefineSection(section: string, instruction: string) {
+    if (!recipeId) return;
+    try {
+      const updated = await api.refineSection(recipeId, section, instruction);
+      setRecipe(updated);
+      push("Section refined", "success");
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Refinement failed", "error");
+    }
+  }
+
+  function handleNotesChange(value: string) {
+    setRecipe((prev) => (prev ? { ...prev, notes: value } : prev));
+    if (notesTimer.current) clearTimeout(notesTimer.current);
+    notesTimer.current = setTimeout(() => handleCommit({ notes: value }), 800);
+  }
+
+  function handleAcceptNotesSuggestion() {
+    if (!notesSuggestion) return;
+    const combined = recipe?.notes ? `${recipe.notes}\n${notesSuggestion}` : notesSuggestion;
+    setRecipe((prev) => (prev ? { ...prev, notes: combined } : prev));
+    handleCommit({ notes: combined });
+    setNotesSuggestion(null);
+  }
+
+  async function handlePublish(mode: "keep_both" | "replace_original" = "keep_both") {
+    if (!recipeId) return;
+    setPublishing(true);
+    try {
+      const published = await api.publishResearch(recipeId, mode);
+      await reloadRecipes();
+      push(mode === "replace_original" ? "Original recipe replaced" : "Published — this recipe is now visible to guests", "success");
+      router.push(`/recipe?id=${encodeURIComponent(published.recipe_id)}`);
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Publish failed", "error");
+    } finally {
+      setPublishing(false);
+      setConfirmingPublish(false);
+    }
+  }
+
+  if (authLoading) return <PageSpinner />;
+
+  if (!isAdmin) {
+    return (
+      <Card>
+        <CardBody className="text-center text-muted">
+          Log in to access this section.{" "}
+          <Link href="/login" className="underline">
+            Log in
+          </Link>
+          .
+        </CardBody>
+      </Card>
+    );
+  }
+
+  if (loading) return <PageSpinner label="Loading research session…" />;
+
+  if (error || !recipe) {
+    return (
+      <Card>
+        <CardBody className="text-center text-muted">{error || "Recipe not found"}</CardBody>
+      </Card>
+    );
+  }
+
+  const canPublish = Boolean(recipe.name && recipe.components.length && recipe.steps.length);
+  const isDraft = recipe.status === "draft";
+  const isLinkedEditDraft = isDraft && recipe.source === "revision_draft" && Boolean(recipe.parent_version_id);
+  const hasUnmatchedNutrition = Boolean(recipe.nutrition.unmatched_ingredients?.length);
+  const publishChecks = [
+    { label: "Name", done: Boolean(recipe.name) },
+    { label: "Ingredients", done: recipe.components.length > 0 },
+    { label: "Steps", done: recipe.steps.length > 0 },
+    { label: "Intro", done: Boolean(recipe.intro) },
+    { label: "Timing", done: recipe.prep_time_minutes != null || recipe.cook_time_minutes != null },
+    { label: "Image", done: Boolean(recipe.hero_image_url) },
+    { label: "Nutrition reviewed", done: !hasUnmatchedNutrition },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Link href="/admin" className="text-sm text-muted hover:underline">
+        &larr; Back to admin
+      </Link>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-ink">{recipe.name}</h1>
+          <div className="flex items-center gap-2 text-xs text-muted">
+            <Badge tone={isDraft ? "neutral" : "success"}>{isDraft ? "Draft" : "Published"}</Badge>
+            <span>{isDraft ? saveStatus === "saving" ? "Saving…" : saveStatus === "error" ? "Save failed" : "Saved" : "Read-only"}</span>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {isDraft ? (
+            <>
+              <ModelPicker value={recipe.research_model} onChange={handleModelChange} />
+              <Button variant="secondary" size="sm" onClick={() => setPreviewMode((v) => !v)}>
+                {previewMode ? "Edit" : "Preview as guest"}
+              </Button>
+              <Button size="sm" disabled={!canPublish} onClick={() => setConfirmingPublish(true)}>
+                Publish
+              </Button>
+            </>
+          ) : (
+            <Button variant="secondary" size="sm" onClick={() => router.push("/admin")}>
+              Back to dashboard
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {isDraft ? (
+        <>
+          <div className="flex gap-2 text-sm">
+            <button
+              type="button"
+              onClick={() => setMode("guided")}
+              className={`rounded-md px-3 py-1.5 font-medium ${
+                mode === "guided" ? "bg-brand text-ink" : "bg-surface-muted text-muted hover:text-foreground"
+              }`}
+            >
+              Guided chat
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("auto")}
+              className={`rounded-md px-3 py-1.5 font-medium ${
+                mode === "auto" ? "bg-brand text-ink" : "bg-surface-muted text-muted hover:text-foreground"
+              }`}
+            >
+              Auto-research
+            </button>
+          </div>
+
+          <Card>
+            <CardBody className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-semibold text-ink">Publish checklist</span>
+              {publishChecks.map((item) => (
+                <Badge key={item.label} tone={item.done ? "success" : "warning"}>
+                  {item.done ? "✓" : "!"} {item.label}
+                </Badge>
+              ))}
+            </CardBody>
+          </Card>
+        </>
+      ) : (
+        <Card>
+          <CardBody className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div className="text-muted">
+              Published recipes are read-only here. Start edits from the admin dashboard to create a draft copy.
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => router.push("/admin")}>
+              Open dashboard
+            </Button>
+          </CardBody>
+        </Card>
+      )}
+
+      {confirmingPublish && (
+        <Card className="border-brand/40 bg-brand-soft/40">
+          <CardBody className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm">
+              {isLinkedEditDraft ? (
+                <>
+                  Publish <strong>{recipe.name}</strong>? Choose whether this draft replaces the original recipe or becomes a separate recipe.
+                </>
+              ) : (
+                <>
+                  Publish <strong>{recipe.name}</strong>? It becomes visible to everyone browsing the site.
+                </>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setConfirmingPublish(false)}>
+                Cancel
+              </Button>
+              {isLinkedEditDraft && (
+                <Button variant="secondary" size="sm" loading={publishing} onClick={() => handlePublish("keep_both")}>
+                  Keep both
+                </Button>
+              )}
+              <Button size="sm" loading={publishing} onClick={() => handlePublish(isLinkedEditDraft ? "replace_original" : "keep_both")}>
+                {isLinkedEditDraft ? "Replace original" : "Yes, publish"}
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
+      {isDraft ? (
+        <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
+          <div className="lg:sticky lg:top-20 lg:h-[calc(100vh-8rem)]">
+            {mode === "guided" ? (
+              <ResearchChatPanel
+                messages={messages}
+                pendingProposal={pendingProposal}
+                sending={sending}
+                deciding={deciding}
+                onSend={handleSend}
+                onApprove={() => handleDecision(true)}
+                onDecline={() => handleDecision(false)}
+                notes={recipe.notes ?? ""}
+                onNotesChange={handleNotesChange}
+                notesSuggestion={notesSuggestion}
+                onAcceptNotesSuggestion={handleAcceptNotesSuggestion}
+                onDismissNotesSuggestion={() => setNotesSuggestion(null)}
+              />
+            ) : (
+              <AutoResearchPanel
+                recipe={recipe}
+                onComplete={handleAutoComplete}
+                onPromptChange={handleStartingPromptChange}
+              />
+            )}
+          </div>
+
+          <ResearchDocumentPreview
+            key={`${recipe.version_id}:${recipe.updated_at}`}
+            recipe={recipe}
+            previewMode={previewMode}
+            onCommit={handleCommit}
+            onRefine={handleRefineSection}
+          />
+        </div>
+      ) : (
+        <ResearchDocumentPreview
+          key={`${recipe.version_id}:${recipe.updated_at}`}
+          recipe={recipe}
+          previewMode
+          onCommit={() => undefined}
+          onRefine={async () => undefined}
+        />
+      )}
+    </div>
+  );
+}
+
+export default function ResearchWorkspacePage() {
+  return (
+    <Suspense fallback={<PageSpinner label="Loading…" />}>
+      <ResearchWorkspaceInner />
+    </Suspense>
+  );
+}

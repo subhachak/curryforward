@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, String, Boolean
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String, Text, Boolean
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -14,37 +14,79 @@ def _uid() -> str:
     return uuid.uuid4().hex[:12]
 
 
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 class RecipeVersion(Base):
     """
-    Each row is one immutable version. 'Update' creates a new row with the
-    same recipe_id and parent_version_id pointing at the prior version
-    (linear history). 'Fork' creates a new recipe_id with parent_version_id
-    pointing at the version it was forked from (branching history).
+    Each row is one version. While `status == "draft"` a row is mutated in
+    place (research autosave) — no new version per edit. Once
+    `status == "published"`, the existing immutable-new-version-per-edit
+    behavior applies again (see routers/recipes.py's update_recipe).
     """
     __tablename__ = "recipe_versions"
 
     version_id = Column(String, primary_key=True, default=_uid)
     recipe_id = Column(String, index=True, nullable=False)
     parent_version_id = Column(String, ForeignKey("recipe_versions.version_id"), nullable=True)
-    lineage = Column(String, default="seed")  # seed | edit | fork | generated | user_customized
+    lineage = Column(String, default="seed")  # seed | edit | fork | generated | user_customized | researched
 
     name = Column(String, nullable=False)
     category = Column(String, nullable=True)
     cuisine_tags = Column(JSON, default=list)
+    hero_image_url = Column(String, nullable=True)
 
     base_servings_amount = Column(Float, nullable=True)
     base_servings_unit = Column(String, default="servings")
+    serving_size_amount = Column(Float, nullable=True)
+    serving_size_unit = Column(String, nullable=True)
 
     components = Column(JSON, default=list)   # [{component_name, ingredients:[...]}]
-    steps = Column(JSON, default=list)        # [{step_number, component_ref, instruction}]
+    steps = Column(JSON, default=list)        # [{step_number, component_ref, instruction, image_url}]
     nutrition = Column(JSON, default=dict)    # computed nutrition snapshot, per this version
 
-    source = Column(String, default="seed")   # seed | web_augmented | generated | user_customized
-    is_current_head = Column(Boolean, default=True)  # latest version for this recipe_id
+    # Research-flow content — all optional, guest-safe (included in to_dict()).
+    intro = Column(Text, nullable=True)
+    history = Column(Text, nullable=True)       # origin/tradition/historical significance, one narrative field
+    prep_time_minutes = Column(Integer, nullable=True)
+    cook_time_minutes = Column(Integer, nullable=True)
+    tips = Column(JSON, default=list)           # list[str]
+    watch_outs = Column(JSON, default=list)     # list[str]
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    # Admin-only scratch fields — never sent to guests, excluded from to_dict().
+    notes = Column(Text, nullable=True)
+    research_conversation = Column(JSON, nullable=True)  # {"messages": [...], "pending_tool_use": {...}|None}
+    research_model = Column(String, nullable=True)  # LiteLLM model string for this session, e.g. "anthropic/claude-sonnet-5"
+    starting_prompt = Column(Text, nullable=True)  # the admin's freeform kickoff text — a name, a description, or a full pasted draft
+
+    # Auto-research (CrewAI) runs in a background thread since it can take a
+    # minute or more — longer than typical proxy/gateway timeouts — so the
+    # kickoff request returns immediately and the frontend polls this recipe
+    # for these fields instead of holding one long HTTP request open.
+    auto_research_status = Column(String, nullable=True)  # None | "running" | "error"
+    auto_research_error = Column(Text, nullable=True)
+    auto_research_progress = Column(JSON, nullable=True)  # list of completed section keys: history/ingredients/steps/tips/merge
+    # Fencing token: set to a fresh id on every /auto/run kickoff. A
+    # background job only applies its result if this still matches the id it
+    # was started with — /auto/cancel clears it so an abandoned job's result
+    # is silently discarded instead of overwriting a cancelled/superseded run.
+    auto_research_job_id = Column(String, nullable=True)
+
+    status = Column(String, default="published")  # draft | published
+    source = Column(String, default="seed")   # seed | web_augmented | generated | user_customized | researched
+    is_current_head = Column(Boolean, default=True)  # latest version for this recipe_id
+    # Soft-delete marker on the current-head row only — hides the recipe from
+    # every list (guest and admin) while keeping the row (and full history)
+    # intact. Restore clears it. Permanent removal is a separate "purge"
+    # action gated on this already being set (see routers/admin.py).
+    deleted_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=_now)
+    updated_at = Column(DateTime, default=_now, onupdate=_now)
 
     def to_dict(self) -> dict:
+        """Guest-safe shape — excludes notes and research_conversation."""
         return {
             "version_id": self.version_id,
             "recipe_id": self.recipe_id,
@@ -53,13 +95,91 @@ class RecipeVersion(Base):
             "name": self.name,
             "category": self.category,
             "cuisine_tags": self.cuisine_tags or [],
+            "hero_image_url": self.hero_image_url,
             "base_servings": {"amount": self.base_servings_amount, "unit": self.base_servings_unit},
+            "serving_size": {"amount": self.serving_size_amount, "unit": self.serving_size_unit},
             "components": self.components or [],
             "steps": self.steps or [],
             "nutrition": self.nutrition or {},
+            "intro": self.intro,
+            "history": self.history,
+            "prep_time_minutes": self.prep_time_minutes,
+            "cook_time_minutes": self.cook_time_minutes,
+            "tips": self.tips or [],
+            "watch_outs": self.watch_outs or [],
+            "status": self.status or "published",
             "source": self.source,
             "is_current_head": self.is_current_head,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+    def to_research_dict(self) -> dict:
+        """Admin-only shape for the research workspace — adds notes + conversation state."""
+        return {
+            **self.to_dict(),
+            "notes": self.notes,
+            "research_conversation": self.research_conversation or {"messages": [], "pending_tool_use": None},
+            "research_model": self.research_model,
+            "starting_prompt": self.starting_prompt,
+            "auto_research_status": self.auto_research_status,
+            "auto_research_error": self.auto_research_error,
+            "auto_research_progress": self.auto_research_progress or [],
+        }
+
+
+class RecipeAnalytics(Base):
+    """Simple per-recipe counters — keyed by recipe_id (not version_id),
+    since a version changes on every edit and counts must survive that.
+    Not an event log/time-series; just aggregate totals, matching the scope
+    of "views, downloads" the admin dashboard actually asked for."""
+    __tablename__ = "recipe_analytics"
+
+    recipe_id = Column(String, primary_key=True)
+    view_count = Column(Integer, default=0, nullable=False)
+    download_count = Column(Integer, default=0, nullable=False)
+    updated_at = Column(DateTime, default=_now, onupdate=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "recipe_id": self.recipe_id,
+            "view_count": self.view_count,
+            "download_count": self.download_count,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class ResearchJob(Base):
+    """Audit trail for auto-research runs. The current recipe row still keeps
+    the live polling fields; this table preserves the historical run inputs,
+    progress, and outcome for debugging and future retry UI."""
+    __tablename__ = "research_jobs"
+
+    job_id = Column(String, primary_key=True)
+    recipe_id = Column(String, index=True, nullable=False)
+    model = Column(String, nullable=True)
+    approved_queries = Column(JSON, default=list)
+    search_results = Column(JSON, default=list)
+    status = Column(String, default="running")  # running | completed | error | cancelled | superseded
+    progress = Column(JSON, default=list)
+    error = Column(Text, nullable=True)
+    started_at = Column(DateTime, default=_now)
+    finished_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=_now, onupdate=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "job_id": self.job_id,
+            "recipe_id": self.recipe_id,
+            "model": self.model,
+            "approved_queries": self.approved_queries or [],
+            "search_results": self.search_results or [],
+            "status": self.status,
+            "progress": self.progress or [],
+            "error": self.error,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "finished_at": self.finished_at.isoformat() if self.finished_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
 

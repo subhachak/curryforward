@@ -24,8 +24,8 @@ function LoginForm() {
     setLoading(true);
     try {
       await login(password);
-      push("Logged in as admin", "success");
-      router.push(searchParams.get("redirect") || "/");
+      push("Logged in", "success");
+      router.push(searchParams.get("redirect") || "/admin");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Login failed");
     } finally {
@@ -41,9 +41,9 @@ function LoginForm() {
             <h1 className="text-lg font-semibold">Admin log in</h1>
             <p className="text-sm text-muted mt-1">
               Enter the admin secret from the backend&apos;s <code className="rounded bg-stone-100 px-1">.env</code>{" "}
-              (<code className="rounded bg-stone-100 px-1">ADMIN_TOKEN</code>) to unlock forking,
+              (<code className="rounded bg-stone-100 px-1">ADMIN_TOKEN</code>) to unlock copying,
               saving chat edits, and the review queue. Without it, you can still browse
-              and try chat customization as a guest — previews just won&apos;t be saved.
+              and try chat customization — previews just won&apos;t be saved.
             </p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-3">

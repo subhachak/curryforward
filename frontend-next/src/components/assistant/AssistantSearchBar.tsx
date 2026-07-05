@@ -2,7 +2,6 @@
 
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useAssistant } from "@/context/AssistantContext";
 import { useAuth } from "@/context/AuthContext";
 import { useRecipes } from "@/context/RecipesContext";
@@ -114,7 +113,6 @@ export function AssistantSearchBar() {
         target.onPersisted();
       } else {
         target.onPreview(result.new_version);
-        if (result.note) addMessage("assistant", result.note);
       }
     } catch (e) {
       addMessage("assistant", e instanceof ApiError ? e.message : "Something went wrong with that change.");
@@ -162,8 +160,11 @@ export function AssistantSearchBar() {
         cuisine_tags: draft.cuisine_tags,
         base_servings_amount: draft.base_servings.amount,
         base_servings_unit: draft.base_servings.unit,
+        serving_size_amount: draft.serving_size?.amount ?? null,
+        serving_size_unit: draft.serving_size?.unit ?? null,
         components: draft.components,
         steps: draft.steps,
+        hero_image_url: null,
       });
       await reload();
       setDraftSession(null);
@@ -274,7 +275,7 @@ export function AssistantSearchBar() {
       </form>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-[28rem] max-w-[90vw] overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
+        <div className="fixed inset-x-3 top-16 z-50 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 sm:w-[28rem] sm:max-w-[90vw]">
           <div className="flex items-center justify-between border-b border-border bg-surface-muted px-4 py-2.5">
             <div className="text-sm font-semibold text-ink">Assistant</div>
             <div className="text-xs text-muted">
@@ -291,7 +292,7 @@ export function AssistantSearchBar() {
                     change — e.g. &ldquo;make it spicier&rdquo; or &ldquo;halve the sugar&rdquo;.
                     {!isAdmin && (
                       <div className="mt-1 text-xs text-muted">
-                        Guest mode — changes preview for this session only.
+                        Changes preview for this session only.
                       </div>
                     )}
                   </>
@@ -304,12 +305,7 @@ export function AssistantSearchBar() {
                 ) : (
                   <>
                     Hi! Ask me to find a recipe — e.g. &ldquo;show me something spicy with
-                    chicken&rdquo;. Open a recipe and I can help customize it too (preview only as
-                    a guest).{" "}
-                    <Link href="/login" className="underline" onClick={() => setOpen(false)}>
-                      Log in as admin
-                    </Link>{" "}
-                    to create and save new recipes.
+                    chicken&rdquo;. Open a recipe and I can help customize it too.
                   </>
                 )}
               </div>

@@ -5,6 +5,7 @@ __pycache__/
 .venv/
 venv/
 .DS_Store
+backend/uploads/
 
 # Next.js frontend
 frontend-next/node_modules/

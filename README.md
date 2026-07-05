@@ -42,6 +42,21 @@ npm run dev
 
 Then open **http://localhost:3000**.
 
+## Configuration
+
+Backend configuration lives in `backend/.env`:
+
+| Variable | Required | Purpose |
+|---|---:|---|
+| `ADMIN_TOKEN` | yes | Shared admin password for `/login` and `X-Admin-Token` API access |
+| `SESSION_SECRET` | recommended | Signing key for the httpOnly admin session cookie; falls back to `ADMIN_TOKEN` |
+| `ANTHROPIC_API_KEY` | for Anthropic chat/generation | Enables the default recipe chat/generate paths |
+| `OPENAI_API_KEY` / `GROQ_API_KEY` | optional | Enables those models in the research model picker through LiteLLM |
+| `DEFAULT_MODEL` | optional | LiteLLM model string for research flows; defaults to `anthropic/claude-sonnet-5` |
+| `TAVILY_API_KEY` | for web research | Enables guided-search approval and auto-research |
+| `CORS_ORIGINS` | optional | Comma-separated allowed frontend origins for cookie auth |
+| `LOG_LEVEL` | optional | Python log level, defaults to `INFO` |
+
 ### Production / single-process
 
 Build the frontend and let FastAPI serve it (no separate Node process needed):
@@ -55,6 +70,27 @@ Open **http://127.0.0.1:8000** — FastAPI serves the exported static site at `/
 and the API at `/api`, same origin, so the session cookie and relative
 `fetch("/api/...")` calls both just work.
 
+## Checks and migrations
+
+Local checks mirror CI:
+
+```bash
+uv run --with-requirements backend/requirements.txt pytest
+cd frontend-next && npm run lint && npm run build
+```
+
+Schema changes should go through Alembic from here forward. The app still keeps
+the lightweight startup migration/backfill path for existing local databases,
+but new schema work should add a migration under `backend/alembic/versions/`:
+
+```bash
+cd backend
+alembic upgrade head
+```
+
+CI is defined in `.github/workflows/ci.yml` and runs backend tests plus frontend
+lint/build on pushes to `main` and pull requests.
+
 ## Access model
 
 Still single-shared-secret (`ADMIN_TOKEN`), not multi-user accounts — appropriate
@@ -66,13 +102,29 @@ secret never sits in `localStorage` or gets attached to every request.
 
 | Role | How | Can do |
 |---|---|---|
-| **Admin** (you) | Click the small icon near the footer, or go to `/login`, with the `ADMIN_TOKEN` value | Fork/edit/delete recipes, persist chat customizations as new versions, draft and save new recipes conversationally, approve/reject the review queue |
+| **Admin** (you) | Click the small icon near the footer → `/login` with the `ADMIN_TOKEN` value → lands on `/admin` | Start/edit recipes from the dashboard, copy/delete drafts, persist chat customizations as new versions, draft and save new recipes conversationally, approve/reject the review queue |
 | **Guest** (anyone else) | Not logged in | Browse all recipes, use the assistant to search or customize a recipe — but the result is a **session-only preview**: not saved, not forkable, gone on refresh |
+
+The rest of the app doesn't call out roles at all — `/recipes` and recipe pages render
+as browsing surfaces. Dashboard-only controls stay on `/admin` rather than being
+shown elsewhere with a "guest mode" label.
 
 Enforced server-side (`app/auth.py`), not just hidden in the UI — a guest hitting
 the API directly gets a `403` on fork/review-decide, not just a missing button.
 The old `X-Admin-Token` header still works too (useful for scripts/tests), checked
 alongside the session cookie.
+
+## Research, provenance, and uploads
+
+Auto-research now leaves an audit trail in `research_jobs`: approved queries,
+search results, progress, status, model, and errors. The current recipe row
+still carries live polling fields for the UI, while `GET
+/api/recipes/research/{recipe_id}/jobs` exposes historical runs for admin
+debugging and future source/provenance UI.
+
+Image uploads are local files under `backend/uploads/`, capped at 8 MB, admin
+only, and validated by both declared content type and file signature before
+being served from `/uploads/...`.
 
 ## What's seeded
 
@@ -126,7 +178,7 @@ curryforward/
 │   └── .env.example
 ├── frontend-next/             # Next.js (TypeScript, Tailwind, App Router)
 │   └── src/
-│       ├── app/               # / (marketing), /recipes (browse), /recipe, /login
+│       ├── app/               # / (marketing), /recipes, /recipe, /recipe/research, /admin, /login
 │       ├── components/        # NavBar, RecipeCard, NutritionCard, assistant/, ui/ design system
 │       ├── context/           # AuthContext, ToastContext, RecipesContext, AssistantContext
 │       └── lib/                # api client, shared types, assistant NL heuristics
@@ -138,12 +190,17 @@ curryforward/
 - **`/`** — marketing/intro page: what Curryforward is, what's new, no recipe
   grid (that's `/recipes`).
 - **`/recipes`** — browse all recipes, filter by category/cuisine tag, search.
-  Admins get a **+ New recipe** button (manual form, `/recipe/edit`).
+  Identical for every visitor — no admin-only controls live here anymore.
 - **`/recipe?id=`** — a single recipe: ingredients, steps, and a Nutrition
   Facts panel styled like a real product label (calories, per-serving macros,
-  rough %DV, ingredient list), sticky in the right column on desktop. Admins
-  get **Edit** (manual form), **Fork**, and **Delete** (with a confirm step —
-  deletion is permanent) buttons.
+  rough %DV, ingredient list), sticky in the right column on desktop. No edit
+  controls live here, even for admins.
+- **`/admin`** — the one place admin-only tools live: recipe research,
+  dashboard edit entry points, review queue, recipe management, Trash, and
+  **Log out**. Editing a published recipe creates/reuses a linked draft copy;
+  publishing that draft lets the admin either replace the original recipe or
+  keep both versions as separate recipes.
+  Guests hitting it directly get a neutral "log in to access this" prompt.
 - **The search bar *is* the assistant** (`components/assistant/AssistantSearchBar.tsx`,
   lives in the nav) — type a search, a customization request, or a whole
   recipe draft into the same box; a dropdown below it carries the
@@ -167,5 +224,6 @@ curryforward/
   instead" correctly resolves against what you asked for two messages ago,
   not just the latest message in isolation.
 - **Admin access is deliberately subtle**: a small icon near the footer
-  (`components/AuthFooterControl.tsx`), not a nav badge — click it to log in
-  or (if already admin) log out.
+  (`components/AuthFooterControl.tsx`), not a nav badge — click it to reach
+  `/login` (guest) or `/admin` (already logged in). No page anywhere else
+  calls out "guest"/"admin" by name; controls just don't render for guests.
