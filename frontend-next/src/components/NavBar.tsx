@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRecipes } from "@/context/RecipesContext";
+import { useAuth } from "@/context/AuthContext";
 import { AssistantSearchBar } from "@/components/assistant/AssistantSearchBar";
 
 function RecipesMenu() {
@@ -55,6 +56,7 @@ function RecipesMenu() {
 
 function MobileMenu() {
   const { categories } = useRecipes();
+  const { isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
 
   return (
@@ -89,6 +91,15 @@ function MobileMenu() {
           >
             All recipes
           </Link>
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="block rounded-md px-2 py-2 text-sm font-medium text-foreground hover:bg-surface-muted"
+              onClick={() => setOpen(false)}
+            >
+              Workspace
+            </Link>
+          )}
           {categories.length > 0 && (
             <div className="mt-1 border-t border-border pt-1">
               {categories.map((c) => (
@@ -110,6 +121,8 @@ function MobileMenu() {
 }
 
 export function NavBar() {
+  const { isAdmin } = useAuth();
+
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur">
       <div className="relative mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-5 sm:px-6">
@@ -123,6 +136,11 @@ export function NavBar() {
             Home
           </Link>
           <RecipesMenu />
+          {isAdmin && (
+            <Link href="/admin" className="text-sm font-medium text-foreground hover:text-brand-hover">
+              Workspace
+            </Link>
+          )}
         </nav>
 
         <AssistantSearchBar />
