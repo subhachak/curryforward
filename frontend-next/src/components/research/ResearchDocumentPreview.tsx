@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Input, Textarea } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -16,6 +17,42 @@ interface RefineBoxProps {
   onRefine: (section: string, instruction: string) => Promise<void>;
 }
 
+interface IconButtonProps {
+  title: string;
+  children: ReactNode;
+  variant?: "secondary" | "ghost" | "danger" | "primary";
+  loading?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}
+
+function IconButton({ title, children, variant = "secondary", loading, disabled, onClick }: IconButtonProps) {
+  return (
+    <Button
+      type="button"
+      variant={variant}
+      size="sm"
+      loading={loading}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      className="h-8 w-8 px-0"
+      onClick={onClick}
+    >
+      <span aria-hidden="true">{children}</span>
+    </Button>
+  );
+}
+
+function SectionHeader({ title, children }: { title: string; children?: ReactNode }) {
+  return (
+    <div className="flex min-h-8 items-center justify-between gap-2">
+      <div className="font-semibold">{title}</div>
+      <div className="flex shrink-0 items-center gap-1">{children}</div>
+    </div>
+  );
+}
+
 /** A small "Refine with AI" affordance shared by each section card — one-shot
  * instruction in, that section's fields regenerate via the same schema the
  * auto-research crew uses (see backend crew_research.py's refine_section). */
@@ -23,18 +60,6 @@ function RefineBox({ section, label, onRefine }: RefineBoxProps) {
   const [open, setOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
   const [loading, setLoading] = useState(false);
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="text-xs font-medium text-brand-hover hover:underline"
-      >
-        ✨ Refine {label} with AI
-      </button>
-    );
-  }
 
   async function handleSend() {
     const text = instruction.trim();
@@ -50,21 +75,28 @@ function RefineBox({ section, label, onRefine }: RefineBoxProps) {
   }
 
   return (
-    <div className="space-y-2 rounded-md border border-border bg-surface-muted p-2">
-      <Input
-        value={instruction}
-        onChange={(e) => setInstruction(e.target.value)}
-        placeholder={`e.g. "make it shorter", "assume beginners"…`}
-        className="text-sm"
-      />
-      <div className="flex gap-2">
-        <Button type="button" size="sm" loading={loading} disabled={!instruction.trim()} onClick={handleSend}>
-          Refine
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-          Cancel
-        </Button>
-      </div>
+    <div className="relative">
+      <IconButton title={`Refine ${label} with AI`} onClick={() => setOpen((v) => !v)}>
+        ✦
+      </IconButton>
+      {open && (
+        <div className="absolute right-0 top-10 z-20 w-[min(20rem,calc(100vw-3rem))] space-y-2 rounded-md border border-border bg-surface p-3 shadow-lg">
+          <Input
+            value={instruction}
+            onChange={(e) => setInstruction(e.target.value)}
+            placeholder={`e.g. "make it shorter", "assume beginners"...`}
+            className="text-sm"
+          />
+          <div className="flex justify-end gap-2">
+            <IconButton title={`Apply refinement to ${label}`} loading={loading} disabled={!instruction.trim()} onClick={handleSend}>
+              ✓
+            </IconButton>
+            <IconButton title="Cancel refinement" variant="ghost" onClick={() => setOpen(false)}>
+              x
+            </IconButton>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -299,6 +331,9 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
     <div className="space-y-6">
       <Card>
         <CardBody className="space-y-4">
+          <SectionHeader title="Recipe details">
+            <RefineBox section="history" label="intro & history" onRefine={onRefine} />
+          </SectionHeader>
           <div>
             <label className="mb-1 block text-sm font-medium">Name</label>
             <Input
@@ -329,19 +364,17 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
                 className="hidden"
                 onChange={handleHeroImageSelected}
               />
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
+              <IconButton
+                title={heroImageUrl ? "Replace hero image" : "Upload hero image"}
                 loading={uploadingHero}
                 onClick={() => heroFileInputRef.current?.click()}
               >
-                {heroImageUrl ? "Replace" : "Upload"}
-              </Button>
+                ↑
+              </IconButton>
               {heroImageUrl && (
-                <Button type="button" variant="ghost" size="sm" onClick={handleHeroImageRemove}>
-                  Remove
-                </Button>
+                <IconButton title="Remove hero image" variant="ghost" onClick={handleHeroImageRemove}>
+                  x
+                </IconButton>
               )}
             </div>
           </div>
@@ -450,17 +483,15 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
               rows={4}
               placeholder="Where this dish comes from, traditions, why it matters"
             />
-            <RefineBox section="history" label="intro & history" onRefine={onRefine} />
           </div>
         </CardBody>
       </Card>
 
       <Card>
         <CardBody className="space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="font-semibold">Components &amp; ingredients</div>
+          <SectionHeader title="Components & ingredients">
             <RefineBox section="ingredients" label="ingredients" onRefine={onRefine} />
-          </div>
+          </SectionHeader>
           {components.map((component, ci) => (
             <div key={ci} className="rounded-lg border border-border p-3 space-y-3">
               <div className="flex items-center gap-2">
@@ -472,9 +503,9 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
                   className="flex-1"
                 />
                 {components.length > 1 && (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => removeComponent(ci)}>
-                    Remove
-                  </Button>
+                  <IconButton title="Remove component" variant="ghost" onClick={() => removeComponent(ci)}>
+                    x
+                  </IconButton>
                 )}
               </div>
               <div className="space-y-2">
@@ -503,30 +534,29 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
                       className="flex-1"
                     />
                     {component.ingredients.length > 1 && (
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeIngredient(ci, ii)}>
-                        ✕
-                      </Button>
+                      <IconButton title="Remove ingredient" variant="ghost" onClick={() => removeIngredient(ci, ii)}>
+                        x
+                      </IconButton>
                     )}
                   </div>
                 ))}
-                <Button type="button" variant="secondary" size="sm" onClick={() => addIngredient(ci)}>
-                  + Ingredient
-                </Button>
+                <IconButton title="Add ingredient" onClick={() => addIngredient(ci)}>
+                  +
+                </IconButton>
               </div>
             </div>
           ))}
-          <Button type="button" variant="secondary" size="sm" onClick={addComponent}>
-            + Component
-          </Button>
+          <IconButton title="Add component" onClick={addComponent}>
+            +
+          </IconButton>
         </CardBody>
       </Card>
 
       <Card>
         <CardBody className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="font-semibold">Steps</div>
+          <SectionHeader title="Steps">
             <RefineBox section="steps" label="steps" onRefine={onRefine} />
-          </div>
+          </SectionHeader>
           {steps.map((step, si) => (
             <div key={si} className="space-y-2 rounded-lg border border-border p-3">
               <div className="flex gap-2">
@@ -540,9 +570,9 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
                   className="flex-1"
                 />
                 {steps.length > 1 && (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => removeStep(si)}>
-                    ✕
-                  </Button>
+                  <IconButton title="Remove step" variant="ghost" onClick={() => removeStep(si)}>
+                    x
+                  </IconButton>
                 )}
               </div>
               <div className="flex items-center gap-3 pl-6">
@@ -559,26 +589,27 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
                   className="hidden"
                   onChange={(e) => handleImageSelected(si, e)}
                 />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
+                <IconButton
+                  title={step.image_url ? "Replace step image" : "Add step image"}
                   loading={uploadingStep === si}
                   onClick={() => fileInputRefs.current[si]?.click()}
                 >
-                  {step.image_url ? "Replace image" : "+ Image"}
-                </Button>
+                  ↑
+                </IconButton>
               </div>
             </div>
           ))}
-          <Button type="button" variant="secondary" size="sm" onClick={addStep}>
-            + Step
-          </Button>
+          <IconButton title="Add step" onClick={addStep}>
+            +
+          </IconButton>
         </CardBody>
       </Card>
 
       <Card>
         <CardBody className="space-y-4">
+          <SectionHeader title="Tips & watch-outs">
+            <RefineBox section="tips" label="tips & watch-outs" onRefine={onRefine} />
+          </SectionHeader>
           <div>
             <label className="mb-1 block text-sm font-medium">Tips &amp; tricks (one per line)</label>
             <Textarea
@@ -601,7 +632,6 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
               rows={3}
             />
           </div>
-          <RefineBox section="tips" label="tips & watch-outs" onRefine={onRefine} />
         </CardBody>
       </Card>
     </div>
