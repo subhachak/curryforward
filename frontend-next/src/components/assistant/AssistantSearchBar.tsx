@@ -255,7 +255,7 @@ export function AssistantSearchBar() {
             src="/brand/icon-contact-chat.svg"
             alt=""
             aria-hidden
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 opacity-70"
+            className="pointer-events-none absolute left-2.5 top-1/2 h-6 w-6 -translate-y-1/2 opacity-70"
           />
           <input
             ref={inputRef}
@@ -271,7 +271,7 @@ export function AssistantSearchBar() {
                   ? "Search, ask, or paste a recipe…"
                   : "Search recipes…"
             }
-            className="w-full rounded-full border border-border bg-surface-muted py-2 pl-9 pr-3 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
+            className="w-full rounded-full border border-border bg-surface-muted py-2 pl-10 pr-3 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
           />
         </div>
       </form>

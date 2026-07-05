@@ -7,7 +7,17 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/IconButton";
 import { MoreMenu, type MenuItem } from "@/components/ui/Menu";
-import { CopyIcon, EyeIcon, EyeOffIcon, PencilIcon, TrashIcon, XIcon, CheckIcon } from "@/components/ui/icons";
+import {
+  CopyIcon,
+  DownloadIcon,
+  EyeIcon,
+  EyeOffIcon,
+  HeartIcon,
+  PencilIcon,
+  TrashIcon,
+  XIcon,
+  CheckIcon,
+} from "@/components/ui/icons";
 import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
 import type { AdminRecipeSummary } from "@/lib/types";
@@ -120,21 +130,52 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
             ];
             return (
               <div key={r.recipe_id} className="rounded-md border border-border bg-surface p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <Link href={href} className="font-medium hover:underline">
-                      {r.name}
-                    </Link>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
-                      <Badge tone={r.status === "published" ? "success" : "warning"}>{r.status}</Badge>
-                      {r.category && <span>{r.category}</span>}
-                      <span>Published {formatDate(r.first_published_at)}</span>
-                      <span>Updated {formatDate(r.updated_at)}</span>
-                      <span>{r.view_count} views</span>
-                      <span>{r.download_count} downloads</span>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex min-w-0 flex-1 gap-3">
+                    {r.hero_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={r.hero_image_url}
+                        alt=""
+                        className="h-16 w-16 shrink-0 rounded-md border border-border object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-border bg-gradient-to-br from-brand-soft to-accent-soft"
+                        aria-hidden
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/brand/mark-cloche-forward.svg" alt="" className="h-8 w-auto opacity-80" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link href={href} className="font-medium hover:underline">
+                          {r.name}
+                        </Link>
+                        <Badge tone={r.status === "published" ? "success" : "warning"}>{r.status}</Badge>
+                        {r.category && <Badge tone="neutral">{r.category}</Badge>}
+                      </div>
+                      {r.intro && <p className="mt-1 line-clamp-2 text-sm text-muted">{r.intro}</p>}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-muted">
+                        <span>Published {formatDate(r.first_published_at)}</span>
+                        <span>Updated {formatDate(r.updated_at)}</span>
+                        <span className="inline-flex items-center gap-1">
+                          <EyeIcon className="h-3.5 w-3.5" />
+                          {r.view_count}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <DownloadIcon className="h-3.5 w-3.5" />
+                          {r.download_count}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <HeartIcon className="h-3.5 w-3.5" fill={r.like_count > 0 ? "currentColor" : "none"} />
+                          {r.like_count}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                     {busy && (
                       <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent text-muted" />
                     )}

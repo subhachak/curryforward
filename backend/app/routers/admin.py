@@ -111,6 +111,8 @@ def list_all_recipes(db: Session = Depends(get_db), role: str = Depends(require_
             "category": r.category,
             "status": r.status or "published",
             "lineage": r.lineage,
+            "hero_image_url": r.hero_image_url,
+            "intro": r.intro,
             "first_published_at": first_published_at.isoformat() if first_published_at else None,
             "updated_at": r.updated_at.isoformat() if r.updated_at else None,
             "view_count": analytics[r.recipe_id].view_count if r.recipe_id in analytics else 0,

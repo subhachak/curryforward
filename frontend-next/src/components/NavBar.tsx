@@ -26,9 +26,9 @@ function RecipesMenu() {
         className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-brand-hover"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/icon-recipes-book.svg" alt="" aria-hidden className="h-4 w-4" />
+        <img src="/brand/icon-recipes-book.svg" alt="" aria-hidden className="h-6 w-6" />
         Recipes
-        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </Link>
@@ -130,7 +130,7 @@ export function NavBar() {
       <div className="relative mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-5 sm:px-6">
         <Link href="/" className="flex shrink-0 items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/logo-primary-horizontal.svg" alt="CurryForward" className="h-8 w-auto" />
+          <img src="/brand/logo-primary-horizontal.svg" alt="CurryForward" className="h-11 w-auto sm:h-12" />
         </Link>
 
         <nav className="hidden items-center gap-5 sm:flex">

@@ -71,10 +71,13 @@ export interface AdminRecipeSummary {
   category: string | null;
   status: "draft" | "published";
   lineage: string;
+  hero_image_url: string | null;
+  intro: string | null;
   first_published_at: string | null;
   updated_at: string | null;
   view_count: number;
   download_count: number;
+  like_count: number;
 }
 
 /** GET /api/admin/recipes/trash — soft-deleted recipes awaiting restore/purge. */
