@@ -39,6 +39,8 @@ def upgrade() -> None:
         sa.Column("cook_time_minutes", sa.Integer(), nullable=True),
         sa.Column("tips", sa.JSON(), nullable=True),
         sa.Column("watch_outs", sa.JSON(), nullable=True),
+        sa.Column("suggested_utensils", sa.JSON(), nullable=True),
+        sa.Column("pan_conversions", sa.JSON(), nullable=True),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("research_conversation", sa.JSON(), nullable=True),
         sa.Column("research_model", sa.String(), nullable=True),

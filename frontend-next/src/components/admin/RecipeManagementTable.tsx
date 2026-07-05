@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { CopyIcon, EyeIcon, PencilIcon, TrashIcon, XIcon, CheckIcon } from "@/components/ui/icons";
 import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
 import type { AdminRecipeSummary } from "@/lib/types";
@@ -33,7 +34,7 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
     setPendingId(recipe.recipe_id);
     try {
       await api.forkRecipe(recipe.recipe_id);
-      push("Copied — a new draft was created", "success");
+      push("Duplicated as a new draft", "success");
       onChanged();
     } catch (e) {
       push(e instanceof ApiError ? e.message : "Copy failed", "error");
@@ -73,7 +74,10 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
   return (
     <Card>
       <CardBody>
-        <div className="mb-3 font-semibold">Recipes ({recipes.length})</div>
+        <div className="mb-1 font-semibold">Recipes ({recipes.length})</div>
+        <div className="mb-3 text-xs text-muted">
+          Published recipes are live. Edits create a draft copy; duplicates are always drafts; only drafts can move to Trash.
+        </div>
         <div className="space-y-2">
           {recipes.map((r) => {
             const href =
@@ -97,17 +101,36 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
                       <span>{r.download_count} downloads</span>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="secondary" size="sm" loading={busy} onClick={() => editRecipe(r)}>
-                      Edit
-                    </Button>
-                    <Button variant="secondary" size="sm" loading={busy} onClick={() => copyRecipe(r)}>
-                      Copy
-                    </Button>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Link
+                      href={href}
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface text-foreground transition-colors hover:bg-surface-muted"
+                      aria-label={r.status === "published" ? "View public recipe" : "Open draft"}
+                      title={r.status === "published" ? "View public recipe" : "Open draft"}
+                    >
+                      <span className="h-4 w-4">
+                        <EyeIcon />
+                      </span>
+                    </Link>
+                    <IconButton
+                      label={r.status === "published" ? "Create or open edit draft" : "Edit draft"}
+                      icon={<PencilIcon />}
+                      loading={busy}
+                      onClick={() => editRecipe(r)}
+                    />
+                    <IconButton
+                      label="Duplicate as draft"
+                      icon={<CopyIcon />}
+                      loading={busy}
+                      onClick={() => copyRecipe(r)}
+                    />
                     {r.status === "draft" && (
-                      <Button variant="danger" size="sm" onClick={() => setConfirmingDeleteId(r.recipe_id)}>
-                        Delete
-                      </Button>
+                      <IconButton
+                        label="Move draft to Trash"
+                        icon={<TrashIcon />}
+                        variant="danger"
+                        onClick={() => setConfirmingDeleteId(r.recipe_id)}
+                      />
                     )}
                   </div>
                 </div>
@@ -115,15 +138,22 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
                 {confirmingDeleteId === r.recipe_id && (
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger/40 bg-danger-soft/40 p-3">
                     <div className="text-sm">
-                      Move <strong>{r.name}</strong> to Trash? You can restore it later.
+                      Move draft <strong>{r.name}</strong> to Trash? You can restore it later.
                     </div>
-                    <div className="flex gap-2">
-                      <Button variant="secondary" size="sm" onClick={() => setConfirmingDeleteId(null)}>
-                        Cancel
-                      </Button>
-                      <Button variant="danger" size="sm" loading={busy} onClick={() => del(r)}>
-                        Yes, delete
-                      </Button>
+                    <div className="flex gap-1.5">
+                      <IconButton
+                        label="Cancel"
+                        icon={<XIcon />}
+                        variant="secondary"
+                        onClick={() => setConfirmingDeleteId(null)}
+                      />
+                      <IconButton
+                        label="Confirm move to Trash"
+                        icon={<CheckIcon />}
+                        variant="danger"
+                        loading={busy}
+                        onClick={() => del(r)}
+                      />
                     </div>
                   </div>
                 )}

@@ -9,7 +9,8 @@ import { RecipeFeedbackPanel } from "@/components/RecipeFeedbackPanel";
 import { VersionHistory } from "@/components/VersionHistory";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { DownloadIcon } from "@/components/ui/icons";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { useAuth } from "@/context/AuthContext";
 import { useAssistant } from "@/context/AssistantContext";
@@ -118,9 +119,7 @@ function RecipeDetailInner() {
         </div>
         <div className="flex flex-wrap gap-2">
           {(recipe.status === "published" || isAdmin) && (
-            <Button variant="secondary" size="sm" onClick={handleDownload}>
-              Download
-            </Button>
+            <IconButton label="Download recipe" icon={<DownloadIcon />} onClick={handleDownload} />
           )}
         </div>
       </div>

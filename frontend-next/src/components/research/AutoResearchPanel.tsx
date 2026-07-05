@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { Input, Textarea } from "@/components/ui/Input";
+import { IconButton } from "@/components/ui/IconButton";
+import { CheckIcon, SearchIcon, SendIcon, XIcon } from "@/components/ui/icons";
+import { CopyAssistField } from "@/components/research/CopyAssistField";
 import { api, ApiError } from "@/lib/api";
 import {
   AUTO_RESEARCH_SECTIONS,
@@ -164,10 +165,13 @@ export function AutoResearchPanel({ recipe, onComplete, onPromptChange }: AutoRe
           <label className="mb-1 block text-xs font-medium text-muted">
             Starting prompt — a name, a description, or a pasted draft to refine
           </label>
-          <Textarea
+          <CopyAssistField
+            recipeId={recipeId}
+            fieldLabel="auto-research starting prompt"
             value={recipe.starting_prompt ?? ""}
-            onChange={(e) => onPromptChange(e.target.value)}
+            onChange={onPromptChange}
             rows={3}
+            multiline
             placeholder="What should the crew research and build?"
           />
         </div>
@@ -185,9 +189,7 @@ export function AutoResearchPanel({ recipe, onComplete, onPromptChange }: AutoRe
               Ingredients, Steps, and Tips specialists concurrently and merges their
               output into the document on the right.
             </p>
-            <Button size="sm" onClick={handlePlan}>
-              Propose searches
-            </Button>
+            <IconButton label="Propose searches" icon={<SearchIcon />} variant="accent" onClick={handlePlan} />
           </div>
         )}
 
@@ -217,10 +219,12 @@ export function AutoResearchPanel({ recipe, onComplete, onPromptChange }: AutoRe
                     onChange={() => toggle(i)}
                   />
                   <div className="flex-1 space-y-1">
-                    <Input
+                    <CopyAssistField
+                      recipeId={recipeId}
+                      fieldLabel={`${q.category} search query`}
                       value={q.query}
-                      onChange={(e) => updateQueryText(i, e.target.value)}
-                      className="text-sm"
+                      onChange={(value) => updateQueryText(i, value)}
+                      inputClassName="text-sm"
                     />
                     <div className="text-xs text-muted">{q.category}</div>
                   </div>
@@ -228,12 +232,8 @@ export function AutoResearchPanel({ recipe, onComplete, onPromptChange }: AutoRe
               ))}
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleRun}>
-                Run auto-research
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => setPhase("idle")}>
-                Cancel
-              </Button>
+              <IconButton label="Run auto-research" icon={<SendIcon />} variant="accent" onClick={handleRun} />
+              <IconButton label="Cancel auto-research plan" icon={<XIcon />} onClick={() => setPhase("idle")} />
             </div>
           </div>
         )}
@@ -263,7 +263,7 @@ export function AutoResearchPanel({ recipe, onComplete, onPromptChange }: AutoRe
                         done ? "bg-brand text-ink" : "border border-border text-muted"
                       }`}
                     >
-                      {done ? "✓" : ""}
+                      {done ? <CheckIcon className="h-3 w-3" /> : ""}
                     </span>
                     <span className={done ? "text-foreground" : "text-muted"}>{SECTION_LABELS[key]}</span>
                     {statusLabel && <span className="text-xs text-muted">{statusLabel}</span>}
@@ -271,9 +271,7 @@ export function AutoResearchPanel({ recipe, onComplete, onPromptChange }: AutoRe
                 );
               })}
             </div>
-            <Button size="sm" variant="secondary" loading={cancelling} onClick={handleCancel}>
-              Stop
-            </Button>
+            <IconButton label="Stop auto-research" icon={<XIcon />} loading={cancelling} onClick={handleCancel} />
           </div>
         )}
 

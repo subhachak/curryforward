@@ -12,6 +12,8 @@ those copies can either replace the original recipe or keep both.
 """
 from __future__ import annotations
 
+import json
+import re
 import threading
 import uuid
 import logging
@@ -30,7 +32,7 @@ from ..llm_agent import (
     run_tavily_search,
     start_research_turn,
 )
-from ..llm_client import is_litellm_configured, is_model_available
+from ..llm_client import is_litellm_configured, is_model_available, litellm_completion
 from ..models import RecipeVersion, ResearchJob
 from ..services.llm_settings import resolve_task_model
 from ..services.audit import audit_admin_action
@@ -44,8 +46,8 @@ PATCHABLE_FIELDS = [
     "name", "category", "cuisine_tags", "base_servings_amount", "base_servings_unit",
     "serving_size_amount", "serving_size_unit",
     "components", "steps", "intro", "history", "prep_time_minutes",
-    "cook_time_minutes", "tips", "watch_outs", "notes", "starting_prompt",
-    "hero_image_url",
+    "cook_time_minutes", "tips", "watch_outs", "suggested_utensils",
+    "pan_conversions", "notes", "starting_prompt", "hero_image_url",
 ]
 
 
@@ -77,6 +79,8 @@ class ResearchPatchRequest(BaseModel):
     cook_time_minutes: int | None = None
     tips: list[str] | None = None
     watch_outs: list[str] | None = None
+    suggested_utensils: list[str] | None = None
+    pan_conversions: list[dict] | None = None
     notes: str | None = None
     starting_prompt: str | None = None
     hero_image_url: str | None = None
@@ -96,6 +100,27 @@ class PublishResearchRequest(BaseModel):
 class RefineSectionRequest(BaseModel):
     section: str
     instruction: str
+
+
+class CopyRewriteRequest(BaseModel):
+    field_label: str
+    text: str
+    instruction: str | None = None
+    recipe_context: str | None = None
+
+
+class CopyRewriteResponse(BaseModel):
+    text: str
+
+
+class RecipeWideEditRequest(BaseModel):
+    instruction: str
+
+
+class RecipeWideEditResponse(BaseModel):
+    recipe: dict
+    changed_fields: list[str]
+    review_notes: str | None = None
 
 
 def _get_draft(db: Session, recipe_id: str) -> RecipeVersion:
@@ -129,6 +154,29 @@ def _apply_patch(row: RecipeVersion, patch: dict, allow_null: bool = False) -> N
         setattr(row, key, value)
     if "components" in patch and (patch["components"] is not None or allow_null):
         row.nutrition = compute_nutrition(row.components or [])
+
+
+def _extract_json_object(text: str) -> dict:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if not match:
+            raise
+        return json.loads(match.group(0))
+
+
+def _preserve_step_images(current_steps: list[dict] | None, next_steps: list[dict]) -> list[dict]:
+    current_steps = current_steps or []
+    merged = []
+    for idx, step in enumerate(next_steps):
+        next_step = dict(step)
+        if "image_url" not in next_step and idx < len(current_steps):
+            image_url = (current_steps[idx] or {}).get("image_url")
+            if image_url:
+                next_step["image_url"] = image_url
+        merged.append(next_step)
+    return merged
 
 
 @router.post("")
@@ -624,6 +672,157 @@ def refine_recipe_section(
     return row.to_research_dict()
 
 
+@router.post("/{recipe_id}/wide-edit", response_model=RecipeWideEditResponse)
+def recipe_wide_edit(
+    recipe_id: str,
+    req: RecipeWideEditRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
+    """One broad admin instruction that can update multiple recipe fields in
+    one pass. The returned `changed_fields` drives frontend review highlights."""
+    row = _get_draft(db, recipe_id)
+    instruction = req.instruction.strip()
+    if not instruction:
+        raise HTTPException(400, "Instruction is required")
+    if not is_litellm_configured():
+        raise HTTPException(400, "litellm is not installed — check backend/requirements.txt")
+    model = resolve_task_model("recipe_wide_edit", db, row.research_model)
+    if not is_model_available(model):
+        raise HTTPException(400, f"No API key configured for model '{model}' — add it to backend/.env")
+
+    system_prompt = (
+        "You are an expert recipe editor inside Curryforward. Apply the admin's "
+        "broad instruction to the existing draft recipe. Return ONLY valid JSON "
+        "with keys: recipe_patch, changed_fields, review_notes. recipe_patch must "
+        "contain only changed fields from this allowlist: "
+        f"{', '.join(PATCHABLE_FIELDS)}. Do not include notes, starting_prompt, "
+        "hero_image_url, research metadata, or unchanged fields unless necessary. "
+        "When changing ingredients, return the complete components array. When "
+        "changing steps, return the complete steps array and do not remove image_url "
+        "values you can see. Preserve factual integrity; if the requested diet/style "
+        "requires ingredient substitutions, adjust related steps, intro, tips, "
+        "watch-outs, utensils, pan conversions, timings, and tags as needed. "
+        "changed_fields must list the top-level recipe_patch keys that changed."
+    )
+    current_document = row.to_research_dict()
+    user_prompt = (
+        f"Admin instruction:\n{instruction}\n\n"
+        f"Current recipe JSON:\n{json.dumps(current_document, ensure_ascii=False)}"
+    )
+    try:
+        response = litellm_completion(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.35,
+        )
+        payload = _extract_json_object(response.choices[0].message.content or "{}")
+    except Exception as e:
+        record_llm_usage(task="recipe_wide_edit", model=model, role=role, status="error", error=str(e))
+        raise HTTPException(500, f"Recipe-wide edit failed: {e}")
+    record_llm_usage(task="recipe_wide_edit", model=model, role=role, response=response)
+
+    patch = payload.get("recipe_patch") or {}
+    if not isinstance(patch, dict):
+        raise HTTPException(500, "Recipe-wide edit returned an invalid patch")
+    patch = {key: value for key, value in patch.items() if key in PATCHABLE_FIELDS and key not in {"notes", "starting_prompt"}}
+    if "steps" in patch and isinstance(patch["steps"], list):
+        patch["steps"] = _preserve_step_images(row.steps or [], patch["steps"])
+    changed_fields = payload.get("changed_fields")
+    if not isinstance(changed_fields, list):
+        changed_fields = list(patch.keys())
+    changed_fields = [field for field in changed_fields if field in patch]
+    if patch:
+        _apply_patch(row, patch, allow_null=False)
+    audit_admin_action(
+        db,
+        action="recipe_wide_edit_applied",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={"fields": changed_fields, "model": model},
+    )
+    db.commit()
+    return {
+        "recipe": row.to_research_dict(),
+        "changed_fields": changed_fields,
+        "review_notes": payload.get("review_notes") if isinstance(payload.get("review_notes"), str) else None,
+    }
+
+
+@router.post("/{recipe_id}/rewrite", response_model=CopyRewriteResponse)
+def rewrite_recipe_copy(
+    recipe_id: str,
+    req: CopyRewriteRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
+    """Admin-only microcopy helper for individual editable fields. It returns
+    a candidate string only; the caller decides whether to apply it through
+    the normal PATCH/autosave path."""
+    row = _get_draft(db, recipe_id)
+    if not is_litellm_configured():
+        raise HTTPException(400, "litellm is not installed — check backend/requirements.txt")
+    model = resolve_task_model("copy_rewrite", db, row.research_model)
+    if not is_model_available(model):
+        raise HTTPException(400, f"No API key configured for model '{model}' — add it to backend/.env")
+
+    field_label = req.field_label.strip()[:120] or "recipe field"
+    source_text = req.text.strip()
+    instruction = (req.instruction or "").strip() or "Rewrite this into polished, user-friendly copy."
+    context = (req.recipe_context or "").strip()[:600]
+    context_line = f"Nearby context: {context}\n" if context else ""
+    if not source_text:
+        raise HTTPException(400, "Text is required")
+
+    system_prompt = (
+        "You are a precise recipe copy editor inside Curryforward. Rewrite only "
+        "the requested field into clear, warm, publishable recipe copy. Keep the "
+        "same factual meaning. Do not invent facts, ingredients, timings, dietary "
+        "claims, history, or provenance. Return only the rewritten field text, no "
+        "quotes, markdown, labels, or explanation. Preserve list-like formatting "
+        "when the input is a newline-separated list."
+    )
+    user_prompt = (
+        f"Recipe: {row.name}\n"
+        f"Field: {field_label}\n"
+        f"Admin direction: {instruction}\n"
+        f"{context_line}"
+        f"Current text:\n{source_text}"
+    )
+    try:
+        response = litellm_completion(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.4,
+        )
+        text = (response.choices[0].message.content or "").strip()
+    except Exception as e:
+        record_llm_usage(task="copy_rewrite", model=model, role=role, status="error", error=str(e))
+        raise HTTPException(500, f"Rewrite failed: {e}")
+    record_llm_usage(task="copy_rewrite", model=model, role=role, response=response)
+    if not text:
+        raise HTTPException(500, "Rewrite returned an empty response")
+    audit_admin_action(
+        db,
+        action="copy_rewrite_generated",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={"field": field_label},
+    )
+    db.commit()
+    return {"text": text}
+
+
 @router.post("/{recipe_id}/publish")
 def publish_research_recipe(
     recipe_id: str,
@@ -681,6 +880,8 @@ def publish_research_recipe(
             cook_time_minutes=row.cook_time_minutes,
             tips=row.tips,
             watch_outs=row.watch_outs,
+            suggested_utensils=row.suggested_utensils,
+            pan_conversions=row.pan_conversions,
             status="published",
             source=row.source if row.source != "revision_draft" else current_original.source,
             is_current_head=True,

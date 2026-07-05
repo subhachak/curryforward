@@ -44,6 +44,8 @@ _RECIPE_VERSION_COLUMN_ADDITIONS = [
     ("hero_image_url", "TEXT"),
     ("serving_size_amount", "REAL"),
     ("serving_size_unit", "TEXT"),
+    ("suggested_utensils", "TEXT"),
+    ("pan_conversions", "TEXT"),
 ]
 
 _RECIPE_FEEDBACK_COLUMN_ADDITIONS = [

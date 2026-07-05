@@ -4,6 +4,7 @@ import type {
   AutoResearchPlan,
   ChatHistoryTurn,
   ChatResult,
+  CopyRewriteResult,
   DraftRecipeResult,
   DraftSummary,
   EditDraftResult,
@@ -17,6 +18,7 @@ import type {
   RecipeResearchDetail,
   ResearchJobSummary,
   RecipeSummary,
+  RecipeWideEditResult,
   RecipeUpsertRequest,
   ResearchPatchPayload,
   ResearchTurnResult,
@@ -124,6 +126,24 @@ export const api = {
     apiFetch<RecipeResearchDetail>(`/recipes/research/${recipeId}/refine`, {
       method: "POST",
       body: JSON.stringify({ section, instruction }),
+    }),
+  wideEditRecipe: (recipeId: string, instruction: string) =>
+    apiFetch<RecipeWideEditResult>(`/recipes/research/${recipeId}/wide-edit`, {
+      method: "POST",
+      body: JSON.stringify({ instruction }),
+    }),
+  rewriteCopy: (
+    recipeId: string,
+    body: { field_label: string; text: string; instruction?: string; recipe_context?: string }
+  ) =>
+    apiFetch<CopyRewriteResult>(`/recipes/research/${recipeId}/rewrite`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  rewriteAdminCopy: (body: { field_label: string; text: string; instruction?: string; recipe_context?: string }) =>
+    apiFetch<CopyRewriteResult>("/admin/rewrite", {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
 
   // Admin dashboard — unified recipe management + trash.

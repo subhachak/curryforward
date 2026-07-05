@@ -6,6 +6,13 @@ export interface Ingredient {
   amount: number | null;
   unit: string;
   gram_equivalent?: number | null;
+  unit_options?: IngredientUnitOption[];
+}
+
+export interface IngredientUnitOption {
+  amount: number | null;
+  unit: string;
+  label?: string | null;
 }
 
 export interface RecipeComponent {
@@ -97,6 +104,8 @@ export interface RecipeDetail {
   cook_time_minutes: number | null;
   tips: string[];
   watch_outs: string[];
+  suggested_utensils: string[];
+  pan_conversions: PanConversion[];
   status: "draft" | "published";
   source: string;
   is_current_head: boolean;
@@ -120,6 +129,14 @@ export interface RecipeFeedbackSummary {
   rating_count: number;
   review_count: number;
   comment_count: number;
+}
+
+export interface PanConversion {
+  from_count: number | null;
+  from_size: string;
+  to_count: number | null;
+  to_size: string;
+  note?: string | null;
 }
 
 export interface RecipeFeedback {
@@ -230,6 +247,10 @@ export interface AutoResearchPlan {
   queries: SearchQueryItem[];
 }
 
+export interface CopyRewriteResult {
+  text: string;
+}
+
 export interface ResearchJobSummary {
   job_id: string;
   recipe_id: string;
@@ -274,6 +295,12 @@ export interface ResearchChatReply {
 
 export type ResearchTurnResult = SearchProposal | ResearchChatReply;
 
+export interface RecipeWideEditResult {
+  recipe: RecipeResearchDetail;
+  changed_fields: string[];
+  review_notes: string | null;
+}
+
 /** Partial direct-edit payload for PATCH /api/recipes/research/{id} — every
  * field optional, sent fields are applied (including explicit nulls, which
  * clear that field). */
@@ -293,6 +320,8 @@ export type ResearchPatchPayload = Partial<{
   cook_time_minutes: number | null;
   tips: string[];
   watch_outs: string[];
+  suggested_utensils: string[];
+  pan_conversions: PanConversion[];
   notes: string | null;
   starting_prompt: string | null;
   hero_image_url: string | null;

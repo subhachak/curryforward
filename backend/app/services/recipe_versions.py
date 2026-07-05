@@ -17,6 +17,8 @@ RICH_CONTENT_FIELDS = [
     "cook_time_minutes",
     "tips",
     "watch_outs",
+    "suggested_utensils",
+    "pan_conversions",
 ]
 
 

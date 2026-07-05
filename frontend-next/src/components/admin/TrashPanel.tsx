@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { CheckIcon, FlameIcon, RestoreIcon, XIcon } from "@/components/ui/icons";
 import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
 import type { TrashedRecipeSummary } from "@/lib/types";
@@ -63,13 +64,19 @@ export function TrashPanel({ recipes, onChanged }: TrashPanelProps) {
                       Deleted {r.deleted_at ? new Date(r.deleted_at).toLocaleDateString() : ""}
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="secondary" size="sm" loading={busy} onClick={() => restore(r)}>
-                      Restore
-                    </Button>
-                    <Button variant="danger" size="sm" onClick={() => setConfirmingPurgeId(r.recipe_id)}>
-                      Purge
-                    </Button>
+                  <div className="flex flex-wrap gap-1.5">
+                    <IconButton
+                      label="Restore draft"
+                      icon={<RestoreIcon />}
+                      loading={busy}
+                      onClick={() => restore(r)}
+                    />
+                    <IconButton
+                      label="Permanently delete"
+                      icon={<FlameIcon />}
+                      variant="danger"
+                      onClick={() => setConfirmingPurgeId(r.recipe_id)}
+                    />
                   </div>
                 </div>
 
@@ -79,13 +86,19 @@ export function TrashPanel({ recipes, onChanged }: TrashPanelProps) {
                       Permanently delete <strong>{r.name}</strong> and all its version history? This
                       cannot be undone — there is no Trash for this.
                     </div>
-                    <div className="flex gap-2">
-                      <Button variant="secondary" size="sm" onClick={() => setConfirmingPurgeId(null)}>
-                        Cancel
-                      </Button>
-                      <Button variant="danger" size="sm" loading={busy} onClick={() => purge(r)}>
-                        Yes, purge permanently
-                      </Button>
+                    <div className="flex gap-1.5">
+                      <IconButton
+                        label="Cancel"
+                        icon={<XIcon />}
+                        onClick={() => setConfirmingPurgeId(null)}
+                      />
+                      <IconButton
+                        label="Confirm permanent delete"
+                        icon={<CheckIcon />}
+                        variant="danger"
+                        loading={busy}
+                        onClick={() => purge(r)}
+                      />
                     </div>
                   </div>
                 )}

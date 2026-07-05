@@ -1,8 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { Input, Textarea } from "@/components/ui/Input";
+import { IconButton } from "@/components/ui/IconButton";
+import { CheckIcon, PencilIcon, SearchIcon, SendIcon, XIcon } from "@/components/ui/icons";
+import { CopyAssistField } from "@/components/research/CopyAssistField";
 
 export interface DisplayMessage {
   id: number;
@@ -12,6 +13,7 @@ export interface DisplayMessage {
 }
 
 interface ResearchChatPanelProps {
+  recipeId: string;
   messages: DisplayMessage[];
   pendingProposal: { query: string } | null;
   sending: boolean;
@@ -27,6 +29,7 @@ interface ResearchChatPanelProps {
 }
 
 export function ResearchChatPanel({
+  recipeId,
   messages,
   pendingProposal,
   sending,
@@ -60,13 +63,12 @@ export function ResearchChatPanel({
     <div className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-surface">
       <div className="flex items-center justify-between border-b border-border bg-surface-muted px-4 py-2.5">
         <div className="text-sm font-semibold text-ink">Research chat</div>
-        <button
-          type="button"
+        <IconButton
+          label={notesOpen ? "Hide notes" : "Show notes"}
+          icon={<PencilIcon />}
+          variant="ghost"
           onClick={() => setNotesOpen((v) => !v)}
-          className="text-xs font-medium text-brand-hover hover:underline"
-        >
-          {notesOpen ? "Hide notes" : "Notes"}
-        </button>
+        />
       </div>
 
       {notesOpen && (
@@ -74,10 +76,13 @@ export function ResearchChatPanel({
           <label className="mb-1 block text-xs font-medium text-muted">
             Your research scratchpad — not shown to guests, never published.
           </label>
-          <Textarea
+          <CopyAssistField
+            recipeId={recipeId}
+            fieldLabel="research scratchpad notes"
             value={notes}
-            onChange={(e) => onNotesChange(e.target.value)}
+            onChange={onNotesChange}
             rows={4}
+            multiline
             placeholder="Sources, half-formed ideas, things to double check…"
           />
         </div>
@@ -88,13 +93,9 @@ export function ResearchChatPanel({
           <div className="mb-2 text-foreground">
             <span className="font-semibold">Note suggestion:</span> {notesSuggestion}
           </div>
-          <div className="flex gap-2">
-            <Button size="sm" onClick={onAcceptNotesSuggestion}>
-              Add to notes
-            </Button>
-            <Button size="sm" variant="ghost" onClick={onDismissNotesSuggestion}>
-              Dismiss
-            </Button>
+          <div className="flex gap-1.5">
+            <IconButton label="Add to notes" icon={<CheckIcon />} onClick={onAcceptNotesSuggestion} />
+            <IconButton label="Dismiss note suggestion" icon={<XIcon />} variant="ghost" onClick={onDismissNotesSuggestion} />
           </div>
         </div>
       )}
@@ -104,7 +105,9 @@ export function ResearchChatPanel({
           m.kind === "search" ? (
             <div key={m.id} className="flex justify-start">
               <div className="max-w-[90%] rounded-lg border border-accent/30 bg-accent-soft px-3 py-2 text-xs text-accent-hover">
-                🔍 Searched: &ldquo;{m.text}&rdquo;
+                <span className="inline-flex items-center gap-1">
+                  <SearchIcon className="h-3.5 w-3.5" /> Searched: &ldquo;{m.text}&rdquo;
+                </span>
               </div>
             </div>
           ) : (
@@ -123,15 +126,13 @@ export function ResearchChatPanel({
         {pendingProposal && (
           <div className="rounded-lg border border-accent/40 bg-accent-soft px-3 py-3 text-sm">
             <div className="mb-2 text-foreground">
-              🔍 Search the web for: <strong>&ldquo;{pendingProposal.query}&rdquo;</strong>?
+              <span className="inline-flex items-center gap-1">
+                <SearchIcon className="h-4 w-4" /> Search the web for: <strong>&ldquo;{pendingProposal.query}&rdquo;</strong>?
+              </span>
             </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="accent" loading={deciding} onClick={onApprove}>
-                Approve
-              </Button>
-              <Button size="sm" variant="secondary" disabled={deciding} onClick={onDecline}>
-                Skip
-              </Button>
+            <div className="flex gap-1.5">
+              <IconButton label="Approve search" icon={<CheckIcon />} variant="accent" loading={deciding} onClick={onApprove} />
+              <IconButton label="Skip search" icon={<XIcon />} disabled={deciding} onClick={onDecline} />
             </div>
           </div>
         )}
@@ -140,15 +141,22 @@ export function ResearchChatPanel({
       </div>
 
       <form onSubmit={handleSubmit} className="flex gap-2 border-t border-border p-3">
-        <Input
+        <CopyAssistField
+          recipeId={recipeId}
+          fieldLabel="research chat message"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={setInput}
           placeholder={pendingProposal ? "Approve or skip the search above first…" : "Tell it what to research or build…"}
           disabled={Boolean(pendingProposal)}
+          className="flex-1"
         />
-        <Button type="submit" size="sm" loading={sending} disabled={!input.trim() || Boolean(pendingProposal)}>
-          Send
-        </Button>
+        <IconButton
+          type="submit"
+          label="Send"
+          icon={<SendIcon />}
+          loading={sending}
+          disabled={!input.trim() || Boolean(pendingProposal)}
+        />
       </form>
     </div>
   );

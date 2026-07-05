@@ -53,6 +53,8 @@ class RecipeVersion(Base):
     cook_time_minutes = Column(Integer, nullable=True)
     tips = Column(JSON, default=list)           # list[str]
     watch_outs = Column(JSON, default=list)     # list[str]
+    suggested_utensils = Column(JSON, default=list)  # list[str]
+    pan_conversions = Column(JSON, default=list)     # [{from_count, from_size, to_count, to_size, note}]
 
     # Admin-only scratch fields — never sent to guests, excluded from to_dict().
     notes = Column(Text, nullable=True)
@@ -107,6 +109,8 @@ class RecipeVersion(Base):
             "cook_time_minutes": self.cook_time_minutes,
             "tips": self.tips or [],
             "watch_outs": self.watch_outs or [],
+            "suggested_utensils": self.suggested_utensils or [],
+            "pan_conversions": self.pan_conversions or [],
             "status": self.status or "published",
             "source": self.source,
             "is_current_head": self.is_current_head,

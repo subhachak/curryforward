@@ -3,45 +3,20 @@
 import { ChangeEvent, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
-import { Input, Textarea } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { IconButton } from "@/components/ui/IconButton";
+import { CheckIcon, PlusIcon, SparklesIcon, UploadIcon, XIcon } from "@/components/ui/icons";
 import { NutritionCard } from "@/components/NutritionCard";
 import { RecipeContent } from "@/components/RecipeContent";
+import { CopyAssistField } from "@/components/research/CopyAssistField";
 import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
-import type { RecipeResearchDetail, ResearchPatchPayload } from "@/lib/types";
+import type { PanConversion, RecipeResearchDetail, ResearchPatchPayload } from "@/lib/types";
 
 interface RefineBoxProps {
   section: string;
   label: string;
   onRefine: (section: string, instruction: string) => Promise<void>;
-}
-
-interface IconButtonProps {
-  title: string;
-  children: ReactNode;
-  variant?: "secondary" | "ghost" | "danger" | "primary";
-  loading?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}
-
-function IconButton({ title, children, variant = "secondary", loading, disabled, onClick }: IconButtonProps) {
-  return (
-    <Button
-      type="button"
-      variant={variant}
-      size="sm"
-      loading={loading}
-      disabled={disabled}
-      title={title}
-      aria-label={title}
-      className="h-8 w-8 px-0"
-      onClick={onClick}
-    >
-      <span aria-hidden="true">{children}</span>
-    </Button>
-  );
 }
 
 function SectionHeader({ title, children }: { title: string; children?: ReactNode }) {
@@ -76,9 +51,7 @@ function RefineBox({ section, label, onRefine }: RefineBoxProps) {
 
   return (
     <div className="relative">
-      <IconButton title={`Refine ${label} with AI`} onClick={() => setOpen((v) => !v)}>
-        ✦
-      </IconButton>
+      <IconButton label={`Refine ${label} with AI`} icon={<SparklesIcon />} onClick={() => setOpen((v) => !v)} />
       {open && (
         <div className="absolute right-0 top-10 z-20 w-[min(20rem,calc(100vw-3rem))] space-y-2 rounded-md border border-border bg-surface p-3 shadow-lg">
           <Input
@@ -88,12 +61,8 @@ function RefineBox({ section, label, onRefine }: RefineBoxProps) {
             className="text-sm"
           />
           <div className="flex justify-end gap-2">
-            <IconButton title={`Apply refinement to ${label}`} loading={loading} disabled={!instruction.trim()} onClick={handleSend}>
-              ✓
-            </IconButton>
-            <IconButton title="Cancel refinement" variant="ghost" onClick={() => setOpen(false)}>
-              x
-            </IconButton>
+            <IconButton label={`Apply refinement to ${label}`} icon={<CheckIcon />} loading={loading} disabled={!instruction.trim()} onClick={handleSend} />
+            <IconButton label="Cancel refinement" icon={<XIcon />} variant="ghost" onClick={() => setOpen(false)} />
           </div>
         </div>
       )}
@@ -105,6 +74,7 @@ interface IngredientRow {
   name: string;
   amount: string;
   unit: string;
+  unitOptionsText: string;
 }
 interface ComponentRow {
   component_name: string;
@@ -117,7 +87,7 @@ interface StepRow {
 }
 
 function emptyIngredient(): IngredientRow {
-  return { name: "", amount: "", unit: "g" };
+  return { name: "", amount: "", unit: "g", unitOptionsText: "" };
 }
 function emptyComponent(): ComponentRow {
   return { component_name: "main", ingredients: [emptyIngredient()] };
@@ -135,6 +105,7 @@ function toComponentRows(recipe: RecipeResearchDetail): ComponentRow[] {
               name: i.name,
               amount: i.amount != null ? String(i.amount) : "",
               unit: i.unit ?? "g",
+              unitOptionsText: formatUnitOptions(i.unit_options || []),
             }))
           : [emptyIngredient()],
       }))
@@ -162,8 +133,72 @@ function buildComponentsPatch(rows: ComponentRow[]) {
           name: i.name.trim(),
           amount: i.amount.trim() ? Number(i.amount) : null,
           unit: i.unit.trim(),
+          unit_options: parseUnitOptions(i.unitOptionsText),
         })),
     }));
+}
+
+function parseUnitOptions(text: string) {
+  return text
+    .split(";")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => {
+      const match = item.match(/^([\d.]+)\s+(.+)$/);
+      return {
+        amount: match ? Number(match[1]) : null,
+        unit: match ? match[2].trim() : item,
+        label: item,
+      };
+    });
+}
+
+function formatUnitOptions(options: { amount: number | null; unit: string; label?: string | null }[]) {
+  return options
+    .map((option) => option.label || [option.amount, option.unit].filter(Boolean).join(" "))
+    .filter(Boolean)
+    .join("; ");
+}
+
+function parseLines(text: string) {
+  return text.split("\n").map((item) => item.trim()).filter(Boolean);
+}
+
+function parsePanConversions(text: string): PanConversion[] {
+  return text
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [conversion, note] = line.split("|").map((part) => part.trim());
+      const [from, to] = conversion.split("=").map((part) => part.trim());
+      const fromSide = parsePanSide(from);
+      const toSide = parsePanSide(to);
+      return {
+        from_count: fromSide.count,
+        from_size: fromSide.size,
+        to_count: toSide.count,
+        to_size: toSide.size,
+        note: note || null,
+      };
+    });
+}
+
+function parsePanSide(text: string | undefined) {
+  const match = (text || "").match(/^([\d.]+)\s*x\s*(.+)$/i);
+  return {
+    count: match ? Number(match[1]) : null,
+    size: match ? match[2].trim() : text || "",
+  };
+}
+
+function formatPanConversions(rows: PanConversion[]) {
+  return rows
+    .map((row) => {
+      const conversion = `${row.from_count ?? ""} x ${row.from_size} = ${row.to_count ?? ""} x ${row.to_size}`;
+      return row.note ? `${conversion} | ${row.note}` : conversion;
+    })
+    .join("\n");
 }
 
 function buildStepsPatch(rows: StepRow[]) {
@@ -181,10 +216,24 @@ interface ResearchDocumentPreviewProps {
   previewMode: boolean;
   onCommit: (patch: ResearchPatchPayload) => void;
   onRefine: (section: string, instruction: string) => Promise<void>;
+  highlightedFields?: string[];
+  onClearHighlights?: () => void;
 }
 
-export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefine }: ResearchDocumentPreviewProps) {
+export function ResearchDocumentPreview({
+  recipe,
+  previewMode,
+  onCommit,
+  onRefine,
+  highlightedFields = [],
+  onClearHighlights,
+}: ResearchDocumentPreviewProps) {
   const { push } = useToast();
+  const highlightSet = new Set(highlightedFields);
+  const isHighlighted = (fields: string[]) => fields.some((field) => highlightSet.has(field));
+  const highlightClass = (fields: string[]) => (isHighlighted(fields) ? "border-brand/60 bg-brand-soft/25" : "");
+  const reviewBadge = (fields: string[]) =>
+    isHighlighted(fields) ? <span className="text-xs font-medium text-accent-hover">Updated by AI</span> : null;
 
   const [name, setName] = useState(recipe.name);
   const [category, setCategory] = useState(recipe.category ?? "");
@@ -203,6 +252,8 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
   const [cookTime, setCookTime] = useState(recipe.cook_time_minutes != null ? String(recipe.cook_time_minutes) : "");
   const [tipsText, setTipsText] = useState(recipe.tips.join("\n"));
   const [watchOutsText, setWatchOutsText] = useState(recipe.watch_outs.join("\n"));
+  const [utensilsText, setUtensilsText] = useState((recipe.suggested_utensils || []).join("\n"));
+  const [panConversionsText, setPanConversionsText] = useState(formatPanConversions(recipe.pan_conversions || []));
   const [components, setComponents] = useState<ComponentRow[]>(() => toComponentRows(recipe));
   const [steps, setSteps] = useState<StepRow[]>(() => toStepRows(recipe));
   const [heroImageUrl, setHeroImageUrl] = useState(recipe.hero_image_url);
@@ -225,12 +276,28 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
   function updateComponent(idx: number, patch: Partial<ComponentRow>) {
     setComponents((rows) => rows.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
   }
+  function applyComponentName(idx: number, value: string) {
+    setComponents((rows) => {
+      const next = rows.map((c, i) => (i === idx ? { ...c, component_name: value } : c));
+      commitComponents(next);
+      return next;
+    });
+  }
   function updateIngredient(ci: number, ii: number, patch: Partial<IngredientRow>) {
     setComponents((rows) =>
       rows.map((c, i) =>
         i === ci ? { ...c, ingredients: c.ingredients.map((ing, j) => (j === ii ? { ...ing, ...patch } : ing)) } : c
       )
     );
+  }
+  function applyIngredient(ci: number, ii: number, patch: Partial<IngredientRow>) {
+    setComponents((rows) => {
+      const next = rows.map((c, i) =>
+        i === ci ? { ...c, ingredients: c.ingredients.map((ing, j) => (j === ii ? { ...ing, ...patch } : ing)) } : c
+      );
+      commitComponents(next);
+      return next;
+    });
   }
   function commitComponents(rows: ComponentRow[]) {
     onCommit({ components: buildComponentsPatch(rows) });
@@ -268,6 +335,13 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
 
   function updateStep(idx: number, patch: Partial<StepRow>) {
     setSteps((rows) => rows.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
+  }
+  function applyStepInstruction(idx: number, value: string) {
+    setSteps((rows) => {
+      const next = rows.map((s, i) => (i === idx ? { ...s, instruction: value } : s));
+      commitSteps(next);
+      return next;
+    });
   }
   function commitSteps(rows: StepRow[]) {
     onCommit({ steps: buildStepsPatch(rows) });
@@ -329,19 +403,45 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
 
   return (
     <div className="space-y-6">
-      <Card>
+      <Card className={highlightClass([
+        "name",
+        "category",
+        "cuisine_tags",
+        "base_servings_amount",
+        "base_servings_unit",
+        "serving_size_amount",
+        "serving_size_unit",
+        "intro",
+        "history",
+        "prep_time_minutes",
+        "cook_time_minutes",
+      ])}>
         <CardBody className="space-y-4">
           <SectionHeader title="Recipe details">
+            {reviewBadge([
+              "name",
+              "category",
+              "cuisine_tags",
+              "base_servings_amount",
+              "base_servings_unit",
+              "serving_size_amount",
+              "serving_size_unit",
+              "intro",
+              "history",
+              "prep_time_minutes",
+              "cook_time_minutes",
+            ])}
             <RefineBox section="history" label="intro & history" onRefine={onRefine} />
           </SectionHeader>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Name</label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onBlur={() => onCommit({ name: name.trim() })}
-            />
-          </div>
+          <CopyAssistField
+            recipeId={recipe.recipe_id}
+            fieldLabel="recipe name"
+            label="Name"
+            value={name}
+            onChange={setName}
+            onBlur={() => onCommit({ name: name.trim() })}
+            onApply={(next) => onCommit({ name: next.trim() })}
+          />
           <div>
             <label className="mb-1 block text-sm font-medium">Hero image</label>
             <div className="flex items-center gap-3">
@@ -365,26 +465,26 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
                 onChange={handleHeroImageSelected}
               />
               <IconButton
-                title={heroImageUrl ? "Replace hero image" : "Upload hero image"}
+                label={heroImageUrl ? "Replace hero image" : "Upload hero image"}
+                icon={<UploadIcon />}
                 loading={uploadingHero}
                 onClick={() => heroFileInputRef.current?.click()}
-              >
-                ↑
-              </IconButton>
+              />
               {heroImageUrl && (
-                <IconButton title="Remove hero image" variant="ghost" onClick={handleHeroImageRemove}>
-                  x
-                </IconButton>
+                <IconButton label="Remove hero image" icon={<XIcon />} variant="ghost" onClick={handleHeroImageRemove} />
               )}
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-sm font-medium">Category</label>
-              <Input
+              <CopyAssistField
+                recipeId={recipe.recipe_id}
+                fieldLabel="recipe category"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={setCategory}
                 onBlur={() => onCommit({ category: category.trim() || null })}
+                onApply={(next) => onCommit({ category: next.trim() || null })}
                 placeholder="main, dessert…"
               />
             </div>
@@ -401,10 +501,13 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Serving unit</label>
-              <Input
+              <CopyAssistField
+                recipeId={recipe.recipe_id}
+                fieldLabel="serving unit"
                 value={servingsUnit}
-                onChange={(e) => setServingsUnit(e.target.value)}
+                onChange={setServingsUnit}
                 onBlur={() => onCommit({ base_servings_unit: servingsUnit.trim() || "servings" })}
+                onApply={(next) => onCommit({ base_servings_unit: next.trim() || "servings" })}
               />
             </div>
           </div>
@@ -423,22 +526,32 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Serving size unit</label>
-              <Input
+              <CopyAssistField
+                recipeId={recipe.recipe_id}
+                fieldLabel="serving size unit"
                 value={servingSizeUnit}
-                onChange={(e) => setServingSizeUnit(e.target.value)}
+                onChange={setServingSizeUnit}
                 onBlur={() => onCommit({ serving_size_unit: servingSizeUnit.trim() || null })}
+                onApply={(next) => onCommit({ serving_size_unit: next.trim() || null })}
                 placeholder="bowl, piece, cup, 250 g"
               />
             </div>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Cuisine tags</label>
-            <Input
+            <CopyAssistField
+              recipeId={recipe.recipe_id}
+              fieldLabel="cuisine tags"
               value={cuisineTags}
-              onChange={(e) => setCuisineTags(e.target.value)}
+              onChange={setCuisineTags}
               onBlur={() =>
                 onCommit({
                   cuisine_tags: cuisineTags.split(",").map((t) => t.trim()).filter(Boolean),
+                })
+              }
+              onApply={(next) =>
+                onCommit({
+                  cuisine_tags: next.split(",").map((t) => t.trim()).filter(Boolean),
                 })
               }
               placeholder="thai, spicy, weeknight (comma separated)"
@@ -466,113 +579,138 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Intro</label>
-            <Textarea
+            <CopyAssistField
+              recipeId={recipe.recipe_id}
+              fieldLabel="recipe intro"
               value={intro}
-              onChange={(e) => setIntro(e.target.value)}
+              onChange={setIntro}
               onBlur={() => onCommit({ intro: intro.trim() || null })}
+              onApply={(next) => onCommit({ intro: next.trim() || null })}
               rows={2}
+              multiline
               placeholder="A short, appetizing description of the dish"
             />
           </div>
           <div className="space-y-2">
             <label className="mb-1 block text-sm font-medium">History &amp; facts</label>
-            <Textarea
+            <CopyAssistField
+              recipeId={recipe.recipe_id}
+              fieldLabel="history and facts"
               value={history}
-              onChange={(e) => setHistory(e.target.value)}
+              onChange={setHistory}
               onBlur={() => onCommit({ history: history.trim() || null })}
+              onApply={(next) => onCommit({ history: next.trim() || null })}
               rows={4}
+              multiline
               placeholder="Where this dish comes from, traditions, why it matters"
             />
           </div>
         </CardBody>
       </Card>
 
-      <Card>
+      <Card className={highlightClass(["components"])}>
         <CardBody className="space-y-4">
           <SectionHeader title="Components & ingredients">
+            {reviewBadge(["components"])}
             <RefineBox section="ingredients" label="ingredients" onRefine={onRefine} />
           </SectionHeader>
           {components.map((component, ci) => (
             <div key={ci} className="rounded-lg border border-border p-3 space-y-3">
               <div className="flex items-center gap-2">
-                <Input
+                <CopyAssistField
+                  recipeId={recipe.recipe_id}
+                  fieldLabel="recipe component name"
                   value={component.component_name}
-                  onChange={(e) => updateComponent(ci, { component_name: e.target.value })}
+                  onChange={(value) => updateComponent(ci, { component_name: value })}
                   onBlur={() => commitComponents(components)}
+                  onApply={(value) => applyComponentName(ci, value)}
                   placeholder="Component name, e.g. main, sauce, garnish"
                   className="flex-1"
                 />
                 {components.length > 1 && (
-                  <IconButton title="Remove component" variant="ghost" onClick={() => removeComponent(ci)}>
-                    x
-                  </IconButton>
+                  <IconButton label="Remove component" icon={<XIcon />} variant="ghost" onClick={() => removeComponent(ci)} />
                 )}
               </div>
               <div className="space-y-2">
                 {component.ingredients.map((ing, ii) => (
-                  <div key={ii} className="flex gap-2">
-                    <Input
-                      value={ing.amount}
-                      onChange={(e) => updateIngredient(ci, ii, { amount: e.target.value })}
+                  <div key={ii} className="space-y-2 rounded-md bg-surface-muted p-2">
+                    <div className="flex gap-2">
+                      <Input
+                        value={ing.amount}
+                        onChange={(e) => updateIngredient(ci, ii, { amount: e.target.value })}
+                        onBlur={() => commitComponents(components)}
+                        placeholder="Amt"
+                        className="w-20"
+                        inputMode="decimal"
+                      />
+                      <CopyAssistField
+                        recipeId={recipe.recipe_id}
+                        fieldLabel="ingredient unit"
+                        value={ing.unit}
+                        onChange={(value) => updateIngredient(ci, ii, { unit: value })}
+                        onBlur={() => commitComponents(components)}
+                        onApply={(value) => applyIngredient(ci, ii, { unit: value })}
+                        placeholder="g"
+                        className="w-20"
+                      />
+                      <CopyAssistField
+                        recipeId={recipe.recipe_id}
+                        fieldLabel="ingredient name"
+                        value={ing.name}
+                        onChange={(value) => updateIngredient(ci, ii, { name: value })}
+                        onBlur={() => commitComponents(components)}
+                        onApply={(value) => applyIngredient(ci, ii, { name: value })}
+                        placeholder="Ingredient name"
+                        className="flex-1"
+                      />
+                      {component.ingredients.length > 1 && (
+                        <IconButton label="Remove ingredient" icon={<XIcon />} variant="ghost" onClick={() => removeIngredient(ci, ii)} />
+                      )}
+                    </div>
+                    <CopyAssistField
+                      recipeId={recipe.recipe_id}
+                      fieldLabel="alternate ingredient units"
+                      value={ing.unitOptionsText}
+                      onChange={(value) => updateIngredient(ci, ii, { unitOptionsText: value })}
                       onBlur={() => commitComponents(components)}
-                      placeholder="Amt"
-                      className="w-20"
-                      inputMode="decimal"
+                      onApply={(value) => applyIngredient(ci, ii, { unitOptionsText: value })}
+                      placeholder="Alternate units, e.g. 1 cup; 240 ml"
+                      inputClassName="text-xs"
                     />
-                    <Input
-                      value={ing.unit}
-                      onChange={(e) => updateIngredient(ci, ii, { unit: e.target.value })}
-                      onBlur={() => commitComponents(components)}
-                      placeholder="g"
-                      className="w-20"
-                    />
-                    <Input
-                      value={ing.name}
-                      onChange={(e) => updateIngredient(ci, ii, { name: e.target.value })}
-                      onBlur={() => commitComponents(components)}
-                      placeholder="Ingredient name"
-                      className="flex-1"
-                    />
-                    {component.ingredients.length > 1 && (
-                      <IconButton title="Remove ingredient" variant="ghost" onClick={() => removeIngredient(ci, ii)}>
-                        x
-                      </IconButton>
-                    )}
                   </div>
                 ))}
-                <IconButton title="Add ingredient" onClick={() => addIngredient(ci)}>
-                  +
-                </IconButton>
+                <IconButton label="Add ingredient" icon={<PlusIcon />} onClick={() => addIngredient(ci)} />
               </div>
             </div>
           ))}
-          <IconButton title="Add component" onClick={addComponent}>
-            +
-          </IconButton>
+          <IconButton label="Add component" icon={<PlusIcon />} onClick={addComponent} />
         </CardBody>
       </Card>
 
-      <Card>
+      <Card className={highlightClass(["steps"])}>
         <CardBody className="space-y-3">
           <SectionHeader title="Steps">
+            {reviewBadge(["steps"])}
             <RefineBox section="steps" label="steps" onRefine={onRefine} />
           </SectionHeader>
           {steps.map((step, si) => (
             <div key={si} className="space-y-2 rounded-lg border border-border p-3">
               <div className="flex gap-2">
                 <span className="mt-2 text-sm text-muted">{si + 1}.</span>
-                <Textarea
+                <CopyAssistField
+                  recipeId={recipe.recipe_id}
+                  fieldLabel={`step ${si + 1} instruction`}
                   value={step.instruction}
-                  onChange={(e) => updateStep(si, { instruction: e.target.value })}
+                  onChange={(value) => updateStep(si, { instruction: value })}
                   onBlur={() => commitSteps(steps)}
+                  onApply={(value) => applyStepInstruction(si, value)}
                   placeholder="What to do in this step"
                   rows={2}
+                  multiline
                   className="flex-1"
                 />
                 {steps.length > 1 && (
-                  <IconButton title="Remove step" variant="ghost" onClick={() => removeStep(si)}>
-                    x
-                  </IconButton>
+                  <IconButton label="Remove step" icon={<XIcon />} variant="ghost" onClick={() => removeStep(si)} />
                 )}
               </div>
               <div className="flex items-center gap-3 pl-6">
@@ -590,46 +728,83 @@ export function ResearchDocumentPreview({ recipe, previewMode, onCommit, onRefin
                   onChange={(e) => handleImageSelected(si, e)}
                 />
                 <IconButton
-                  title={step.image_url ? "Replace step image" : "Add step image"}
+                  label={step.image_url ? "Replace step image" : "Add step image"}
+                  icon={<UploadIcon />}
                   loading={uploadingStep === si}
                   onClick={() => fileInputRefs.current[si]?.click()}
-                >
-                  ↑
-                </IconButton>
+                />
               </div>
             </div>
           ))}
-          <IconButton title="Add step" onClick={addStep}>
-            +
-          </IconButton>
+          <IconButton label="Add step" icon={<PlusIcon />} onClick={addStep} />
         </CardBody>
       </Card>
 
-      <Card>
+      <Card className={highlightClass(["tips", "watch_outs", "suggested_utensils", "pan_conversions"])}>
         <CardBody className="space-y-4">
           <SectionHeader title="Tips & watch-outs">
+            {reviewBadge(["tips", "watch_outs", "suggested_utensils", "pan_conversions"])}
+            {highlightedFields.length > 0 && onClearHighlights && (
+              <IconButton label="Mark AI changes reviewed" icon={<CheckIcon />} onClick={onClearHighlights} />
+            )}
             <RefineBox section="tips" label="tips & watch-outs" onRefine={onRefine} />
           </SectionHeader>
           <div>
             <label className="mb-1 block text-sm font-medium">Tips &amp; tricks (one per line)</label>
-            <Textarea
+            <CopyAssistField
+              recipeId={recipe.recipe_id}
+              fieldLabel="tips and tricks"
               value={tipsText}
-              onChange={(e) => setTipsText(e.target.value)}
+              onChange={setTipsText}
               onBlur={() =>
                 onCommit({ tips: tipsText.split("\n").map((t) => t.trim()).filter(Boolean) })
               }
+              onApply={(next) => onCommit({ tips: next.split("\n").map((t) => t.trim()).filter(Boolean) })}
               rows={3}
+              multiline
             />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Things to watch out for (one per line)</label>
-            <Textarea
+            <CopyAssistField
+              recipeId={recipe.recipe_id}
+              fieldLabel="things to watch out for"
               value={watchOutsText}
-              onChange={(e) => setWatchOutsText(e.target.value)}
+              onChange={setWatchOutsText}
               onBlur={() =>
                 onCommit({ watch_outs: watchOutsText.split("\n").map((t) => t.trim()).filter(Boolean) })
               }
+              onApply={(next) => onCommit({ watch_outs: next.split("\n").map((t) => t.trim()).filter(Boolean) })}
               rows={3}
+              multiline
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Suggested utensils (one per line)</label>
+            <CopyAssistField
+              recipeId={recipe.recipe_id}
+              fieldLabel="suggested cooking utensils"
+              value={utensilsText}
+              onChange={setUtensilsText}
+              onBlur={() => onCommit({ suggested_utensils: parseLines(utensilsText) })}
+              onApply={(next) => onCommit({ suggested_utensils: parseLines(next) })}
+              rows={3}
+              multiline
+              placeholder={"Heavy-bottomed pan\nRimmed baking sheet\nInstant-read thermometer"}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Baking pan conversions</label>
+            <CopyAssistField
+              recipeId={recipe.recipe_id}
+              fieldLabel="baking pan conversions"
+              value={panConversionsText}
+              onChange={setPanConversionsText}
+              onBlur={() => onCommit({ pan_conversions: parsePanConversions(panConversionsText) })}
+              onApply={(next) => onCommit({ pan_conversions: parsePanConversions(next) })}
+              rows={3}
+              multiline
+              placeholder="1 x 9-inch round = 2 x 6-inch round | reduce bake time slightly"
             />
           </div>
         </CardBody>

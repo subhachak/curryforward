@@ -39,7 +39,15 @@ def render_markdown(recipe: dict) -> str:
             lines.append(f"\n**{component['component_name']}**")
         for ing in component.get("ingredients", []):
             amount = f"{ing['amount']} {ing['unit']}".strip() if ing.get("amount") else ""
-            lines.append(f"- {amount + ' ' if amount else ''}{ing['name']}")
+            alternates = ing.get("unit_options") or []
+            alt_text = ""
+            if alternates:
+                labels = [
+                    option.get("label") or " ".join(str(v) for v in (option.get("amount"), option.get("unit")) if v)
+                    for option in alternates
+                ]
+                alt_text = f" ({'; '.join(label for label in labels if label)})"
+            lines.append(f"- {amount + ' ' if amount else ''}{ing['name']}{alt_text}")
     lines.append("")
 
     lines.append("## Steps")
@@ -57,6 +65,21 @@ def render_markdown(recipe: dict) -> str:
         lines.append("## Things to watch out for")
         for w in recipe["watch_outs"]:
             lines.append(f"- {w}")
+        lines.append("")
+
+    if recipe.get("suggested_utensils"):
+        lines.append("## Suggested utensils")
+        for item in recipe["suggested_utensils"]:
+            lines.append(f"- {item}")
+        lines.append("")
+
+    if recipe.get("pan_conversions"):
+        lines.append("## Baking pan conversions")
+        for item in recipe["pan_conversions"]:
+            from_side = f"{item.get('from_count') or '?'} x {item.get('from_size') or ''}".strip()
+            to_side = f"{item.get('to_count') or '?'} x {item.get('to_size') or ''}".strip()
+            note = f" — {item['note']}" if item.get("note") else ""
+            lines.append(f"- {from_side} = {to_side}{note}")
         lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"

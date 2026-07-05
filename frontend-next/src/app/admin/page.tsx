@@ -4,11 +4,13 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ModelPicker } from "@/components/research/ModelPicker";
+import { CopyAssistField } from "@/components/research/CopyAssistField";
 import { RecipeManagementTable } from "@/components/admin/RecipeManagementTable";
 import { TrashPanel } from "@/components/admin/TrashPanel";
 import { Card, CardBody } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Input, Textarea } from "@/components/ui/Input";
+import { IconButton } from "@/components/ui/IconButton";
+import { CheckIcon, LogOutIcon, PlusIcon, SendIcon, XIcon } from "@/components/ui/icons";
+import { Input } from "@/components/ui/Input";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
@@ -190,9 +192,7 @@ export default function AdminPage() {
           <h1 className="text-2xl font-bold text-ink">Workspace</h1>
           <p className="text-sm text-muted">Manage recipes, research drafts, feedback, analytics, and cleanup.</p>
         </div>
-        <Button variant="secondary" size="sm" onClick={handleLogout}>
-          Log out
-        </Button>
+        <IconButton label="Log out" icon={<LogOutIcon />} onClick={handleLogout} />
       </div>
 
       <div className="grid gap-3 rounded-md border border-border bg-surface p-3 sm:grid-cols-2 lg:grid-cols-6">
@@ -362,9 +362,7 @@ function RecipesTab({
                 </option>
               ))}
             </select>
-            <Button type="button" onClick={onStartResearch}>
-              New research
-            </Button>
+            <IconButton label="Research new recipe" icon={<PlusIcon />} size="md" onClick={onStartResearch} />
           </div>
           <div className="mt-3 text-sm text-muted">
             Showing {recipes.length} of {totalRecipes} recipes.
@@ -402,17 +400,24 @@ function ResearchTab({
           </p>
         </div>
         <form onSubmit={onSubmit} className="space-y-3">
-          <Textarea
+          <CopyAssistField
+            fieldLabel="new recipe research prompt"
             value={prompt}
-            onChange={(e) => onPromptChange(e.target.value)}
+            onChange={onPromptChange}
             placeholder="A dish name, a longer description, or paste a draft recipe to refine..."
+            multiline
             rows={8}
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <ModelPicker value={model} onChange={onModelChange} />
-            <Button type="submit" loading={starting} disabled={!prompt.trim()}>
-              Start research
-            </Button>
+            <IconButton
+              type="submit"
+              label="Start research"
+              icon={<SendIcon />}
+              size="md"
+              loading={starting}
+              disabled={!prompt.trim()}
+            />
           </div>
         </form>
       </CardBody>
@@ -487,13 +492,20 @@ function FeedbackReviewPanel({
                         {item.rating ? ` · ${item.rating}/5` : ""}
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button variant="secondary" size="sm" loading={busy} onClick={() => decide(item, true)}>
-                        Approve
-                      </Button>
-                      <Button variant="danger" size="sm" loading={busy} onClick={() => decide(item, false)}>
-                        Reject
-                      </Button>
+                    <div className="flex gap-1.5">
+                      <IconButton
+                        label="Approve feedback"
+                        icon={<CheckIcon />}
+                        loading={busy}
+                        onClick={() => decide(item, true)}
+                      />
+                      <IconButton
+                        label="Reject feedback"
+                        icon={<XIcon />}
+                        variant="danger"
+                        loading={busy}
+                        onClick={() => decide(item, false)}
+                      />
                     </div>
                   </div>
                   <p className="mt-3 whitespace-pre-wrap text-sm text-foreground">{item.comment}</p>

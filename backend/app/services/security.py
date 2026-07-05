@@ -104,7 +104,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             or path.endswith("/auto/plan")
             or path.endswith("/auto/run")
             or path.endswith("/refine")
-            or path in {"/api/recipes/draft", "/api/recipes/generate"}
+            or path.endswith("/rewrite")
+            or path.endswith("/wide-edit")
+            or path in {"/api/admin/rewrite", "/api/recipes/draft", "/api/recipes/generate"}
         ):
             return "llm", self.llm_limit
         return "default", self.default_limit

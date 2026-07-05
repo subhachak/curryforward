@@ -16,9 +16,11 @@ from sqlalchemy.orm import Session
 
 from ..auth import require_admin
 from ..db import get_db
+from ..llm_client import is_litellm_configured, is_model_available, litellm_completion
 from ..models import AdminAuditLog, LLMUsageLog, RecipeAnalytics, RecipeFeedback, RecipeVersion
 from ..services.audit import audit_admin_action
-from ..services.llm_settings import available_models, get_llm_settings, set_llm_setting
+from ..services.llm_settings import available_models, get_llm_settings, resolve_task_model, set_llm_setting
+from ..services.llm_usage import record_llm_usage
 from ..services.recipe_versions import fork_recipe_version
 
 router = APIRouter(prefix="/api/admin")
@@ -30,6 +32,54 @@ class FeedbackDecision(BaseModel):
 
 class LLMSettingUpdate(BaseModel):
     model: str
+
+
+class CopyRewriteRequest(BaseModel):
+    field_label: str
+    text: str
+    instruction: str | None = None
+    recipe_context: str | None = None
+
+
+class CopyRewriteResponse(BaseModel):
+    text: str
+
+
+def _rewrite_copy_text(req: CopyRewriteRequest, model: str) -> tuple[str, object]:
+    field_label = req.field_label.strip()[:120] or "field"
+    source_text = req.text.strip()
+    instruction = (req.instruction or "").strip() or "Rewrite this into polished, user-friendly copy."
+    context = (req.recipe_context or "").strip()[:600]
+    context_line = f"Nearby context: {context}\n" if context else ""
+    if not source_text:
+        raise HTTPException(400, "Text is required")
+    response = litellm_completion(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a precise recipe copy editor inside Curryforward. Rewrite only "
+                    "the requested field into clear, warm, publishable recipe copy. Keep the "
+                    "same factual meaning. Do not invent facts, ingredients, timings, dietary "
+                    "claims, history, or provenance. Return only the rewritten field text, no "
+                    "quotes, markdown, labels, or explanation. Preserve list-like formatting "
+                    "when the input is a newline-separated list."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Field: {field_label}\n"
+                    f"Admin direction: {instruction}\n"
+                    f"{context_line}"
+                    f"Current text:\n{source_text}"
+                ),
+            },
+        ],
+        temperature=0.4,
+    )
+    return (response.choices[0].message.content or "").strip(), response
 
 
 @router.get("/recipes")
@@ -99,6 +149,39 @@ def update_llm_setting(
         return result
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@router.post("/rewrite", response_model=CopyRewriteResponse)
+def rewrite_admin_copy(
+    req: CopyRewriteRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
+    if not is_litellm_configured():
+        raise HTTPException(400, "litellm is not installed — check backend/requirements.txt")
+    model = resolve_task_model("copy_rewrite", db)
+    if not is_model_available(model):
+        raise HTTPException(400, f"No API key configured for model '{model}' — add it to backend/.env")
+    try:
+        text, response = _rewrite_copy_text(req, model)
+    except HTTPException:
+        raise
+    except Exception as e:
+        record_llm_usage(task="copy_rewrite", model=model, role=role, status="error", error=str(e))
+        raise HTTPException(500, f"Rewrite failed: {e}")
+    record_llm_usage(task="copy_rewrite", model=model, role=role, response=response)
+    if not text:
+        raise HTTPException(500, "Rewrite returned an empty response")
+    audit_admin_action(
+        db,
+        action="copy_rewrite_generated",
+        target_type="admin",
+        request=request,
+        details={"field": req.field_label.strip()[:120]},
+    )
+    db.commit()
+    return {"text": text}
 
 
 @router.post("/recipes/{recipe_id}/edit-draft")

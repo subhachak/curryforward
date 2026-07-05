@@ -142,6 +142,11 @@ class StepsSection(BaseModel):
 class TipsSection(BaseModel):
     tips: list[str] = Field(default_factory=list)
     watch_outs: list[str] = Field(default_factory=list)
+    suggested_utensils: list[str] = Field(default_factory=list)
+    pan_conversions: list[dict] = Field(
+        default_factory=list,
+        description='For baking recipes only: [{"from_count": number, "from_size": str, "to_count": number, "to_size": str, "note": str|null}]',
+    )
 
 
 class MergedRecipePatch(BaseModel):
@@ -158,6 +163,8 @@ class MergedRecipePatch(BaseModel):
     cook_time_minutes: Optional[int] = None
     tips: list[str] = Field(default_factory=list)
     watch_outs: list[str] = Field(default_factory=list)
+    suggested_utensils: list[str] = Field(default_factory=list)
+    pan_conversions: list[dict] = Field(default_factory=list)
 
 
 # Section key -> Pydantic schema + a human label, shared by the crew's task

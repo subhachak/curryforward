@@ -10,6 +10,7 @@ class IngredientPayload(BaseModel):
     amount: float | None = None
     unit: str = ""
     gram_equivalent: float | None = None
+    unit_options: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ComponentPayload(BaseModel):
@@ -78,6 +79,8 @@ class RecipeDetailResponse(BaseModel):
     cook_time_minutes: int | None
     tips: list[str]
     watch_outs: list[str]
+    suggested_utensils: list[str]
+    pan_conversions: list[dict[str, Any]]
     status: Literal["draft", "published"] | str
     source: str | None
     is_current_head: bool

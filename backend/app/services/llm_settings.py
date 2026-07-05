@@ -41,6 +41,16 @@ TASK_DEFAULTS = {
         "default_model": "gemini/gemini-2.5-flash",
         "description": "Focused rewrites for recipe sections.",
     },
+    "copy_rewrite": {
+        "label": "Field copy rewrite",
+        "default_model": "gemini/gemini-2.5-flash-lite",
+        "description": "Cheap admin-only rewrites for individual editable text fields.",
+    },
+    "recipe_wide_edit": {
+        "label": "Recipe-wide edit",
+        "default_model": "gemini/gemini-2.5-flash",
+        "description": "Applies broad admin instructions across ingredients, steps, copy, equipment, and metadata.",
+    },
     "recipe_customize": {
         "label": "Recipe customization",
         "default_model": "anthropic/claude-haiku-4-5-20251001",

@@ -8,7 +8,9 @@ import { ModelPicker } from "@/components/research/ModelPicker";
 import { ResearchChatPanel, type DisplayMessage } from "@/components/research/ResearchChatPanel";
 import { ResearchDocumentPreview } from "@/components/research/ResearchDocumentPreview";
 import { Card, CardBody } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { CheckIcon, CopyIcon, EyeIcon, PencilIcon, SendIcon, XIcon } from "@/components/ui/icons";
+import { Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { useAuth } from "@/context/AuthContext";
@@ -40,6 +42,10 @@ function ResearchWorkspaceInner() {
   const [confirmingPublish, setConfirmingPublish] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [mode, setMode] = useState<"guided" | "auto">("auto");
+  const [wideEditPrompt, setWideEditPrompt] = useState("");
+  const [wideEditing, setWideEditing] = useState(false);
+  const [reviewHighlights, setReviewHighlights] = useState<string[]>([]);
+  const [reviewNotes, setReviewNotes] = useState<string | null>(null);
 
   const nextId = useRef(0);
   const kickedOff = useRef(false);
@@ -183,6 +189,26 @@ function ResearchWorkspaceInner() {
     }
   }
 
+  async function handleWideEdit() {
+    if (!recipeId) return;
+    const instruction = wideEditPrompt.trim();
+    if (!instruction) return;
+    setWideEditing(true);
+    try {
+      const result = await api.wideEditRecipe(recipeId, instruction);
+      setRecipe(result.recipe);
+      setReviewHighlights(result.changed_fields);
+      setReviewNotes(result.review_notes);
+      setWideEditPrompt("");
+      setSaveStatus("saved");
+      push(`Updated ${result.changed_fields.length || 0} section${result.changed_fields.length === 1 ? "" : "s"} for review`, "success");
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Recipe-wide edit failed", "error");
+    } finally {
+      setWideEditing(false);
+    }
+  }
+
   function handleNotesChange(value: string) {
     setRecipe((prev) => (prev ? { ...prev, notes: value } : prev));
     if (notesTimer.current) clearTimeout(notesTimer.current);
@@ -271,17 +297,20 @@ function ResearchWorkspaceInner() {
           {isDraft ? (
             <>
               <ModelPicker value={recipe.research_model} onChange={handleModelChange} />
-              <Button variant="secondary" size="sm" onClick={() => setPreviewMode((v) => !v)}>
-                {previewMode ? "Edit" : "Preview as guest"}
-              </Button>
-              <Button size="sm" disabled={!canPublish} onClick={() => setConfirmingPublish(true)}>
-                Publish
-              </Button>
+              <IconButton
+                label={previewMode ? "Edit draft" : "Preview as guest"}
+                icon={previewMode ? <PencilIcon /> : <EyeIcon />}
+                onClick={() => setPreviewMode((v) => !v)}
+              />
+              <IconButton
+                label="Publish"
+                icon={<SendIcon />}
+                disabled={!canPublish}
+                onClick={() => setConfirmingPublish(true)}
+              />
             </>
           ) : (
-            <Button variant="secondary" size="sm" onClick={() => router.push("/admin")}>
-              Back to dashboard
-            </Button>
+            <IconButton label="Back to dashboard" icon={<XIcon />} onClick={() => router.push("/admin")} />
           )}
         </div>
       </div>
@@ -326,9 +355,7 @@ function ResearchWorkspaceInner() {
             <div className="text-muted">
               Published recipes are read-only here. Start edits from the admin dashboard to create a draft copy.
             </div>
-            <Button variant="secondary" size="sm" onClick={() => router.push("/admin")}>
-              Open dashboard
-            </Button>
+            <IconButton label="Open dashboard" icon={<XIcon />} onClick={() => router.push("/admin")} />
           </CardBody>
         </Card>
       )}
@@ -348,17 +375,21 @@ function ResearchWorkspaceInner() {
               )}
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" size="sm" onClick={() => setConfirmingPublish(false)}>
-                Cancel
-              </Button>
+              <IconButton label="Cancel publish" icon={<XIcon />} onClick={() => setConfirmingPublish(false)} />
               {isLinkedEditDraft && (
-                <Button variant="secondary" size="sm" loading={publishing} onClick={() => handlePublish("keep_both")}>
-                  Keep both
-                </Button>
+                <IconButton
+                  label="Keep both versions"
+                  icon={<CopyIcon />}
+                  loading={publishing}
+                  onClick={() => handlePublish("keep_both")}
+                />
               )}
-              <Button size="sm" loading={publishing} onClick={() => handlePublish(isLinkedEditDraft ? "replace_original" : "keep_both")}>
-                {isLinkedEditDraft ? "Replace original" : "Yes, publish"}
-              </Button>
+              <IconButton
+                label={isLinkedEditDraft ? "Replace original" : "Publish recipe"}
+                icon={<CheckIcon />}
+                loading={publishing}
+                onClick={() => handlePublish(isLinkedEditDraft ? "replace_original" : "keep_both")}
+              />
             </div>
           </CardBody>
         </Card>
@@ -369,6 +400,7 @@ function ResearchWorkspaceInner() {
           <div className="lg:sticky lg:top-20 lg:h-[calc(100vh-8rem)]">
             {mode === "guided" ? (
               <ResearchChatPanel
+                recipeId={recipe.recipe_id}
                 messages={messages}
                 pendingProposal={pendingProposal}
                 sending={sending}
@@ -391,13 +423,67 @@ function ResearchWorkspaceInner() {
             )}
           </div>
 
-          <ResearchDocumentPreview
-            key={`${recipe.version_id}:${recipe.updated_at}`}
-            recipe={recipe}
-            previewMode={previewMode}
-            onCommit={handleCommit}
-            onRefine={handleRefineSection}
-          />
+          <div className="space-y-4">
+            {!previewMode && (
+              <Card className={reviewHighlights.length ? "border-brand/50 bg-brand-soft/30" : ""}>
+                <CardBody className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-ink">Recipe-wide AI edit</div>
+                      <div className="text-xs text-muted">Apply one broad instruction across the draft, then review highlighted sections.</div>
+                    </div>
+                    {reviewHighlights.length > 0 && (
+                      <IconButton
+                        label="Clear review highlights"
+                        icon={<CheckIcon />}
+                        onClick={() => {
+                          setReviewHighlights([]);
+                          setReviewNotes(null);
+                        }}
+                      />
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Textarea
+                      value={wideEditPrompt}
+                      onChange={(e) => setWideEditPrompt(e.target.value)}
+                      rows={3}
+                      placeholder="Make this recipe keto friendly; make it kid friendly; turn it into a weeknight version..."
+                    />
+                    <IconButton
+                      label="Apply recipe-wide edit"
+                      icon={<SendIcon />}
+                      loading={wideEditing}
+                      disabled={!wideEditPrompt.trim()}
+                      onClick={handleWideEdit}
+                    />
+                  </div>
+                  {(reviewHighlights.length > 0 || reviewNotes) && (
+                    <div className="rounded-md border border-brand/30 bg-surface px-3 py-2 text-xs text-muted">
+                      {reviewHighlights.length > 0 && (
+                        <div>
+                          Review: <span className="font-medium text-foreground">{reviewHighlights.join(", ")}</span>
+                        </div>
+                      )}
+                      {reviewNotes && <div className="mt-1">{reviewNotes}</div>}
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+            )}
+            <ResearchDocumentPreview
+              key={`${recipe.version_id}:${recipe.updated_at}`}
+              recipe={recipe}
+              previewMode={previewMode}
+              onCommit={handleCommit}
+              onRefine={handleRefineSection}
+              highlightedFields={reviewHighlights}
+              onClearHighlights={() => {
+                setReviewHighlights([]);
+                setReviewNotes(null);
+              }}
+            />
+          </div>
         </div>
       ) : (
         <ResearchDocumentPreview
@@ -406,6 +492,8 @@ function ResearchWorkspaceInner() {
           previewMode
           onCommit={() => undefined}
           onRefine={async () => undefined}
+          highlightedFields={[]}
+          onClearHighlights={() => undefined}
         />
       )}
     </div>
