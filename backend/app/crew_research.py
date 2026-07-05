@@ -57,7 +57,14 @@ def extract_dish_name(prompt: str, model: str) -> str:
     try:
         response = litellm_completion(
             model=model,
-            max_tokens=200,
+            max_tokens=500,
+            # Reasoning models (o-series/gpt-5) spend part of max_tokens on
+            # hidden reasoning before writing the visible JSON — for a task
+            # this trivial that reasoning is pure overhead that risks eating
+            # the whole budget and truncating the output. Harmless for
+            # non-reasoning models: litellm.drop_params (set in llm_client.py)
+            # silently drops params a given provider/model doesn't support.
+            reasoning_effort="low",
             messages=[
                 {"role": "system", "content": NAME_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
@@ -101,12 +108,26 @@ def propose_search_batch(dish_name: str, starting_prompt: str | None, model: str
         user_content += f"\n\nAdmin's starting prompt (may include a draft recipe):\n{starting_prompt}"
     response = litellm_completion(
         model=model,
-        max_tokens=1000,
+        # Generous headroom: up to 6 queries plus a 2-3 sentence plan is a
+        # verbose JSON payload, and reasoning models (o-series/gpt-5) spend
+        # part of this budget on hidden reasoning before the visible JSON —
+        # too tight a budget risks truncating mid-object (a JSONDecodeError
+        # surfaced to the admin as an opaque 500). reasoning_effort="low"
+        # cuts that hidden overhead for a task this simple; harmless for
+        # non-reasoning models since litellm.drop_params (llm_client.py)
+        # silently drops params a given provider/model doesn't support.
+        max_tokens=2000,
+        reasoning_effort="low",
         messages=[
             {"role": "system", "content": PLAN_SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
     )
+    if response.choices[0].finish_reason == "length":
+        raise RuntimeError(
+            "The model's response was cut off before finishing — try a shorter "
+            "starting prompt, or switch to a different model."
+        )
     text = response.choices[0].message.content or ""
     start, end = text.find("{"), text.rfind("}") + 1
     envelope = json.loads(text[start:end])
@@ -115,6 +136,41 @@ def propose_search_batch(dish_name: str, starting_prompt: str | None, model: str
 
 # --- crew: 4 specialists + 1 orchestrator -----------------------------------
 
+# OpenAI's structured-outputs mode (triggered by CrewAI/LiteLLM whenever a
+# Task has output_pydantic and the resolved model is an OpenAI one) requires
+# every object schema — including ones nested inside array items — to
+# explicitly declare "additionalProperties": false. LiteLLM auto-injects that
+# for any schema with declared "properties" (that's why HistorySection, all
+# plain str/list[str] fields, always worked), but a bare `dict`-typed field
+# renders as a structureless {"type": "object"} with no "properties" to walk
+# into, so nothing gets injected there and OpenAI rejects the schema outright
+# (seen in production as "'additionalProperties' is required ... 'items'").
+# Fix: give every such field a concrete nested model instead of `dict`.
+class IngredientItem(BaseModel):
+    name: str
+    amount: Optional[float] = None
+    unit: Optional[str] = None
+
+
+class ComponentItem(BaseModel):
+    component_name: str
+    ingredients: list[IngredientItem] = Field(default_factory=list)
+
+
+class StepItem(BaseModel):
+    step_number: Optional[int] = None
+    component_ref: Optional[str] = None
+    instruction: str
+
+
+class PanConversionItem(BaseModel):
+    from_count: Optional[float] = None
+    from_size: str
+    to_count: Optional[float] = None
+    to_size: str
+    note: Optional[str] = None
+
+
 class HistorySection(BaseModel):
     history: str = Field(description="Narrative: origin, tradition, cultural significance")
     intro: str = Field(description="A short, 2-4 sentence appetizing description of the dish")
@@ -122,8 +178,9 @@ class HistorySection(BaseModel):
 
 
 class IngredientsSection(BaseModel):
-    components: list[dict] = Field(
-        description='[{"component_name": str, "ingredients": [{"name": str, "amount": number, "unit": str}]}] — prefer grams'
+    components: list[ComponentItem] = Field(
+        default_factory=list,
+        description="Prefer grams for ingredient amounts/units where reasonable.",
     )
     base_servings_amount: Optional[float] = None
     base_servings_unit: str = "servings"
@@ -132,9 +189,7 @@ class IngredientsSection(BaseModel):
 
 
 class StepsSection(BaseModel):
-    steps: list[dict] = Field(
-        description='[{"step_number": int, "component_ref": str|null, "instruction": str}]'
-    )
+    steps: list[StepItem] = Field(default_factory=list)
     prep_time_minutes: Optional[int] = None
     cook_time_minutes: Optional[int] = None
 
@@ -143,9 +198,9 @@ class TipsSection(BaseModel):
     tips: list[str] = Field(default_factory=list)
     watch_outs: list[str] = Field(default_factory=list)
     suggested_utensils: list[str] = Field(default_factory=list)
-    pan_conversions: list[dict] = Field(
+    pan_conversions: list[PanConversionItem] = Field(
         default_factory=list,
-        description='For baking recipes only: [{"from_count": number, "from_size": str, "to_count": number, "to_size": str, "note": str|null}]',
+        description="For baking recipes only.",
     )
 
 
@@ -155,8 +210,8 @@ class MergedRecipePatch(BaseModel):
     base_servings_unit: Optional[str] = None
     serving_size_amount: Optional[float] = None
     serving_size_unit: Optional[str] = None
-    components: list[dict] = Field(default_factory=list)
-    steps: list[dict] = Field(default_factory=list)
+    components: list[ComponentItem] = Field(default_factory=list)
+    steps: list[StepItem] = Field(default_factory=list)
     intro: Optional[str] = None
     history: Optional[str] = None
     prep_time_minutes: Optional[int] = None
@@ -164,7 +219,7 @@ class MergedRecipePatch(BaseModel):
     tips: list[str] = Field(default_factory=list)
     watch_outs: list[str] = Field(default_factory=list)
     suggested_utensils: list[str] = Field(default_factory=list)
-    pan_conversions: list[dict] = Field(default_factory=list)
+    pan_conversions: list[PanConversionItem] = Field(default_factory=list)
 
 
 # Section key -> Pydantic schema + a human label, shared by the crew's task
@@ -365,12 +420,18 @@ def refine_section(section: str, current_document: dict, instruction: str, model
     )
     response = litellm_completion(
         model=model,
-        max_tokens=1500,
+        max_tokens=2200,
+        reasoning_effort="low",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
     )
+    if response.choices[0].finish_reason == "length":
+        raise RuntimeError(
+            "The model's response was cut off before finishing — try a shorter "
+            "instruction, or switch to a different model."
+        )
     text = response.choices[0].message.content or ""
     start, end = text.find("{"), text.rfind("}") + 1
     return json.loads(text[start:end])
