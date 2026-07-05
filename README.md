@@ -55,6 +55,8 @@ Backend configuration lives in `backend/.env`:
 | `DEFAULT_MODEL` | optional | LiteLLM model string for research flows; defaults to `anthropic/claude-sonnet-5` |
 | `TAVILY_API_KEY` | for web research | Enables guided-search approval and auto-research |
 | `CORS_ORIGINS` | optional | Comma-separated allowed frontend origins for cookie auth |
+| `DATABASE_URL` | optional | SQLite database URL; use `sqlite:////data/curryforward.db` with a persistent Railway Volume |
+| `UPLOADS_DIR` | optional | Uploaded-image directory; use `/data/uploads` with a persistent Railway Volume |
 | `LOG_LEVEL` | optional | Python log level, defaults to `INFO` |
 
 ### Production / single-process
@@ -69,6 +71,35 @@ cd ../backend && uvicorn app.main:app
 Open **http://127.0.0.1:8000** — FastAPI serves the exported static site at `/`
 and the API at `/api`, same origin, so the session cookie and relative
 `fetch("/api/...")` calls both just work.
+
+### Railway deployment
+
+This repo includes a `Dockerfile` and `railway.toml` for a single Railway
+service. The Docker build compiles the Next static export, copies it into the
+FastAPI runtime image, and runs `uvicorn`; no Node process is needed after the
+image is built.
+
+Railway deploys are persistent only where you attach persistent storage. Do not
+store the SQLite database or uploaded images on the container filesystem. Add a
+Railway Volume mounted at `/data`, then set:
+
+```bash
+DATABASE_URL=sqlite:////data/curryforward.db
+UPLOADS_DIR=/data/uploads
+```
+
+Also set the app secrets in Railway variables:
+
+```bash
+ADMIN_TOKEN=...
+SESSION_SECRET=...
+ANTHROPIC_API_KEY=...
+TAVILY_API_KEY=...
+DEFAULT_MODEL=anthropic/claude-sonnet-5
+```
+
+Optional model-provider variables such as `OPENAI_API_KEY` and `GROQ_API_KEY`
+can be added later. The Railway health check uses `/api/health`.
 
 ## Checks and migrations
 

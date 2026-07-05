@@ -1,0 +1,17 @@
+.git
+.agents
+.codex
+backend/.env
+backend/.venv
+backend/__pycache__
+backend/app/__pycache__
+backend/app/routers/__pycache__
+backend/app/services/__pycache__
+backend/uploads
+backend/curryforward.db
+frontend-next/.next
+frontend-next/node_modules
+frontend-next/out
+frontend-next/.env*
+*.pyc
+.DS_Store

@@ -54,6 +54,12 @@ app.include_router(uploads_router)
 # image-optimization pipeline, so recipe pages just use <img src="/uploads/...">).
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
+
+@app.get("/api/health")
+def health_check():
+    return {"ok": True}
+
+
 # Production: `next build` with output:'export' writes static files to
 # frontend-next/out — same origin as the API, so the session cookie and
 # relative /api fetches both work with zero extra config.

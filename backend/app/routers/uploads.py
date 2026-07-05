@@ -1,10 +1,11 @@
 """
-Image uploads for research-flow recipe steps. Saved as plain files on disk
-under backend/uploads/ — matches this app's local-first, no-hosted-dependency
-design (no S3/cloud storage), served back via a static mount in main.py.
+Image uploads for research-flow recipe steps. Saved as plain files on disk.
+Defaults to backend/uploads for local development, but can be pointed at a
+persistent mount with UPLOADS_DIR in production.
 """
 from __future__ import annotations
 
+import os
 import uuid
 from pathlib import Path
 
@@ -14,7 +15,7 @@ from ..auth import require_admin
 
 router = APIRouter(prefix="/api/uploads")
 
-UPLOADS_DIR = Path(__file__).parent.parent.parent / "uploads"
+UPLOADS_DIR = Path(os.environ.get("UPLOADS_DIR", Path(__file__).parent.parent.parent / "uploads"))
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)  # must exist before main.py mounts it
 
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024  # 8MB

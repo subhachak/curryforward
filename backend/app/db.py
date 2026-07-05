@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 
 import sqlalchemy
+from sqlalchemy.engine import make_url
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -11,7 +12,10 @@ from .nutrition import compute_nutrition
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./curryforward.db")
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+_database_url = make_url(DATABASE_URL)
+_connect_args = {"check_same_thread": False} if _database_url.drivername.startswith("sqlite") else {}
+
+engine = create_engine(DATABASE_URL, connect_args=_connect_args)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 # Columns added to recipe_versions after the initial release. No migration
