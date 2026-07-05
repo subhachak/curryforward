@@ -80,20 +80,8 @@ def upgrade() -> None:
     )
     op.create_index("ix_research_jobs_recipe_id", "research_jobs", ["recipe_id"])
 
-    op.create_table(
-        "review_queue",
-        sa.Column("item_id", sa.String(), primary_key=True),
-        sa.Column("name", sa.String(), nullable=False),
-        sa.Column("raw_extraction", sa.JSON(), nullable=True),
-        sa.Column("review_reason", sa.String(), nullable=True),
-        sa.Column("extraction_confidence", sa.Float(), nullable=True),
-        sa.Column("status", sa.String(), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=True),
-    )
-
 
 def downgrade() -> None:
-    op.drop_table("review_queue")
     op.drop_index("ix_research_jobs_recipe_id", table_name="research_jobs")
     op.drop_table("research_jobs")
     op.drop_table("recipe_analytics")

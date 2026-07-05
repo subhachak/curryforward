@@ -42,7 +42,7 @@ function LoginForm() {
             <p className="text-sm text-muted mt-1">
               Enter the admin secret from the backend&apos;s <code className="rounded bg-stone-100 px-1">.env</code>{" "}
               (<code className="rounded bg-stone-100 px-1">ADMIN_TOKEN</code>) to unlock copying,
-              saving chat edits, and the review queue. Without it, you can still browse
+              saving chat edits, and the workspace. Without it, you can still browse
               and try chat customization — previews just won&apos;t be saved.
             </p>
           </div>

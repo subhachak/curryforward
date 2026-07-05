@@ -263,16 +263,6 @@ export type ResearchPatchPayload = Partial<{
   model: string | null;
 }>;
 
-export interface ReviewQueueItem {
-  item_id: string;
-  name: string;
-  raw_extraction: Record<string, unknown>;
-  review_reason: string | null;
-  extraction_confidence: number;
-  status: "pending" | "approved" | "rejected";
-  created_at: string | null;
-}
-
 export interface ChatResult {
   change_summary: string;
   new_version: RecipeDetail;

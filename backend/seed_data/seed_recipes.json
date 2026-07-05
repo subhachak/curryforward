@@ -5,7 +5,7 @@
     "source": "seed",
     "is_recipe": true,
     "base_servings": {
-      "amount": 1.0,
+      "amount": 1,
       "unit": "batch"
     },
     "components": [
@@ -15,7 +15,7 @@
           {
             "ingredient_id": "3d3b",
             "name": "Vanilla",
-            "amount": 1.0,
+            "amount": 1,
             "unit": "tbsp",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -23,7 +23,7 @@
           {
             "ingredient_id": "69ce",
             "name": "Confectioner's sugar",
-            "amount": 1.0,
+            "amount": 1,
             "unit": "lb",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -31,7 +31,7 @@
           {
             "ingredient_id": "97ba",
             "name": "\"Unsalted butter",
-            "amount": 1.0,
+            "amount": 1,
             "unit": "cup",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -39,7 +39,7 @@
           {
             "ingredient_id": "72ac",
             "name": "Heavy whipping cream",
-            "amount": 3.0,
+            "amount": 3,
             "unit": "tbsp",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -75,10 +75,7 @@
         "component_ref_is_guess": false
       }
     ],
-    "extraction_confidence": 0.85,
-    "extraction_flags": [],
-    "needs_human_review": false,
-    "review_reason": null
+    "extraction_flags": []
   },
   {
     "recipe_id": "bonde",
@@ -86,7 +83,7 @@
     "source": "seed",
     "is_recipe": true,
     "base_servings": {
-      "amount": 1.0,
+      "amount": 1,
       "unit": "batch"
     },
     "components": [
@@ -96,7 +93,7 @@
           {
             "ingredient_id": "aa6c",
             "name": "Besan",
-            "amount": 200.0,
+            "amount": 200,
             "unit": "g",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -120,7 +117,7 @@
           {
             "ingredient_id": "5a8a",
             "name": "Water",
-            "amount": 1.0,
+            "amount": 1,
             "unit": "cup",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -128,7 +125,7 @@
           {
             "ingredient_id": "1eab",
             "name": "Salt",
-            "amount": 1.0,
+            "amount": 1,
             "unit": "tsp",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -136,7 +133,7 @@
           {
             "ingredient_id": "2878",
             "name": "\"Red",
-            "amount": 3.0,
+            "amount": 3,
             "unit": "drop",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -144,7 +141,7 @@
           {
             "ingredient_id": "ebb2",
             "name": "Sugar",
-            "amount": 3.0,
+            "amount": 3,
             "unit": "cup",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -152,7 +149,7 @@
           {
             "ingredient_id": "929b",
             "name": "Water",
-            "amount": 3.0,
+            "amount": 3,
             "unit": "cup",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -160,7 +157,7 @@
           {
             "ingredient_id": "2058",
             "name": "Vegetable oil",
-            "amount": 3.0,
+            "amount": 3,
             "unit": "cup",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -194,10 +191,7 @@
         "component_ref_is_guess": false
       }
     ],
-    "extraction_confidence": 0.85,
-    "extraction_flags": [],
-    "needs_human_review": false,
-    "review_reason": null
+    "extraction_flags": []
   },
   {
     "recipe_id": "chicken-biriyani",
@@ -205,7 +199,7 @@
     "source": "seed",
     "is_recipe": true,
     "base_servings": {
-      "amount": 3.0,
+      "amount": 3,
       "unit": "people"
     },
     "components": [
@@ -215,7 +209,7 @@
           {
             "ingredient_id": "a1ce",
             "name": "Chicken",
-            "amount": 650.0,
+            "amount": 650,
             "unit": "g",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -223,7 +217,7 @@
           {
             "ingredient_id": "8beb",
             "name": "Yoghurt",
-            "amount": 65.0,
+            "amount": 65,
             "unit": "g",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -231,7 +225,7 @@
           {
             "ingredient_id": "6cc5",
             "name": "Salt",
-            "amount": 5.0,
+            "amount": 5,
             "unit": "g",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -239,7 +233,7 @@
           {
             "ingredient_id": "a1dd",
             "name": "Chili powder",
-            "amount": 5.0,
+            "amount": 5,
             "unit": "g",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -247,7 +241,7 @@
           {
             "ingredient_id": "e136",
             "name": "Biriyani masala powder",
-            "amount": 20.0,
+            "amount": 20,
             "unit": "g",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -255,7 +249,7 @@
           {
             "ingredient_id": "7ba4",
             "name": "Fried onion",
-            "amount": 150.0,
+            "amount": 150,
             "unit": "g",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -263,7 +257,7 @@
           {
             "ingredient_id": "3477",
             "name": "Oil",
-            "amount": 20.0,
+            "amount": 20,
             "unit": "g",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -271,7 +265,7 @@
           {
             "ingredient_id": "f527",
             "name": "Ginger garlic paste",
-            "amount": 50.0,
+            "amount": 50,
             "unit": "g",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -279,7 +273,7 @@
           {
             "ingredient_id": "70ac",
             "name": "Potatoes",
-            "amount": 2.0,
+            "amount": 2,
             "unit": "piece",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -287,7 +281,7 @@
           {
             "ingredient_id": "d1b2",
             "name": "Rice",
-            "amount": 1.0,
+            "amount": 1,
             "unit": "cup",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -295,7 +289,7 @@
           {
             "ingredient_id": "54ad",
             "name": "Water",
-            "amount": 5.0,
+            "amount": 5,
             "unit": "cup",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -303,7 +297,7 @@
           {
             "ingredient_id": "594d",
             "name": "Eggs",
-            "amount": 2.0,
+            "amount": 2,
             "unit": "piece",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -319,10 +313,7 @@
         "component_ref_is_guess": false
       }
     ],
-    "extraction_confidence": 0.85,
-    "extraction_flags": [],
-    "needs_human_review": false,
-    "review_reason": null
+    "extraction_flags": []
   },
   {
     "recipe_id": "jaynagarer-moa",
@@ -330,7 +321,7 @@
     "source": "seed",
     "is_recipe": true,
     "base_servings": {
-      "amount": 12.0,
+      "amount": 12,
       "unit": "pieces"
     },
     "components": [
@@ -340,7 +331,7 @@
           {
             "ingredient_id": "aca0",
             "name": "Khoi",
-            "amount": 200.0,
+            "amount": 200,
             "unit": "g",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -348,7 +339,7 @@
           {
             "ingredient_id": "d5e3",
             "name": "Khejur Gur (Patali Gur)",
-            "amount": 2.0,
+            "amount": 2,
             "unit": "cup",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -356,7 +347,7 @@
           {
             "ingredient_id": "4a16",
             "name": "Water",
-            "amount": 3.0,
+            "amount": 3,
             "unit": "cup",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -364,7 +355,7 @@
           {
             "ingredient_id": "cae3",
             "name": "Sugar",
-            "amount": 1.0,
+            "amount": 1,
             "unit": "cup",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -372,7 +363,7 @@
           {
             "ingredient_id": "e335",
             "name": "Khoa",
-            "amount": 200.0,
+            "amount": 200,
             "unit": "g",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -380,7 +371,7 @@
           {
             "ingredient_id": "3971",
             "name": "Condensed milk",
-            "amount": 3.0,
+            "amount": 3,
             "unit": "tbsp",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -388,7 +379,7 @@
           {
             "ingredient_id": "3c36",
             "name": "Ghee",
-            "amount": 2.0,
+            "amount": 2,
             "unit": "tbsp",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -396,7 +387,7 @@
           {
             "ingredient_id": "56ae",
             "name": "Cardamom powder",
-            "amount": 2.0,
+            "amount": 2,
             "unit": "tsp",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -420,10 +411,7 @@
         "component_ref_is_guess": false
       }
     ],
-    "extraction_confidence": 0.85,
-    "extraction_flags": [],
-    "needs_human_review": false,
-    "review_reason": null
+    "extraction_flags": []
   },
   {
     "recipe_id": "macher-chop",
@@ -431,7 +419,7 @@
     "source": "seed",
     "is_recipe": true,
     "base_servings": {
-      "amount": 10.0,
+      "amount": 10,
       "unit": "pieces"
     },
     "components": [
@@ -449,7 +437,7 @@
           {
             "ingredient_id": "8bce",
             "name": "Medium potatoes",
-            "amount": 2.0,
+            "amount": 2,
             "unit": "piece",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -457,7 +445,7 @@
           {
             "ingredient_id": "1b40",
             "name": "Large onion",
-            "amount": 1.0,
+            "amount": 1,
             "unit": "piece",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -473,10 +461,7 @@
         "component_ref_is_guess": false
       }
     ],
-    "extraction_confidence": 0.85,
-    "extraction_flags": [],
-    "needs_human_review": false,
-    "review_reason": null
+    "extraction_flags": []
   },
   {
     "recipe_id": "mutton-biriyani",
@@ -484,7 +469,7 @@
     "source": "seed",
     "is_recipe": true,
     "base_servings": {
-      "amount": 3.0,
+      "amount": 3,
       "unit": "people"
     },
     "components": [
@@ -502,7 +487,7 @@
           {
             "ingredient_id": "ff90",
             "name": "Yoghurt",
-            "amount": 3.0,
+            "amount": 3,
             "unit": "tbsp",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -518,10 +503,7 @@
         "component_ref_is_guess": false
       }
     ],
-    "extraction_confidence": 0.85,
-    "extraction_flags": [],
-    "needs_human_review": false,
-    "review_reason": null
+    "extraction_flags": []
   },
   {
     "recipe_id": "payesh",
@@ -529,7 +511,7 @@
     "source": "seed",
     "is_recipe": true,
     "base_servings": {
-      "amount": 10.0,
+      "amount": 10,
       "unit": "pieces"
     },
     "components": [
@@ -563,10 +545,7 @@
         "component_ref_is_guess": false
       }
     ],
-    "extraction_confidence": 0.85,
-    "extraction_flags": [],
-    "needs_human_review": false,
-    "review_reason": null
+    "extraction_flags": []
   },
   {
     "recipe_id": "sondesh",
@@ -574,7 +553,7 @@
     "source": "seed",
     "is_recipe": true,
     "base_servings": {
-      "amount": 6.0,
+      "amount": 6,
       "unit": "people"
     },
     "components": [
@@ -584,7 +563,7 @@
           {
             "ingredient_id": "96fd",
             "name": "Whole Milk",
-            "amount": 4.0,
+            "amount": 4,
             "unit": "cup",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -592,7 +571,7 @@
           {
             "ingredient_id": "26d3",
             "name": "Nolen Gur",
-            "amount": 1.0,
+            "amount": 1,
             "unit": "cup",
             "gram_equivalent": null,
             "non_standard_unit": false
@@ -608,9 +587,6 @@
         "component_ref_is_guess": false
       }
     ],
-    "extraction_confidence": 0.85,
-    "extraction_flags": [],
-    "needs_human_review": false,
-    "review_reason": null
+    "extraction_flags": []
   }
 ]

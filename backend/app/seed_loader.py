@@ -6,7 +6,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from .models import RecipeVersion, ReviewQueueItem
+from .models import RecipeVersion
 from .nutrition import compute_nutrition
 
 SEED_DIR = Path(__file__).parent.parent / "seed_data"
@@ -22,8 +22,6 @@ def load_seed_data(db: Session):
         return
 
     seed_path = SEED_DIR / "seed_recipes.json"
-    review_path = SEED_DIR / "review_queue.json"
-
     if seed_path.exists():
         recipes = json.loads(seed_path.read_text())
         for r in recipes:
@@ -44,18 +42,6 @@ def load_seed_data(db: Session):
                 is_current_head=True,
             )
             db.add(version)
-
-    if review_path.exists():
-        review_items = json.loads(review_path.read_text())
-        for r in review_items:
-            item = ReviewQueueItem(
-                name=r["name"],
-                raw_extraction=r,
-                review_reason=r.get("review_reason"),
-                extraction_confidence=r.get("extraction_confidence", 0.5),
-                status="pending",
-            )
-            db.add(item)
 
     db.commit()
 

@@ -1,6 +1,6 @@
 """
 Minimal role model for local/personal use:
-- Admin (you): full access — fork, persist chat edits, decide review queue items.
+- Admin (you): full access — fork, persist chat edits, and manage recipes.
 - Guest (anyone else you share the app with): can browse recipes and use chat
   to customize DURING THEIR SESSION, but nothing they do is persisted or
   forkable. This is enforced server-side, not just hidden in the UI.

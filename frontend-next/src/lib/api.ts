@@ -18,7 +18,6 @@ import type {
   RecipeUpsertRequest,
   ResearchPatchPayload,
   ResearchTurnResult,
-  ReviewQueueItem,
   Role,
   TrashedRecipeSummary,
 } from "./types";
@@ -75,13 +74,6 @@ export const api = {
     apiFetch<DraftRecipeResult>("/recipes/draft", {
       method: "POST",
       body: JSON.stringify({ message, history, draft }),
-    }),
-
-  reviewQueue: () => apiFetch<ReviewQueueItem[]>("/review-queue"),
-  decideReview: (itemId: string, approved: boolean) =>
-    apiFetch<{ status: string }>(`/review-queue/${itemId}/decide`, {
-      method: "POST",
-      body: JSON.stringify({ approved }),
     }),
 
   // Agentic recipe research workspace — admin-only.

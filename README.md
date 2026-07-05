@@ -5,7 +5,7 @@ Agentic recipe generator — seeded from your real recipe collection, expandable
 ## Architecture
 
 ```
-Excel/Sheet seed → recipe-pipeline (normalization + human review gate)
+Starter recipe seed → Curryforward admin research workflow
     → Curryforward backend (FastAPI + SQLite)
         → Recipe Store (versioned: fork = new lineage, edit = new version)
         → Nutrition Engine (heuristic v0, per-version snapshot)
@@ -140,7 +140,7 @@ secret never sits in `localStorage` or gets attached to every request.
 
 | Role | How | Can do |
 |---|---|---|
-| **Admin** (you) | Click the small icon near the footer → `/login` with the `ADMIN_TOKEN` value → lands on `/admin` | Start/edit recipes from the dashboard, copy/delete drafts, persist chat customizations as new versions, draft and save new recipes conversationally, approve/reject the review queue |
+| **Admin** (you) | Click the small icon near the footer → `/login` with the `ADMIN_TOKEN` value → lands on `/admin` | Start/edit recipes from the dashboard, copy/delete drafts, persist chat customizations as new versions, draft and save new recipes conversationally, moderate public feedback |
 | **Guest** (anyone else) | Not logged in | Browse all recipes, use the assistant to search or customize a recipe — but the result is a **session-only preview**: not saved, not forkable, gone on refresh |
 
 The rest of the app doesn't call out roles at all — `/recipes` and recipe pages render
@@ -148,7 +148,7 @@ as browsing surfaces. Dashboard-only controls stay on `/admin` rather than being
 shown elsewhere with a "guest mode" label.
 
 Enforced server-side (`app/auth.py`), not just hidden in the UI — a guest hitting
-the API directly gets a `403` on fork/review-decide, not just a missing button.
+the API directly gets a `403` on admin-only actions, not just a missing button.
 The old `X-Admin-Token` header still works too (useful for scripts/tests), checked
 alongside the session cookie.
 
@@ -168,19 +168,17 @@ being served from `/uploads/...`.
 
 The `seed_data/` folder contains real output from the recipe-pipeline, run against
 your actual recipe sheet:
-- **8 recipes auto-committed** (clean extractions, high confidence)
-- **9 recipes in the review queue** (prose-format sources, multi-component ambiguity,
-  or undetected serving scale) — visible and actionable in the app's Review Queue panel
+- **8 starter recipes** are loaded into the local database the first time the app
+  starts.
 
-This split is real, not illustrative — it reflects genuine data quality in your sheet,
-not a designed demo split.
+New recipes should enter through the admin Workspace research flow.
 
 ## Known limitations (v0, by design)
 
 | Limitation | Why | Path to v1 |
 |---|---|---|
 | Nutrition is approximate | Curated ~30-ingredient table + rough unit-to-gram conversion, not USDA-grade | Swap `nutrition.py`'s lookup for a USDA FoodData Central API call — same `compute_nutrition()` interface |
-| Only 8 of ~40 real recipes seeded | This build used a representative subset of your sheet to keep the interactive session tractable | Re-run `scripts/run_extraction.py` against your full sheet text — same pipeline, no code changes needed |
+| Only 8 of ~40 real recipes seeded | This build used a representative subset of your sheet to keep the interactive session tractable | Add recipes through Workspace research or regenerate `seed_recipes.json` from your full sheet |
 | No LLM-based extraction yet | v0 uses the heuristic extractor built earlier | Recipe-pipeline's extractor is designed to swap in an LLM call behind the same `extract()` interface |
 | Chat customization requires your own Anthropic API key | Local-first design — no hosted dependency | N/A — this is the intended design, not a gap |
 
@@ -204,7 +202,7 @@ curryforward/
 │   ├── app/
 │   │   ├── main.py           # FastAPI entrypoint, mounts frontend export + API
 │   │   ├── auth.py           # role model + /api/auth/login, /api/auth/logout
-│   │   ├── models.py         # RecipeVersion, ReviewQueueItem (SQLAlchemy)
+│   │   ├── models.py         # SQLAlchemy models
 │   │   ├── db.py             # SQLite engine/session
 │   │   ├── nutrition.py      # heuristic nutrition engine (v0)
 │   │   ├── llm_agent.py      # chat customization + gap-fill generation
@@ -234,7 +232,7 @@ curryforward/
   rough %DV, ingredient list), sticky in the right column on desktop. No edit
   controls live here, even for admins.
 - **`/admin`** — the one place admin-only tools live: recipe research,
-  dashboard edit entry points, review queue, recipe management, Trash, and
+  dashboard edit entry points, feedback moderation, recipe management, Trash, and
   **Log out**. Editing a published recipe creates/reuses a linked draft copy;
   publishing that draft lets the admin either replace the original recipe or
   keep both versions as separate recipes.

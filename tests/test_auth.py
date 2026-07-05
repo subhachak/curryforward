@@ -45,20 +45,6 @@ def test_admin_can_fork():
     assert r.json()["lineage"] == "fork"
 
 
-def test_guest_cannot_decide_review_queue():
-    items = client.get("/api/review-queue", headers=ADMIN_HEADERS).json()
-    if not items:
-        return
-    item_id = items[0]["item_id"]
-    r = client.post(f"/api/review-queue/{item_id}/decide", json={"approved": True})
-    assert r.status_code == 403
-
-
-def test_guest_cannot_read_review_queue():
-    r = client.get("/api/review-queue")
-    assert r.status_code == 403
-
-
 def test_forking_original_recipe_leaves_it_unchanged():
     before = client.get("/api/recipes/bonde").json()
     client.post("/api/recipes/bonde/fork", headers=ADMIN_HEADERS)

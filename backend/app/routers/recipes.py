@@ -19,7 +19,7 @@ from ..llm_agent import (
     is_configured,
 )
 from ..llm_client import is_litellm_configured, is_model_available, litellm_completion
-from ..models import RecipeAnalytics, RecipeFeedback, RecipeVersion, ReviewQueueItem
+from ..models import RecipeAnalytics, RecipeFeedback, RecipeVersion
 from ..nutrition import compute_nutrition
 from ..recipe_export import render_markdown
 from ..schemas import (
@@ -164,10 +164,6 @@ class GenerateRequest(BaseModel):
     dietary: list[str] = []
     cuisine_style: str | None = None
     flavor_profile: list[str] = []
-
-
-class ReviewDecision(BaseModel):
-    approved: bool
 
 
 @router.get("/recipes", response_model=list[RecipeSummaryResponse], response_model_exclude_none=True)
@@ -528,48 +524,3 @@ def generate_recipe(
 @router.get("/me")
 def whoami(role: str = Depends(get_role)):
     return {"role": role}
-
-
-@router.get("/review-queue")
-def get_review_queue(db: Session = Depends(get_db), role: str = Depends(require_admin)):
-    items = db.query(ReviewQueueItem).filter(ReviewQueueItem.status == "pending").all()
-    return [i.to_dict() for i in items]
-
-
-@router.post("/review-queue/{item_id}/decide")
-def decide_review_item(
-    item_id: str,
-    decision: ReviewDecision,
-    db: Session = Depends(get_db),
-    role: str = Depends(require_admin),
-):
-    """Human approval gate — per the locked policy, ambiguous extractions
-    (multi-component mappings, prose-format sources) never auto-commit."""
-    item = db.query(ReviewQueueItem).filter(ReviewQueueItem.item_id == item_id).first()
-    if not item:
-        raise HTTPException(404, "Review item not found")
-
-    if decision.approved:
-        raw = item.raw_extraction
-        nutrition = compute_nutrition(raw.get("components", []))
-        version = RecipeVersion(
-            recipe_id=raw["recipe_id"],
-            parent_version_id=None,
-            lineage="seed",
-            name=raw["name"],
-            category="main",
-            base_servings_amount=raw["base_servings"]["amount"],
-            base_servings_unit=raw["base_servings"]["unit"],
-            components=raw["components"],
-            steps=raw["steps"],
-            nutrition=nutrition,
-            source="seed",
-            is_current_head=True,
-        )
-        db.add(version)
-        item.status = "approved"
-    else:
-        item.status = "rejected"
-
-    db.commit()
-    return {"status": item.status}

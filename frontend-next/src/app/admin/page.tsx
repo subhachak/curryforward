@@ -3,7 +3,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ReviewQueuePanel } from "@/components/ReviewQueuePanel";
 import { ModelPicker } from "@/components/research/ModelPicker";
 import { RecipeManagementTable } from "@/components/admin/RecipeManagementTable";
 import { TrashPanel } from "@/components/admin/TrashPanel";
@@ -19,17 +18,16 @@ import type {
   AdminRecipeSummary,
   LLMSettingsResponse,
   PendingRecipeFeedback,
-  ReviewQueueItem,
   TrashedRecipeSummary,
 } from "@/lib/types";
 
-type WorkspaceTab = "recipes" | "research" | "review" | "trash" | "analytics" | "models";
+type WorkspaceTab = "recipes" | "research" | "feedback" | "trash" | "analytics" | "models";
 type RecipeStatusFilter = "all" | "published" | "draft";
 
 const tabs: { id: WorkspaceTab; label: string }[] = [
   { id: "recipes", label: "All recipes" },
   { id: "research", label: "Research new recipe" },
-  { id: "review", label: "Review queue" },
+  { id: "feedback", label: "Feedback" },
   { id: "trash", label: "Trash" },
   { id: "analytics", label: "Analytics" },
   { id: "models", label: "Models" },
@@ -41,9 +39,7 @@ export default function AdminPage() {
   const { push } = useToast();
   const router = useRouter();
 
-  const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>([]);
   const [pendingFeedback, setPendingFeedback] = useState<PendingRecipeFeedback[]>([]);
-  const [loadingQueue, setLoadingQueue] = useState(true);
   const [loadingFeedback, setLoadingFeedback] = useState(true);
   const [llmSettings, setLLMSettings] = useState<LLMSettingsResponse | null>(null);
   const [loadingLLMSettings, setLoadingLLMSettings] = useState(true);
@@ -57,17 +53,6 @@ export default function AdminPage() {
   const [recipeSearch, setRecipeSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<RecipeStatusFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-
-  const loadReviewQueue = useCallback(async () => {
-    setLoadingQueue(true);
-    try {
-      setReviewQueue(await api.reviewQueue());
-    } catch (e) {
-      push(e instanceof ApiError ? e.message : "Failed to load review queue", "error");
-    } finally {
-      setLoadingQueue(false);
-    }
-  }, [push]);
 
   const loadFeedbackQueue = useCallback(async () => {
     setLoadingFeedback(true);
@@ -107,12 +92,11 @@ export default function AdminPage() {
   useEffect(() => {
     if (isAdmin) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadReviewQueue();
       loadFeedbackQueue();
       loadRecipeManagement();
       loadLLMSettings();
     }
-  }, [isAdmin, loadFeedbackQueue, loadLLMSettings, loadReviewQueue, loadRecipeManagement]);
+  }, [isAdmin, loadFeedbackQueue, loadLLMSettings, loadRecipeManagement]);
 
   async function handleStartResearch(e: FormEvent) {
     e.preventDefault();
@@ -133,10 +117,6 @@ export default function AdminPage() {
     router.push("/");
   }
 
-  async function handleReviewDecided() {
-    await Promise.all([loadReviewQueue(), reloadRecipes()]);
-  }
-
   async function handleFeedbackDecided() {
     await loadFeedbackQueue();
   }
@@ -145,7 +125,6 @@ export default function AdminPage() {
     await Promise.all([loadRecipeManagement(), reloadRecipes()]);
   }
 
-  const pendingReviews = reviewQueue.length;
   const pendingFeedbackCount = pendingFeedback.length;
   const draftCount = adminRecipes.filter((r) => r.status === "draft").length;
   const publishedCount = adminRecipes.filter((r) => r.status === "published").length;
@@ -190,7 +169,7 @@ export default function AdminPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-ink">Workspace</h1>
-          <p className="text-sm text-muted">Manage recipes, research drafts, imports, analytics, and cleanup.</p>
+          <p className="text-sm text-muted">Manage recipes, research drafts, feedback, analytics, and cleanup.</p>
         </div>
         <Button variant="secondary" size="sm" onClick={handleLogout}>
           Log out
@@ -201,7 +180,7 @@ export default function AdminPage() {
         <StatTile label="Total recipes" value={adminRecipes.length} />
         <StatTile label="Published" value={publishedCount} />
         <StatTile label="Drafts" value={draftCount} />
-        <StatTile label="Reviews" value={pendingReviews + pendingFeedbackCount} />
+        <StatTile label="Feedback" value={pendingFeedbackCount} />
         <StatTile label="Views" value={totalViews} />
         <StatTile label="Downloads" value={totalDownloads} />
       </div>
@@ -253,13 +232,10 @@ export default function AdminPage() {
         />
       )}
 
-      {activeTab === "review" && (
-        <ReviewTab
-          loading={loadingQueue}
+      {activeTab === "feedback" && (
+        <FeedbackTab
           loadingFeedback={loadingFeedback}
-          items={reviewQueue}
           pendingFeedback={pendingFeedback}
-          onDecided={handleReviewDecided}
           onFeedbackDecided={handleFeedbackDecided}
         />
       )}
@@ -272,7 +248,7 @@ export default function AdminPage() {
         <AnalyticsTab
           topRecipes={topRecipes}
           draftCount={draftCount}
-          pendingReviews={pendingReviews}
+          pendingFeedback={pendingFeedbackCount}
           trashCount={trash.length}
         />
       )}
@@ -422,40 +398,17 @@ function ResearchTab({
   );
 }
 
-function ReviewTab({
-  loading,
+function FeedbackTab({
   loadingFeedback,
-  items,
   pendingFeedback,
-  onDecided,
   onFeedbackDecided,
 }: {
-  loading: boolean;
   loadingFeedback: boolean;
-  items: ReviewQueueItem[];
   pendingFeedback: PendingRecipeFeedback[];
-  onDecided: () => void;
   onFeedbackDecided: () => void;
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {loading ? (
-        <Card>
-          <CardBody>
-            <PageSpinner label="Loading review queue..." />
-          </CardBody>
-        </Card>
-      ) : items.length > 0 ? (
-        <ReviewQueuePanel items={items} onDecided={onDecided} />
-      ) : (
-        <Card>
-          <CardBody>
-            <div className="font-semibold">Recipe import review</div>
-            <div className="mt-2 text-sm text-muted">No imported recipes waiting for review.</div>
-          </CardBody>
-        </Card>
-      )}
-
+    <div className="max-w-3xl">
       {loadingFeedback ? (
         <Card>
           <CardBody>
@@ -561,12 +514,12 @@ function TrashTab({
 function AnalyticsTab({
   topRecipes,
   draftCount,
-  pendingReviews,
+  pendingFeedback,
   trashCount,
 }: {
   topRecipes: AdminRecipeSummary[];
   draftCount: number;
-  pendingReviews: number;
+  pendingFeedback: number;
   trashCount: number;
 }) {
   return (
@@ -632,8 +585,8 @@ function AnalyticsTab({
           <div className="font-semibold">Content operations</div>
           <div className="mt-3 grid grid-cols-3 gap-3">
             <div>
-              <div className="text-2xl font-bold text-ink">{pendingReviews}</div>
-              <div className="text-xs text-muted">reviews</div>
+              <div className="text-2xl font-bold text-ink">{pendingFeedback}</div>
+              <div className="text-xs text-muted">feedback</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-ink">{draftCount}</div>

@@ -229,27 +229,3 @@ class ResearchJob(Base):
             "finished_at": self.finished_at.isoformat() if self.finished_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
-
-
-class ReviewQueueItem(Base):
-    """Recipes awaiting human approval before entering the versioned Recipe Store."""
-    __tablename__ = "review_queue"
-
-    item_id = Column(String, primary_key=True, default=_uid)
-    name = Column(String, nullable=False)
-    raw_extraction = Column(JSON, default=dict)  # the extractor's full output incl. its guess
-    review_reason = Column(String, nullable=True)
-    extraction_confidence = Column(Float, default=0.5)
-    status = Column(String, default="pending")  # pending | approved | rejected
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-
-    def to_dict(self) -> dict:
-        return {
-            "item_id": self.item_id,
-            "name": self.name,
-            "raw_extraction": self.raw_extraction,
-            "review_reason": self.review_reason,
-            "extraction_confidence": self.extraction_confidence,
-            "status": self.status,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-        }
