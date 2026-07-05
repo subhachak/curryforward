@@ -154,9 +154,14 @@ def _recipe_context_chat(recipe: RecipeVersion, message: str, history: list[dict
         "Answer the user's question using only the recipe context below. "
         "You may explain ingredients, steps, substitutions, timing, serving, storage, "
         "nutrition shown in the recipe, and cooking technique directly relevant to this recipe. "
-        "Suggesting an ingredient substitution or answering 'can I use X instead of Y' is "
-        "expected and allowed — that is answering a question, not rewriting the recipe. "
-        "Do not output a full rewritten recipe or claim to have changed the saved recipe. "
+        "This includes advising how to adapt it — e.g. lower-calorie, lower-sugar, dairy-free, "
+        "gluten-free, spicier, milder, vegetarian/vegan, or other dietary or flavor variations — "
+        "by describing the swaps or adjustments in your answer (fewer/leaner ingredients, different "
+        "cooking method, smaller portion, etc.). Answering these questions, including 'can I use X "
+        "instead of Y' or 'how do I make this healthier/lower calorie', is expected and allowed — "
+        "that is answering a question, not rewriting the recipe. "
+        "Do not output a full rewritten recipe or claim to have changed the saved recipe — describe "
+        "the adjustment in your answer instead. "
         "Do not answer unrelated questions, "
         "including finance, politics, news, world affairs, coding, medical/legal advice, or general trivia. "
         "If the question is outside this recipe context, reply exactly: "
@@ -172,9 +177,25 @@ def _recipe_context_chat(recipe: RecipeVersion, message: str, history: list[dict
                 {"role": "user", "content": message},
             ],
             temperature=0.2,
-            max_tokens=350,
+            # Reasoning models (o-series/gpt-5) spend part of max_tokens on
+            # hidden reasoning before writing the visible reply — with the
+            # old max_tokens=350 and no reasoning_effort, gpt-5-nano/mini
+            # would burn the *entire* budget on reasoning (confirmed via
+            # response.usage.completion_tokens_details.reasoning_tokens),
+            # leaving finish_reason="length" and an EMPTY message.content
+            # for every single guest question, not just off-topic ones.
+            # That empty string then silently fell through to `reply or
+            # "I can only answer..."` below, disguising a truncation bug as
+            # a deliberate policy refusal. reasoning_effort="low" cuts that
+            # overhead for this simple task; harmless for non-reasoning
+            # models since litellm.drop_params (llm_client.py) silently
+            # drops params a given provider/model doesn't support.
+            max_tokens=1200,
+            reasoning_effort="low",
         )
         record_llm_usage(task="recipe_context_chat", model=model, role="guest", response=response)
+        if response.choices[0].finish_reason == "length" and not (response.choices[0].message.content or "").strip():
+            raise RuntimeError("The model's response was cut off before writing a reply.")
         reply = (response.choices[0].message.content or "").strip()
     except HTTPException:
         raise

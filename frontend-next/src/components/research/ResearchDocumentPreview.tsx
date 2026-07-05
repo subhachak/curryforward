@@ -9,9 +9,19 @@ import { CheckIcon, PlusIcon, SparklesIcon, UploadIcon, XIcon } from "@/componen
 import { NutritionCard } from "@/components/NutritionCard";
 import { RecipeContent } from "@/components/RecipeContent";
 import { CopyAssistField } from "@/components/research/CopyAssistField";
+import { useRecipes } from "@/context/RecipesContext";
 import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
 import type { PanConversion, RecipeResearchDetail, ResearchPatchPayload } from "@/lib/types";
+
+// Recognized by backend/app/nutrition.py's UNIT_TO_GRAM — picking one of
+// these lets the nutrition calculation actually match the ingredient,
+// but the field stays a free-text input (with these as datalist suggestions)
+// since plenty of real ingredient units fall outside this set (e.g. "pods",
+// "pinch", "leaf") and forcing a closed dropdown would block entering them.
+const INGREDIENT_UNIT_SUGGESTIONS = ["g", "ml", "cup", "tbsp", "tsp", "oz", "lb", "piece", "drop", "inch"];
+const SERVING_UNIT_SUGGESTIONS = ["servings", "people", "portions"];
+const SERVING_SIZE_UNIT_SUGGESTIONS = ["bowl", "piece", "cup", "g", "ml"];
 
 interface RefineBoxProps {
   section: string;
@@ -229,6 +239,7 @@ export function ResearchDocumentPreview({
   onClearHighlights,
 }: ResearchDocumentPreviewProps) {
   const { push } = useToast();
+  const { categories } = useRecipes();
   const highlightSet = new Set(highlightedFields);
   const isHighlighted = (fields: string[]) => fields.some((field) => highlightSet.has(field));
   const highlightClass = (fields: string[]) => (isHighlighted(fields) ? "border-brand/60 bg-brand-soft/25" : "");
@@ -276,28 +287,12 @@ export function ResearchDocumentPreview({
   function updateComponent(idx: number, patch: Partial<ComponentRow>) {
     setComponents((rows) => rows.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
   }
-  function applyComponentName(idx: number, value: string) {
-    setComponents((rows) => {
-      const next = rows.map((c, i) => (i === idx ? { ...c, component_name: value } : c));
-      commitComponents(next);
-      return next;
-    });
-  }
   function updateIngredient(ci: number, ii: number, patch: Partial<IngredientRow>) {
     setComponents((rows) =>
       rows.map((c, i) =>
         i === ci ? { ...c, ingredients: c.ingredients.map((ing, j) => (j === ii ? { ...ing, ...patch } : ing)) } : c
       )
     );
-  }
-  function applyIngredient(ci: number, ii: number, patch: Partial<IngredientRow>) {
-    setComponents((rows) => {
-      const next = rows.map((c, i) =>
-        i === ci ? { ...c, ingredients: c.ingredients.map((ing, j) => (j === ii ? { ...ing, ...patch } : ing)) } : c
-      );
-      commitComponents(next);
-      return next;
-    });
   }
   function commitComponents(rows: ComponentRow[]) {
     onCommit({ components: buildComponentsPatch(rows) });
@@ -433,15 +428,14 @@ export function ResearchDocumentPreview({
             ])}
             <RefineBox section="history" label="intro & history" onRefine={onRefine} />
           </SectionHeader>
-          <CopyAssistField
-            recipeId={recipe.recipe_id}
-            fieldLabel="recipe name"
-            label="Name"
-            value={name}
-            onChange={setName}
-            onBlur={() => onCommit({ name: name.trim() })}
-            onApply={(next) => onCommit({ name: next.trim() })}
-          />
+          <div>
+            <label className="mb-1 block text-sm font-medium">Name</label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={() => onCommit({ name: name.trim() })}
+            />
+          </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Hero image</label>
             <div className="flex items-center gap-3">
@@ -478,15 +472,18 @@ export function ResearchDocumentPreview({
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-sm font-medium">Category</label>
-              <CopyAssistField
-                recipeId={recipe.recipe_id}
-                fieldLabel="recipe category"
+              <Input
                 value={category}
-                onChange={setCategory}
+                onChange={(e) => setCategory(e.target.value)}
                 onBlur={() => onCommit({ category: category.trim() || null })}
-                onApply={(next) => onCommit({ category: next.trim() || null })}
                 placeholder="main, dessert…"
+                list="category-options"
               />
+              <datalist id="category-options">
+                {categories.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Serves (amount)</label>
@@ -501,14 +498,17 @@ export function ResearchDocumentPreview({
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Serving unit</label>
-              <CopyAssistField
-                recipeId={recipe.recipe_id}
-                fieldLabel="serving unit"
+              <Input
                 value={servingsUnit}
-                onChange={setServingsUnit}
+                onChange={(e) => setServingsUnit(e.target.value)}
                 onBlur={() => onCommit({ base_servings_unit: servingsUnit.trim() || "servings" })}
-                onApply={(next) => onCommit({ base_servings_unit: next.trim() || "servings" })}
+                list="serving-unit-options"
               />
+              <datalist id="serving-unit-options">
+                {SERVING_UNIT_SUGGESTIONS.map((u) => (
+                  <option key={u} value={u} />
+                ))}
+              </datalist>
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -526,32 +526,28 @@ export function ResearchDocumentPreview({
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Serving size unit</label>
-              <CopyAssistField
-                recipeId={recipe.recipe_id}
-                fieldLabel="serving size unit"
+              <Input
                 value={servingSizeUnit}
-                onChange={setServingSizeUnit}
+                onChange={(e) => setServingSizeUnit(e.target.value)}
                 onBlur={() => onCommit({ serving_size_unit: servingSizeUnit.trim() || null })}
-                onApply={(next) => onCommit({ serving_size_unit: next.trim() || null })}
                 placeholder="bowl, piece, cup, 250 g"
+                list="serving-size-unit-options"
               />
+              <datalist id="serving-size-unit-options">
+                {SERVING_SIZE_UNIT_SUGGESTIONS.map((u) => (
+                  <option key={u} value={u} />
+                ))}
+              </datalist>
             </div>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Cuisine tags</label>
-            <CopyAssistField
-              recipeId={recipe.recipe_id}
-              fieldLabel="cuisine tags"
+            <Input
               value={cuisineTags}
-              onChange={setCuisineTags}
+              onChange={(e) => setCuisineTags(e.target.value)}
               onBlur={() =>
                 onCommit({
                   cuisine_tags: cuisineTags.split(",").map((t) => t.trim()).filter(Boolean),
-                })
-              }
-              onApply={(next) =>
-                onCommit({
-                  cuisine_tags: next.split(",").map((t) => t.trim()).filter(Boolean),
                 })
               }
               placeholder="thai, spicy, weeknight (comma separated)"
@@ -610,23 +606,23 @@ export function ResearchDocumentPreview({
 
       <Card className={highlightClass(["components"])}>
         <CardBody className="space-y-4">
-          <SectionHeader title="Components & ingredients">
-            {reviewBadge(["components"])}
-            <RefineBox section="ingredients" label="ingredients" onRefine={onRefine} />
-          </SectionHeader>
+          <SectionHeader title="Components & ingredients">{reviewBadge(["components"])}</SectionHeader>
+          <datalist id="ingredient-unit-options">
+            {INGREDIENT_UNIT_SUGGESTIONS.map((u) => (
+              <option key={u} value={u} />
+            ))}
+          </datalist>
           {components.map((component, ci) => (
             <div key={ci} className="rounded-lg border border-border p-3 space-y-3">
               <div className="flex items-center gap-2">
-                <CopyAssistField
-                  recipeId={recipe.recipe_id}
-                  fieldLabel="recipe component name"
-                  value={component.component_name}
-                  onChange={(value) => updateComponent(ci, { component_name: value })}
-                  onBlur={() => commitComponents(components)}
-                  onApply={(value) => applyComponentName(ci, value)}
-                  placeholder="Component name, e.g. main, sauce, garnish"
-                  className="flex-1"
-                />
+                <div className="flex-1">
+                  <Input
+                    value={component.component_name}
+                    onChange={(e) => updateComponent(ci, { component_name: e.target.value })}
+                    onBlur={() => commitComponents(components)}
+                    placeholder="Component name, e.g. main, sauce, garnish"
+                  />
+                </div>
                 {components.length > 1 && (
                   <IconButton label="Remove component" icon={<XIcon />} variant="ghost" onClick={() => removeComponent(ci)} />
                 )}
@@ -635,47 +631,42 @@ export function ResearchDocumentPreview({
                 {component.ingredients.map((ing, ii) => (
                   <div key={ii} className="space-y-2 rounded-md bg-surface-muted p-2">
                     <div className="flex gap-2">
-                      <Input
-                        value={ing.amount}
-                        onChange={(e) => updateIngredient(ci, ii, { amount: e.target.value })}
-                        onBlur={() => commitComponents(components)}
-                        placeholder="Amt"
-                        className="w-20"
-                        inputMode="decimal"
-                      />
-                      <CopyAssistField
-                        recipeId={recipe.recipe_id}
-                        fieldLabel="ingredient unit"
-                        value={ing.unit}
-                        onChange={(value) => updateIngredient(ci, ii, { unit: value })}
-                        onBlur={() => commitComponents(components)}
-                        onApply={(value) => applyIngredient(ci, ii, { unit: value })}
-                        placeholder="g"
-                        className="w-20"
-                      />
-                      <CopyAssistField
-                        recipeId={recipe.recipe_id}
-                        fieldLabel="ingredient name"
-                        value={ing.name}
-                        onChange={(value) => updateIngredient(ci, ii, { name: value })}
-                        onBlur={() => commitComponents(components)}
-                        onApply={(value) => applyIngredient(ci, ii, { name: value })}
-                        placeholder="Ingredient name"
-                        className="flex-1"
-                      />
+                      <div className="w-20 shrink-0">
+                        <Input
+                          value={ing.amount}
+                          onChange={(e) => updateIngredient(ci, ii, { amount: e.target.value })}
+                          onBlur={() => commitComponents(components)}
+                          placeholder="Amt"
+                          inputMode="decimal"
+                        />
+                      </div>
+                      <div className="w-20 shrink-0">
+                        <Input
+                          value={ing.unit}
+                          onChange={(e) => updateIngredient(ci, ii, { unit: e.target.value })}
+                          onBlur={() => commitComponents(components)}
+                          placeholder="g"
+                          list="ingredient-unit-options"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <Input
+                          value={ing.name}
+                          onChange={(e) => updateIngredient(ci, ii, { name: e.target.value })}
+                          onBlur={() => commitComponents(components)}
+                          placeholder="Ingredient name"
+                        />
+                      </div>
                       {component.ingredients.length > 1 && (
                         <IconButton label="Remove ingredient" icon={<XIcon />} variant="ghost" onClick={() => removeIngredient(ci, ii)} />
                       )}
                     </div>
-                    <CopyAssistField
-                      recipeId={recipe.recipe_id}
-                      fieldLabel="alternate ingredient units"
+                    <Input
                       value={ing.unitOptionsText}
-                      onChange={(value) => updateIngredient(ci, ii, { unitOptionsText: value })}
+                      onChange={(e) => updateIngredient(ci, ii, { unitOptionsText: e.target.value })}
                       onBlur={() => commitComponents(components)}
-                      onApply={(value) => applyIngredient(ci, ii, { unitOptionsText: value })}
                       placeholder="Alternate units, e.g. 1 cup; 240 ml"
-                      inputClassName="text-xs"
+                      className="text-xs"
                     />
                   </div>
                 ))}

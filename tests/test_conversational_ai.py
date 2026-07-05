@@ -102,6 +102,7 @@ def test_guest_chat_is_read_only_recipe_context(monkeypatch):
 
     class FakeChoice:
         message = type("Message", (), {"content": "Use an airtight container for this recipe."})()
+        finish_reason = "stop"
 
     class FakeResponse:
         choices = [FakeChoice()]
@@ -122,6 +123,36 @@ def test_guest_chat_is_read_only_recipe_context(monkeypatch):
     assert body == {"reply": "Use an airtight container for this recipe.", "persisted": False}
     assert "Recipe context JSON" in calls[0]["messages"][0]["content"]
     assert "Do not output a full rewritten recipe or claim to have changed the saved recipe" in calls[0]["messages"][0]["content"]
+    assert calls[0]["reasoning_effort"] == "low"
+    assert calls[0]["max_tokens"] >= 1200
+
+
+def test_guest_chat_truncated_reply_is_a_clear_error_not_a_fake_refusal(monkeypatch):
+    """Regression test for a real production bug: a reasoning model
+    (gpt-5-nano/gpt-5-mini) could spend its *entire* token budget on hidden
+    reasoning, returning finish_reason="length" with empty message.content —
+    the endpoint used to fall through `reply or "I can only answer..."` and
+    silently present that as a deliberate policy refusal for ANY question,
+    on-topic or not. It must now surface a clear failure instead."""
+
+    class FakeChoice:
+        message = type("Message", (), {"content": ""})()
+        finish_reason = "length"
+
+    class FakeResponse:
+        choices = [FakeChoice()]
+        usage = {"prompt_tokens": 10, "completion_tokens": 350, "total_tokens": 360}
+
+    def fake_completion(**kwargs):
+        return FakeResponse()
+
+    monkeypatch.setattr(recipes_router, "is_litellm_configured", lambda: True)
+    monkeypatch.setattr(recipes_router, "is_model_available", lambda model: True)
+    monkeypatch.setattr(recipes_router, "litellm_completion", fake_completion)
+
+    r = client.post("/api/recipes/bonde/chat", json={"message": "how can i make it low calorie"})
+    assert r.status_code == 502
+    assert r.json()["detail"] != "I can only answer questions about this recipe."
 
 
 def test_guest_cannot_generate_recipe():
