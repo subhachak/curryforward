@@ -83,6 +83,34 @@ class RecipeDetailResponse(BaseModel):
     is_current_head: bool
     created_at: str | None
     updated_at: str | None
+    metadata: dict[str, Any] | None = None
+    feedback_summary: dict[str, Any] | None = None
+
+
+class RecipeFeedbackCreateRequest(BaseModel):
+    author_name: str | None = Field(default=None, max_length=80)
+    rating: int | None = Field(default=None, ge=1, le=5)
+    comment: str = Field(min_length=1, max_length=2000)
+
+
+class RecipeFeedbackResponse(BaseModel):
+    feedback_id: str
+    recipe_id: str
+    author_name: str | None
+    rating: int | None
+    comment: str
+    status: str
+    moderation_reason: str | None
+    created_at: str | None
+    updated_at: str | None
+
+
+class RecipeFeedbackListResponse(BaseModel):
+    average_rating: float | None
+    rating_count: int
+    review_count: int
+    comment_count: int
+    items: list[RecipeFeedbackResponse]
 
 
 class RecipeResearchResponse(RecipeDetailResponse):

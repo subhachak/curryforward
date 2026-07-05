@@ -91,6 +91,8 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
                       <Badge tone={r.status === "published" ? "success" : "warning"}>{r.status}</Badge>
                       {r.category && <span>{r.category}</span>}
+                      <span>Published {formatDate(r.first_published_at)}</span>
+                      <span>Updated {formatDate(r.updated_at)}</span>
                       <span>{r.view_count} views</span>
                       <span>{r.download_count} downloads</span>
                     </div>
@@ -132,4 +134,9 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
       </CardBody>
     </Card>
   );
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "not yet";
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
 }

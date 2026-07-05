@@ -163,3 +163,73 @@ def test_delete_requires_draft_status():
     r = client.delete(f"/api/recipes/{created['recipe_id']}", headers=ADMIN_HEADERS)
     assert r.status_code == 400
     assert "Unpublish" in r.json()["detail"]
+
+
+def test_published_recipe_accepts_feedback_and_exposes_metadata(monkeypatch):
+    monkeypatch.setattr(
+        "app.routers.recipes._scan_feedback_with_ai",
+        lambda recipe, author_name, rating, comment, db=None: {"approved": True, "reason": "looks fine"},
+    )
+    created = client.post("/api/recipes", json=NEW_RECIPE, headers=ADMIN_HEADERS).json()
+    client.patch(
+        f"/api/recipes/research/{created['recipe_id']}",
+        json={"components": NEW_RECIPE["components"], "steps": NEW_RECIPE["steps"]},
+        headers=ADMIN_HEADERS,
+    )
+    client.post(f"/api/recipes/research/{created['recipe_id']}/publish", headers=ADMIN_HEADERS)
+
+    detail = client.get(f"/api/recipes/{created['recipe_id']}").json()
+    assert detail["metadata"]["first_published_at"]
+    assert detail["metadata"]["version_count"] == 1
+    assert detail["feedback_summary"]["rating_count"] == 0
+
+    r = client.post(
+        f"/api/recipes/{created['recipe_id']}/feedback",
+        json={"author_name": "Tester", "rating": 5, "comment": "Loved this."},
+    )
+    assert r.status_code == 200
+    assert r.json()["rating"] == 5
+
+    feedback = client.get(f"/api/recipes/{created['recipe_id']}/feedback").json()
+    assert feedback["average_rating"] == 5
+    assert feedback["rating_count"] == 1
+    assert feedback["items"][0]["comment"] == "Loved this."
+
+
+def test_flagged_feedback_waits_for_admin_approval(monkeypatch):
+    monkeypatch.setattr(
+        "app.routers.recipes._scan_feedback_with_ai",
+        lambda recipe, author_name, rating, comment, db=None: {"approved": False, "reason": "flagged in test"},
+    )
+    created = client.post("/api/recipes", json=NEW_RECIPE, headers=ADMIN_HEADERS).json()
+    client.patch(
+        f"/api/recipes/research/{created['recipe_id']}",
+        json={"components": NEW_RECIPE["components"], "steps": NEW_RECIPE["steps"]},
+        headers=ADMIN_HEADERS,
+    )
+    client.post(f"/api/recipes/research/{created['recipe_id']}/publish", headers=ADMIN_HEADERS)
+
+    submitted = client.post(
+        f"/api/recipes/{created['recipe_id']}/feedback",
+        json={"author_name": "Tester", "rating": 4, "comment": "Needs review."},
+    )
+    assert submitted.status_code == 200
+    assert submitted.json()["status"] == "pending_review"
+
+    public_feedback = client.get(f"/api/recipes/{created['recipe_id']}/feedback").json()
+    assert public_feedback["items"] == []
+
+    pending = client.get("/api/admin/feedback/pending", headers=ADMIN_HEADERS).json()
+    pending_item = next(item for item in pending if item["recipe_id"] == created["recipe_id"])
+    assert pending_item["moderation_reason"] == "flagged in test"
+
+    decided = client.post(
+        f"/api/admin/feedback/{pending_item['feedback_id']}/decide",
+        json={"approved": True},
+        headers=ADMIN_HEADERS,
+    )
+    assert decided.status_code == 200
+    assert decided.json()["status"] == "approved"
+
+    public_feedback = client.get(f"/api/recipes/{created['recipe_id']}/feedback").json()
+    assert public_feedback["items"][0]["comment"] == "Needs review."

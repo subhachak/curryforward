@@ -6,8 +6,12 @@ import type {
   DraftRecipeResult,
   DraftSummary,
   EditDraftResult,
+  LLMSettingsResponse,
   ModelOption,
+  PendingRecipeFeedback,
   RecipeDetail,
+  RecipeFeedback,
+  RecipeFeedbackList,
   RecipeResearchDetail,
   ResearchJobSummary,
   RecipeSummary,
@@ -49,6 +53,12 @@ export const api = {
 
   listRecipes: () => apiFetch<RecipeSummary[]>("/recipes"),
   getRecipe: (recipeId: string) => apiFetch<RecipeDetail>(`/recipes/${recipeId}`),
+  listRecipeFeedback: (recipeId: string) => apiFetch<RecipeFeedbackList>(`/recipes/${recipeId}/feedback`),
+  createRecipeFeedback: (recipeId: string, body: { author_name?: string; rating?: number | null; comment: string }) =>
+    apiFetch<RecipeFeedback>(`/recipes/${recipeId}/feedback`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   getHistory: (recipeId: string) => apiFetch<RecipeDetail[]>(`/recipes/${recipeId}/history`),
   forkRecipe: (recipeId: string) =>
     apiFetch<RecipeDetail>(`/recipes/${recipeId}/fork`, { method: "POST" }),
@@ -127,6 +137,18 @@ export const api = {
   createEditDraft: (recipeId: string) =>
     apiFetch<EditDraftResult>(`/admin/recipes/${recipeId}/edit-draft`, { method: "POST" }),
   listTrash: () => apiFetch<TrashedRecipeSummary[]>("/admin/recipes/trash"),
+  getLLMSettings: () => apiFetch<LLMSettingsResponse>("/admin/llm-settings"),
+  updateLLMSetting: (key: string, model: string) =>
+    apiFetch<{ key: string; model: string; updated_at: string | null }>(`/admin/llm-settings/${key}`, {
+      method: "PUT",
+      body: JSON.stringify({ model }),
+    }),
+  listPendingFeedback: () => apiFetch<PendingRecipeFeedback[]>("/admin/feedback/pending"),
+  decideFeedback: (feedbackId: string, approved: boolean) =>
+    apiFetch<RecipeFeedback>(`/admin/feedback/${feedbackId}/decide`, {
+      method: "POST",
+      body: JSON.stringify({ approved }),
+    }),
   restoreRecipe: (recipeId: string) =>
     apiFetch<RecipeDetail>(`/admin/recipes/${recipeId}/restore`, { method: "POST" }),
   purgeRecipe: (recipeId: string) =>

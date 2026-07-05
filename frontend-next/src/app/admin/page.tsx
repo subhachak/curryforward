@@ -15,9 +15,15 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { useRecipes } from "@/context/RecipesContext";
 import { api, ApiError } from "@/lib/api";
-import type { AdminRecipeSummary, ReviewQueueItem, TrashedRecipeSummary } from "@/lib/types";
+import type {
+  AdminRecipeSummary,
+  LLMSettingsResponse,
+  PendingRecipeFeedback,
+  ReviewQueueItem,
+  TrashedRecipeSummary,
+} from "@/lib/types";
 
-type WorkspaceTab = "recipes" | "research" | "review" | "trash" | "analytics";
+type WorkspaceTab = "recipes" | "research" | "review" | "trash" | "analytics" | "models";
 type RecipeStatusFilter = "all" | "published" | "draft";
 
 const tabs: { id: WorkspaceTab; label: string }[] = [
@@ -26,6 +32,7 @@ const tabs: { id: WorkspaceTab; label: string }[] = [
   { id: "review", label: "Review queue" },
   { id: "trash", label: "Trash" },
   { id: "analytics", label: "Analytics" },
+  { id: "models", label: "Models" },
 ];
 
 export default function AdminPage() {
@@ -35,7 +42,11 @@ export default function AdminPage() {
   const router = useRouter();
 
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>([]);
+  const [pendingFeedback, setPendingFeedback] = useState<PendingRecipeFeedback[]>([]);
   const [loadingQueue, setLoadingQueue] = useState(true);
+  const [loadingFeedback, setLoadingFeedback] = useState(true);
+  const [llmSettings, setLLMSettings] = useState<LLMSettingsResponse | null>(null);
+  const [loadingLLMSettings, setLoadingLLMSettings] = useState(true);
   const [adminRecipes, setAdminRecipes] = useState<AdminRecipeSummary[]>([]);
   const [trash, setTrash] = useState<TrashedRecipeSummary[]>([]);
   const [loadingRecipes, setLoadingRecipes] = useState(true);
@@ -58,6 +69,17 @@ export default function AdminPage() {
     }
   }, [push]);
 
+  const loadFeedbackQueue = useCallback(async () => {
+    setLoadingFeedback(true);
+    try {
+      setPendingFeedback(await api.listPendingFeedback());
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Failed to load feedback review", "error");
+    } finally {
+      setLoadingFeedback(false);
+    }
+  }, [push]);
+
   const loadRecipeManagement = useCallback(async () => {
     setLoadingRecipes(true);
     try {
@@ -71,13 +93,26 @@ export default function AdminPage() {
     }
   }, [push]);
 
+  const loadLLMSettings = useCallback(async () => {
+    setLoadingLLMSettings(true);
+    try {
+      setLLMSettings(await api.getLLMSettings());
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Failed to load model settings", "error");
+    } finally {
+      setLoadingLLMSettings(false);
+    }
+  }, [push]);
+
   useEffect(() => {
     if (isAdmin) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       loadReviewQueue();
+      loadFeedbackQueue();
       loadRecipeManagement();
+      loadLLMSettings();
     }
-  }, [isAdmin, loadReviewQueue, loadRecipeManagement]);
+  }, [isAdmin, loadFeedbackQueue, loadLLMSettings, loadReviewQueue, loadRecipeManagement]);
 
   async function handleStartResearch(e: FormEvent) {
     e.preventDefault();
@@ -102,11 +137,16 @@ export default function AdminPage() {
     await Promise.all([loadReviewQueue(), reloadRecipes()]);
   }
 
+  async function handleFeedbackDecided() {
+    await loadFeedbackQueue();
+  }
+
   async function handleRecipesChanged() {
     await Promise.all([loadRecipeManagement(), reloadRecipes()]);
   }
 
   const pendingReviews = reviewQueue.length;
+  const pendingFeedbackCount = pendingFeedback.length;
   const draftCount = adminRecipes.filter((r) => r.status === "draft").length;
   const publishedCount = adminRecipes.filter((r) => r.status === "published").length;
   const totalViews = adminRecipes.reduce((sum, r) => sum + r.view_count, 0);
@@ -161,7 +201,7 @@ export default function AdminPage() {
         <StatTile label="Total recipes" value={adminRecipes.length} />
         <StatTile label="Published" value={publishedCount} />
         <StatTile label="Drafts" value={draftCount} />
-        <StatTile label="Reviews" value={pendingReviews} />
+        <StatTile label="Reviews" value={pendingReviews + pendingFeedbackCount} />
         <StatTile label="Views" value={totalViews} />
         <StatTile label="Downloads" value={totalDownloads} />
       </div>
@@ -214,7 +254,14 @@ export default function AdminPage() {
       )}
 
       {activeTab === "review" && (
-        <ReviewTab loading={loadingQueue} items={reviewQueue} onDecided={handleReviewDecided} />
+        <ReviewTab
+          loading={loadingQueue}
+          loadingFeedback={loadingFeedback}
+          items={reviewQueue}
+          pendingFeedback={pendingFeedback}
+          onDecided={handleReviewDecided}
+          onFeedbackDecided={handleFeedbackDecided}
+        />
       )}
 
       {activeTab === "trash" && (
@@ -228,6 +275,10 @@ export default function AdminPage() {
           pendingReviews={pendingReviews}
           trashCount={trash.length}
         />
+      )}
+
+      {activeTab === "models" && (
+        <ModelsTab loading={loadingLLMSettings} settings={llmSettings} onChanged={loadLLMSettings} />
       )}
     </div>
   );
@@ -373,28 +424,114 @@ function ResearchTab({
 
 function ReviewTab({
   loading,
+  loadingFeedback,
+  items,
+  pendingFeedback,
+  onDecided,
+  onFeedbackDecided,
+}: {
+  loading: boolean;
+  loadingFeedback: boolean;
+  items: ReviewQueueItem[];
+  pendingFeedback: PendingRecipeFeedback[];
+  onDecided: () => void;
+  onFeedbackDecided: () => void;
+}) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {loading ? (
+        <Card>
+          <CardBody>
+            <PageSpinner label="Loading review queue..." />
+          </CardBody>
+        </Card>
+      ) : items.length > 0 ? (
+        <ReviewQueuePanel items={items} onDecided={onDecided} />
+      ) : (
+        <Card>
+          <CardBody>
+            <div className="font-semibold">Recipe import review</div>
+            <div className="mt-2 text-sm text-muted">No imported recipes waiting for review.</div>
+          </CardBody>
+        </Card>
+      )}
+
+      {loadingFeedback ? (
+        <Card>
+          <CardBody>
+            <PageSpinner label="Loading feedback review..." />
+          </CardBody>
+        </Card>
+      ) : (
+        <FeedbackReviewPanel items={pendingFeedback} onDecided={onFeedbackDecided} />
+      )}
+    </div>
+  );
+}
+
+function FeedbackReviewPanel({
   items,
   onDecided,
 }: {
-  loading: boolean;
-  items: ReviewQueueItem[];
+  items: PendingRecipeFeedback[];
   onDecided: () => void;
 }) {
-  if (loading) {
-    return (
-      <Card>
-        <CardBody>
-          <PageSpinner label="Loading review queue..." />
-        </CardBody>
-      </Card>
-    );
+  const { push } = useToast();
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
+  async function decide(item: PendingRecipeFeedback, approved: boolean) {
+    setPendingId(item.feedback_id);
+    try {
+      await api.decideFeedback(item.feedback_id, approved);
+      push(approved ? "Feedback approved" : "Feedback rejected", "success");
+      onDecided();
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Feedback decision failed", "error");
+    } finally {
+      setPendingId(null);
+    }
   }
-  if (items.length > 0) return <ReviewQueuePanel items={items} onDecided={onDecided} />;
+
   return (
     <Card>
       <CardBody>
-        <div className="font-semibold">Review queue</div>
-        <div className="mt-2 text-sm text-muted">No recipes waiting for review.</div>
+        <div className="font-semibold">Feedback review</div>
+        {items.length === 0 ? (
+          <div className="mt-2 text-sm text-muted">No flagged comments or reviews waiting for approval.</div>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {items.map((item) => {
+              const busy = pendingId === item.feedback_id;
+              return (
+                <div key={item.feedback_id} className="rounded-md border border-border bg-surface p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-foreground">{item.recipe_name}</div>
+                      <div className="mt-1 text-xs text-muted">
+                        {item.author_name || "Anonymous"}
+                        {item.rating ? ` · ${item.rating}/5` : ""}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="secondary" size="sm" loading={busy} onClick={() => decide(item, true)}>
+                        Approve
+                      </Button>
+                      <Button variant="danger" size="sm" loading={busy} onClick={() => decide(item, false)}>
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="mt-3 whitespace-pre-wrap text-sm text-foreground">{item.comment}</p>
+                  {item.moderation_reason && (
+                    <div className="mt-3 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning">
+                      {item.moderation_reason}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </CardBody>
     </Card>
   );
@@ -511,4 +648,94 @@ function AnalyticsTab({
       </Card>
     </div>
   );
+}
+
+function ModelsTab({
+  loading,
+  settings,
+  onChanged,
+}: {
+  loading: boolean;
+  settings: LLMSettingsResponse | null;
+  onChanged: () => void;
+}) {
+  const { push } = useToast();
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  async function update(key: string, model: string) {
+    setSavingKey(key);
+    try {
+      await api.updateLLMSetting(key, model);
+      push("Model default updated", "success");
+      onChanged();
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Could not update model default", "error");
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
+  if (loading || !settings) {
+    return (
+      <Card>
+        <CardBody>
+          <PageSpinner label="Loading model settings..." />
+        </CardBody>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardBody>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="font-semibold">Model defaults</div>
+            <p className="mt-1 text-sm text-muted">
+              Pick the default model for each task. Research drafts can still override these with their own model.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 space-y-3">
+          {settings.settings.map((setting) => (
+            <div key={setting.key} className="grid gap-3 rounded-md border border-border bg-surface p-3 lg:grid-cols-[1fr_320px]">
+              <div>
+                <div className="text-sm font-medium text-foreground">{setting.label}</div>
+                <div className="mt-1 text-xs text-muted">{setting.description}</div>
+                <div className="mt-1 text-xs text-muted">Recommended: {modelLabel(settings, setting.default_model)}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={setting.model}
+                  onChange={(e) => update(setting.key, e.target.value)}
+                  disabled={savingKey === setting.key}
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60"
+                  aria-label={`Model for ${setting.label}`}
+                >
+                  {settings.models.map((model) => (
+                    <option
+                      key={model.id}
+                      value={model.id}
+                      disabled={isAnthropicOnlyTask(setting.key) && !model.id.startsWith("anthropic/")}
+                    >
+                      {model.label}
+                      {model.available === false ? " (key missing)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+function modelLabel(settings: LLMSettingsResponse, modelId: string) {
+  return settings.models.find((model) => model.id === modelId)?.label ?? modelId;
+}
+
+function isAnthropicOnlyTask(key: string) {
+  return key === "recipe_customize" || key === "recipe_draft" || key === "gap_generation";
 }

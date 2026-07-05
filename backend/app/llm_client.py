@@ -11,8 +11,6 @@ Anthropic-proprietary built-in tool without a bigger rewrite.
 """
 from __future__ import annotations
 
-import os
-
 try:
     import litellm
     litellm.drop_params = True  # silently ignore a per-provider param LiteLLM
@@ -22,34 +20,28 @@ try:
 except ImportError:
     litellm = None
 
-MODEL_CATALOG = [
-    {"id": "anthropic/claude-sonnet-5", "label": "Claude Sonnet 5 (Anthropic)", "provider_env_var": "ANTHROPIC_API_KEY"},
-    {"id": "anthropic/claude-haiku-4-5-20251001", "label": "Claude Haiku 4.5 (Anthropic, cheaper)", "provider_env_var": "ANTHROPIC_API_KEY"},
-    {"id": "openai/gpt-4o-mini", "label": "GPT-4o mini (OpenAI, cheap)", "provider_env_var": "OPENAI_API_KEY"},
-    {"id": "openai/gpt-4o", "label": "GPT-4o (OpenAI)", "provider_env_var": "OPENAI_API_KEY"},
-    {"id": "groq/llama-3.3-70b-versatile", "label": "Llama 3.3 70B (Groq, fastest/cheapest)", "provider_env_var": "GROQ_API_KEY"},
-]
-
-
 def available_models() -> list[dict]:
     """Filters MODEL_CATALOG to entries whose provider key is actually set —
     the dropdown only ever offers a model that would actually work."""
-    return [m for m in MODEL_CATALOG if os.environ.get(m["provider_env_var"])]
+    from .services.llm_settings import available_models as catalog
+
+    return [m for m in catalog() if m["available"]]
 
 
 def resolve_model(model: str | None) -> str:
     """A session's chosen model, or the configured default if unset/blank."""
-    return model or os.environ.get("DEFAULT_MODEL", "anthropic/claude-sonnet-5")
+    from .services.llm_settings import resolve_task_model
+
+    return model or resolve_task_model("research_chat")
 
 
 def is_model_available(model: str) -> bool:
     """Whether the given model's provider key is set. Unknown model strings
     (not in our small catalog) fall back to checking ANTHROPIC_API_KEY, since
     that's the only provider guaranteed to be relevant to this app."""
-    entry = next((m for m in MODEL_CATALOG if m["id"] == model), None)
-    if entry is None:
-        return bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return bool(os.environ.get(entry["provider_env_var"]))
+    from .services.llm_settings import is_model_available as available
+
+    return available(model)
 
 
 def is_litellm_configured() -> bool:

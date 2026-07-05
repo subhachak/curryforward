@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { NutritionCard } from "@/components/NutritionCard";
 import { RecipeContent } from "@/components/RecipeContent";
+import { RecipeFeedbackPanel } from "@/components/RecipeFeedbackPanel";
 import { VersionHistory } from "@/components/VersionHistory";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -94,6 +95,8 @@ function RecipeDetailInner() {
   }
 
   const lineage = lineageLabel(recipe.lineage);
+  const metadata = recipe.metadata;
+  const feedback = recipe.feedback_summary;
 
   return (
     <div className="space-y-6">
@@ -126,6 +129,8 @@ function RecipeDetailInner() {
         <div className="space-y-6">
           <RecipeContent recipe={recipe} />
 
+          <RecipeFeedbackPanel recipeId={recipe.recipe_id} />
+
           <Card className="border-dashed">
             <CardBody className="text-sm text-muted">
               Want changes? Use the <span className="font-medium text-foreground">search bar</span>{" "}
@@ -137,11 +142,45 @@ function RecipeDetailInner() {
         </div>
 
         <aside className="lg:sticky lg:top-20 lg:self-start">
-          <NutritionCard recipe={recipe} />
+          <div className="space-y-4">
+            <NutritionCard recipe={recipe} />
+            <Card>
+              <CardBody>
+                <div className="font-semibold">Recipe details</div>
+                <dl className="mt-3 space-y-2 text-sm">
+                  <MetaRow label="First published" value={formatDate(metadata?.first_published_at)} />
+                  <MetaRow label="Last updated" value={formatDate(metadata?.last_updated_at ?? recipe.updated_at)} />
+                  <MetaRow label="Versions" value={metadata?.version_count?.toString() ?? "1"} />
+                  <MetaRow
+                    label="Rating"
+                    value={
+                      feedback?.average_rating
+                        ? `${feedback.average_rating.toFixed(1)} (${feedback.rating_count})`
+                        : "Not rated"
+                    }
+                  />
+                </dl>
+              </CardBody>
+            </Card>
+          </div>
         </aside>
       </div>
     </div>
   );
+}
+
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <dt className="text-muted">{label}</dt>
+      <dd className="text-right font-medium text-foreground">{value}</dd>
+    </div>
+  );
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Not published";
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
 }
 
 export default function RecipeDetailPage() {

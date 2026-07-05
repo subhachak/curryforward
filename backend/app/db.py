@@ -46,6 +46,10 @@ _RECIPE_VERSION_COLUMN_ADDITIONS = [
     ("serving_size_unit", "TEXT"),
 ]
 
+_RECIPE_FEEDBACK_COLUMN_ADDITIONS = [
+    ("moderation_reason", "TEXT"),
+]
+
 
 def _run_lightweight_migrations():
     inspector = sqlalchemy.inspect(engine)
@@ -64,6 +68,12 @@ def _run_lightweight_migrations():
             conn.execute(sqlalchemy.text(
                 "UPDATE recipe_versions SET status = 'published' WHERE status IS NULL"
             ))
+    if "recipe_feedback" in inspector.get_table_names():
+        existing_feedback = {c["name"] for c in inspector.get_columns("recipe_feedback")}
+        with engine.begin() as conn:
+            for name, coltype in _RECIPE_FEEDBACK_COLUMN_ADDITIONS:
+                if name not in existing_feedback:
+                    conn.execute(sqlalchemy.text(f"ALTER TABLE recipe_feedback ADD COLUMN {name} {coltype}"))
 
 
 def _backfill_expanded_nutrition():

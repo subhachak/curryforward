@@ -10,14 +10,25 @@ were created (manual, research, or fork).
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..auth import require_admin
 from ..db import get_db
-from ..models import RecipeAnalytics, RecipeVersion
+from ..models import RecipeAnalytics, RecipeFeedback, RecipeVersion
+from ..services.llm_settings import available_models, get_llm_settings, set_llm_setting
 from ..services.recipe_versions import fork_recipe_version
 
 router = APIRouter(prefix="/api/admin")
+
+
+class FeedbackDecision(BaseModel):
+    approved: bool
+
+
+class LLMSettingUpdate(BaseModel):
+    model: str
 
 
 @router.get("/recipes")
@@ -35,20 +46,47 @@ def list_all_recipes(db: Session = Depends(get_db), role: str = Depends(require_
         a.recipe_id: a
         for a in db.query(RecipeAnalytics).filter(RecipeAnalytics.recipe_id.in_(recipe_ids)).all()
     }
-    return [
-        {
+    result = []
+    for r in rows:
+        first_published_at = (
+            db.query(func.min(RecipeVersion.created_at))
+            .filter(RecipeVersion.recipe_id == r.recipe_id, RecipeVersion.status == "published")
+            .scalar()
+        )
+        result.append({
             "recipe_id": r.recipe_id,
             "version_id": r.version_id,
             "name": r.name,
             "category": r.category,
             "status": r.status or "published",
             "lineage": r.lineage,
+            "first_published_at": first_published_at.isoformat() if first_published_at else None,
             "updated_at": r.updated_at.isoformat() if r.updated_at else None,
             "view_count": analytics[r.recipe_id].view_count if r.recipe_id in analytics else 0,
             "download_count": analytics[r.recipe_id].download_count if r.recipe_id in analytics else 0,
-        }
-        for r in rows
-    ]
+        })
+    return result
+
+
+@router.get("/llm-settings")
+def list_llm_settings(db: Session = Depends(get_db), role: str = Depends(require_admin)):
+    return {
+        "settings": get_llm_settings(db),
+        "models": available_models(),
+    }
+
+
+@router.put("/llm-settings/{key}")
+def update_llm_setting(
+    key: str,
+    req: LLMSettingUpdate,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
+    try:
+        return set_llm_setting(db, key, req.model)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @router.post("/recipes/{recipe_id}/edit-draft")
@@ -128,6 +166,44 @@ def list_trash(db: Session = Depends(get_db), role: str = Depends(require_admin)
     ]
 
 
+@router.get("/feedback/pending")
+def list_pending_feedback(db: Session = Depends(get_db), role: str = Depends(require_admin)):
+    rows = (
+        db.query(RecipeFeedback, RecipeVersion.name)
+        .join(
+            RecipeVersion,
+            (RecipeVersion.recipe_id == RecipeFeedback.recipe_id)
+            & (RecipeVersion.is_current_head == True),  # noqa: E712
+        )
+        .filter(RecipeFeedback.status == "pending_review")
+        .order_by(RecipeFeedback.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            **feedback.to_dict(),
+            "recipe_name": recipe_name,
+        }
+        for feedback, recipe_name in rows
+    ]
+
+
+@router.post("/feedback/{feedback_id}/decide")
+def decide_feedback(
+    feedback_id: str,
+    req: FeedbackDecision,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
+    row = db.query(RecipeFeedback).filter(RecipeFeedback.feedback_id == feedback_id).first()
+    if not row:
+        raise HTTPException(404, "Feedback not found")
+    row.status = "approved" if req.approved else "rejected"
+    db.commit()
+    db.refresh(row)
+    return row.to_dict()
+
+
 @router.post("/recipes/{recipe_id}/restore")
 def restore_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(require_admin)):
     """Un-deletes a trashed recipe — clears deleted_at, no other state
@@ -166,5 +242,6 @@ def purge_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depe
     for v in versions:
         db.delete(v)
     db.query(RecipeAnalytics).filter(RecipeAnalytics.recipe_id == recipe_id).delete()
+    db.query(RecipeFeedback).filter(RecipeFeedback.recipe_id == recipe_id).delete()
     db.commit()
     return {"purged": recipe_id}

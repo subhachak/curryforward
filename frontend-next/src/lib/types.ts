@@ -62,6 +62,7 @@ export interface AdminRecipeSummary {
   category: string | null;
   status: "draft" | "published";
   lineage: string;
+  first_published_at: string | null;
   updated_at: string | null;
   view_count: number;
   download_count: number;
@@ -101,6 +102,44 @@ export interface RecipeDetail {
   is_current_head: boolean;
   created_at: string | null;
   updated_at: string | null;
+  metadata?: RecipeMetadata | null;
+  feedback_summary?: RecipeFeedbackSummary | null;
+}
+
+export interface RecipeMetadata {
+  first_published_at: string | null;
+  last_published_at: string | null;
+  current_version_published_at: string | null;
+  last_updated_at: string | null;
+  version_count: number;
+  current_version_id: string;
+}
+
+export interface RecipeFeedbackSummary {
+  average_rating: number | null;
+  rating_count: number;
+  review_count: number;
+  comment_count: number;
+}
+
+export interface RecipeFeedback {
+  feedback_id: string;
+  recipe_id: string;
+  author_name: string | null;
+  rating: number | null;
+  comment: string;
+  status: "approved" | "pending_review" | "rejected" | string;
+  moderation_reason: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface PendingRecipeFeedback extends RecipeFeedback {
+  recipe_name: string;
+}
+
+export interface RecipeFeedbackList extends RecipeFeedbackSummary {
+  items: RecipeFeedback[];
 }
 
 /** Admin-only shape — adds the research scratchpad, never sent to guests. */
@@ -127,6 +166,22 @@ export interface ModelOption {
   id: string;
   label: string;
   provider_env_var: string;
+  provider?: string;
+  available?: boolean;
+  provider_env_vars?: string[];
+}
+
+export interface LLMTaskSetting {
+  key: string;
+  label: string;
+  description: string;
+  default_model: string;
+  model: string;
+}
+
+export interface LLMSettingsResponse {
+  settings: LLMTaskSetting[];
+  models: ModelOption[];
 }
 
 export interface SearchQueryItem {

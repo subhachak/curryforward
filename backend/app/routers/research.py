@@ -30,8 +30,9 @@ from ..llm_agent import (
     run_tavily_search,
     start_research_turn,
 )
-from ..llm_client import is_litellm_configured, is_model_available, resolve_model
+from ..llm_client import is_litellm_configured, is_model_available
 from ..models import RecipeVersion, ResearchJob
+from ..services.llm_settings import resolve_task_model
 from ..nutrition import compute_nutrition
 
 router = APIRouter(prefix="/api/recipes/research")
@@ -142,7 +143,7 @@ def start_research(
     headers. Deriving a good name needs a working model, so this gates on
     is_model_available() the same way /chat and /auto do (unlike before,
     when creating a draft had no AI dependency at all)."""
-    model = resolve_model(req.model)
+    model = req.model or resolve_task_model("dish_name_extraction", db)
     if not is_model_available(model):
         raise HTTPException(400, f"No API key configured for model '{model}' — add it to backend/.env")
 
@@ -266,7 +267,7 @@ def research_chat(
     persisted immediately (autosave) before responding.
     """
     row = _get_draft(db, recipe_id)
-    model = resolve_model(row.research_model)
+    model = resolve_task_model("research_chat", db, row.research_model)
     if not is_model_available(model):
         raise HTTPException(400, f"No API key configured for model '{model}' — add it to backend/.env")
 
@@ -337,7 +338,7 @@ def auto_research_plan(
     row = _get_draft(db, recipe_id)
     if not is_litellm_configured():
         raise HTTPException(400, "litellm is not installed — check backend/requirements.txt")
-    model = resolve_model(row.research_model)
+    model = resolve_task_model("research_plan", db, row.research_model)
     if not is_model_available(model):
         raise HTTPException(400, f"No API key configured for model '{model}' — add it to backend/.env")
     try:
@@ -366,7 +367,7 @@ def auto_research_run(
         raise HTTPException(409, "Auto-research is already running for this recipe")
     if not is_tavily_configured():
         raise HTTPException(400, "TAVILY_API_KEY not set — add it to backend/.env")
-    model = resolve_model(row.research_model)
+    model = resolve_task_model("auto_research_crew", db, row.research_model)
     if not is_model_available(model):
         raise HTTPException(400, f"No API key configured for model '{model}' — add it to backend/.env")
 
@@ -540,7 +541,7 @@ def refine_recipe_section(
     tips) — a single LLM call, not a crew, so this stays synchronous like
     /chat."""
     row = _get_draft(db, recipe_id)
-    model = resolve_model(row.research_model)
+    model = resolve_task_model("section_refine", db, row.research_model)
     if not is_model_available(model):
         raise HTTPException(400, f"No API key configured for model '{model}' — add it to backend/.env")
     try:

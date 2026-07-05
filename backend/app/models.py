@@ -149,6 +149,54 @@ class RecipeAnalytics(Base):
         }
 
 
+class RecipeFeedback(Base):
+    """Public per-recipe ratings, reviews, and comments.
+
+    A row with rating is a review; a row without rating is a comment. Keep this
+    keyed to recipe_id so feedback survives version replacement.
+    """
+    __tablename__ = "recipe_feedback"
+
+    feedback_id = Column(String, primary_key=True, default=_uid)
+    recipe_id = Column(String, index=True, nullable=False)
+    author_name = Column(String, nullable=True)
+    rating = Column(Integer, nullable=True)
+    comment = Column(Text, nullable=False)
+    status = Column(String, default="pending_review", nullable=False)
+    moderation_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=_now)
+    updated_at = Column(DateTime, default=_now, onupdate=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "feedback_id": self.feedback_id,
+            "recipe_id": self.recipe_id,
+            "author_name": self.author_name,
+            "rating": self.rating,
+            "comment": self.comment,
+            "status": self.status,
+            "moderation_reason": self.moderation_reason,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class LLMSetting(Base):
+    """Admin-configurable default model per LLM task."""
+    __tablename__ = "llm_settings"
+
+    key = Column(String, primary_key=True)
+    model = Column(String, nullable=False)
+    updated_at = Column(DateTime, default=_now, onupdate=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "key": self.key,
+            "model": self.model,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
 class ResearchJob(Base):
     """Audit trail for auto-research runs. The current recipe row still keeps
     the live polling fields; this table preserves the historical run inputs,

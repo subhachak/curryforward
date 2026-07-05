@@ -357,7 +357,12 @@ def _validate_customization_payload(payload: dict, current_version: dict) -> dic
         ) from exc
 
 
-def customize_recipe(current_version: dict, user_request: str, history: list[dict] | None = None) -> dict:
+def customize_recipe(
+    current_version: dict,
+    user_request: str,
+    history: list[dict] | None = None,
+    model: str | None = None,
+) -> dict:
     client = _client()
     if client is None:
         raise RuntimeError(
@@ -394,7 +399,7 @@ def customize_recipe(current_version: dict, user_request: str, history: list[dic
 
         try:
             message = client.messages.create(
-                model=MODEL,
+                model=model or MODEL,
                 max_tokens=2000,
                 system=CUSTOMIZE_SYSTEM_PROMPT,
                 tools=[CUSTOMIZE_RECIPE_TOOL],
@@ -431,6 +436,7 @@ def draft_recipe_from_conversation(
     message: str,
     history: list[dict] | None = None,
     current_draft: dict | None = None,
+    model: str | None = None,
 ) -> dict:
     """Conversational, never-persisting recipe drafting — the counterpart to
     customize_recipe() but for a recipe that doesn't exist yet. The caller
@@ -449,7 +455,7 @@ def draft_recipe_from_conversation(
     messages.append({"role": "user", "content": user_content})
 
     response = client.messages.create(
-        model=MODEL,
+        model=model or MODEL,
         max_tokens=3000,
         system=DRAFT_SYSTEM_PROMPT,
         tools=[{"type": "web_search_20250305", "name": "web_search"}],
@@ -462,7 +468,7 @@ def draft_recipe_from_conversation(
     return json.loads(text[start:end])
 
 
-def generate_recipe_for_gap(dish_name: str, preferences: dict) -> dict:
+def generate_recipe_for_gap(dish_name: str, preferences: dict, model: str | None = None) -> dict:
     client = _client()
     if client is None:
         raise RuntimeError(
@@ -470,7 +476,7 @@ def generate_recipe_for_gap(dish_name: str, preferences: dict) -> dict:
         )
 
     message = client.messages.create(
-        model=MODEL,
+        model=model or MODEL,
         max_tokens=3000,
         system=GENERATE_SYSTEM_PROMPT,
         tools=[{"type": "web_search_20250305", "name": "web_search"}],

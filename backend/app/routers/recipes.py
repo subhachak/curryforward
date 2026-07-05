@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -17,10 +18,19 @@ from ..llm_agent import (
     generate_recipe_for_gap,
     is_configured,
 )
-from ..models import RecipeAnalytics, RecipeVersion, ReviewQueueItem
+from ..llm_client import is_litellm_configured, is_model_available, litellm_completion
+from ..models import RecipeAnalytics, RecipeFeedback, RecipeVersion, ReviewQueueItem
 from ..nutrition import compute_nutrition
 from ..recipe_export import render_markdown
-from ..schemas import RecipeDetailResponse, RecipeSummaryResponse, RecipeUpsertRequest
+from ..schemas import (
+    RecipeDetailResponse,
+    RecipeFeedbackCreateRequest,
+    RecipeFeedbackListResponse,
+    RecipeFeedbackResponse,
+    RecipeSummaryResponse,
+    RecipeUpsertRequest,
+)
+from ..services.llm_settings import anthropic_model_name, resolve_task_model
 from ..services.recipe_versions import (
     create_chat_edit_version,
     create_manual_recipe,
@@ -43,6 +53,94 @@ def _increment_analytics(db: Session, recipe_id: str, field: str) -> None:
         db.flush()
     setattr(row, field, getattr(row, field) + 1)
     db.commit()
+
+
+def _recipe_metadata(db: Session, recipe_id: str, current: RecipeVersion) -> dict:
+    versions = db.query(RecipeVersion).filter(RecipeVersion.recipe_id == recipe_id).all()
+    published_versions = [v for v in versions if (v.status or "published") == "published"]
+    first_published = min((v.created_at for v in published_versions if v.created_at), default=None)
+    last_published = max((v.created_at for v in published_versions if v.created_at), default=None)
+    last_updated = max((v.updated_at for v in versions if v.updated_at), default=current.updated_at)
+    return {
+        "first_published_at": first_published.isoformat() if first_published else None,
+        "last_published_at": last_published.isoformat() if last_published else None,
+        "current_version_published_at": current.created_at.isoformat()
+        if (current.status or "published") == "published" and current.created_at
+        else None,
+        "last_updated_at": last_updated.isoformat() if last_updated else None,
+        "version_count": len(versions),
+        "current_version_id": current.version_id,
+    }
+
+
+def _feedback_summary(db: Session, recipe_id: str) -> dict:
+    rows = (
+        db.query(RecipeFeedback)
+        .filter(RecipeFeedback.recipe_id == recipe_id, RecipeFeedback.status == "approved")
+        .order_by(RecipeFeedback.created_at.desc())
+        .all()
+    )
+    ratings = [r.rating for r in rows if r.rating is not None]
+    return {
+        "average_rating": round(sum(ratings) / len(ratings), 1) if ratings else None,
+        "rating_count": len(ratings),
+        "review_count": len([r for r in rows if r.rating is not None]),
+        "comment_count": len(rows),
+    }
+
+
+def _visible_recipe_or_404(recipe_id: str, db: Session, role: str) -> RecipeVersion:
+    version = current_head_query(db, recipe_id).first()
+    if not version or ((version.status or "published") != "published" and role != "admin"):
+        raise HTTPException(404, "Recipe not found")
+    return version
+
+
+def _scan_feedback_with_ai(
+    recipe: RecipeVersion,
+    author_name: str | None,
+    rating: int | None,
+    comment: str,
+    db: Session | None = None,
+) -> dict:
+    """Return {"approved": bool, "reason": str}. Fail closed: if scanner
+    config/provider/parsing is unavailable, keep the item hidden for admin
+    review instead of publishing unscanned public content."""
+    model = resolve_task_model("feedback_moderation", db)
+    if not is_litellm_configured():
+        return {"approved": False, "reason": "AI scanner unavailable: LiteLLM is not installed."}
+    if not is_model_available(model):
+        return {"approved": False, "reason": f"AI scanner unavailable: no API key configured for {model}."}
+
+    prompt = (
+        "You moderate public recipe comments. Return only JSON with keys "
+        "`approved` (boolean) and `reason` (short string). Approve normal "
+        "recipe feedback, disagreement, and mild criticism. Flag harassment, "
+        "hate, sexual content, threats, spam, private data, malware links, or "
+        "content unrelated to the recipe.\n\n"
+        f"Recipe: {recipe.name}\n"
+        f"Author: {author_name or 'Anonymous'}\n"
+        f"Rating: {rating if rating is not None else 'none'}\n"
+        f"Comment: {comment}"
+    )
+    try:
+        response = litellm_completion(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are a precise content moderation classifier."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0,
+            max_tokens=160,
+        )
+        content = response.choices[0].message.content
+        parsed = json.loads(content)
+        approved = bool(parsed.get("approved"))
+        reason = str(parsed.get("reason") or ("Approved by AI scan" if approved else "Flagged by AI scan"))
+        return {"approved": approved, "reason": reason[:500]}
+    except Exception:
+        logger.exception("Feedback moderation scan failed")
+        return {"approved": False, "reason": "AI scanner failed; queued for admin review."}
 
 
 class HistoryTurn(BaseModel):
@@ -104,15 +202,63 @@ def list_recipes(db: Session = Depends(get_db), role: str = Depends(get_role)):
 
 @router.get("/recipes/{recipe_id}", response_model=RecipeDetailResponse)
 def get_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
-    version = current_head_query(db, recipe_id).first()
-    # 404 (not 403) for a guest hitting a draft — don't confirm it exists.
-    if not version or ((version.status or "published") != "published" and role != "admin"):
-        raise HTTPException(404, "Recipe not found")
+    version = _visible_recipe_or_404(recipe_id, db, role)
     if role != "admin":
         # Guest-only, so the admin's own edit/preview traffic doesn't inflate
         # the count shown on the dashboard.
         _increment_analytics(db, recipe_id, "view_count")
-    return version.to_dict()
+    return {
+        **version.to_dict(),
+        "metadata": _recipe_metadata(db, recipe_id, version),
+        "feedback_summary": _feedback_summary(db, recipe_id),
+    }
+
+
+@router.get("/recipes/{recipe_id}/feedback", response_model=RecipeFeedbackListResponse)
+def list_recipe_feedback(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
+    _visible_recipe_or_404(recipe_id, db, role)
+    rows = (
+        db.query(RecipeFeedback)
+        .filter(RecipeFeedback.recipe_id == recipe_id, RecipeFeedback.status == "approved")
+        .order_by(RecipeFeedback.created_at.desc())
+        .all()
+    )
+    ratings = [r.rating for r in rows if r.rating is not None]
+    return {
+        "average_rating": round(sum(ratings) / len(ratings), 1) if ratings else None,
+        "rating_count": len(ratings),
+        "review_count": len([r for r in rows if r.rating is not None]),
+        "comment_count": len(rows),
+        "items": [r.to_dict() for r in rows],
+    }
+
+
+@router.post("/recipes/{recipe_id}/feedback", response_model=RecipeFeedbackResponse)
+def create_recipe_feedback(
+    recipe_id: str,
+    req: RecipeFeedbackCreateRequest,
+    db: Session = Depends(get_db),
+    role: str = Depends(get_role),
+):
+    version = _visible_recipe_or_404(recipe_id, db, role)
+    if (version.status or "published") != "published":
+        raise HTTPException(400, "Feedback can only be added to published recipes")
+    comment = req.comment.strip()
+    if not comment:
+        raise HTTPException(400, "Comment is required")
+    row = RecipeFeedback(
+        recipe_id=recipe_id,
+        author_name=(req.author_name or "").strip()[:80] or None,
+        rating=req.rating,
+        comment=comment,
+    )
+    scan = _scan_feedback_with_ai(version, row.author_name, row.rating, row.comment, db)
+    row.status = "approved" if scan["approved"] else "pending_review"
+    row.moderation_reason = scan["reason"]
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row.to_dict()
 
 
 @router.get("/recipes/{recipe_id}/download")
@@ -204,7 +350,11 @@ def delete_recipe(
 
 
 @router.post("/recipes/draft")
-def draft_recipe(req: DraftRequest, role: str = Depends(require_admin)):
+def draft_recipe(
+    req: DraftRequest,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
     """
     Conversational, admin-only recipe drafting — the create-time counterpart
     to /recipes/{id}/chat. Paste a natural-language draft, name a dish idea
@@ -220,6 +370,7 @@ def draft_recipe(req: DraftRequest, role: str = Depends(require_admin)):
             req.message,
             history=[h.model_dump() for h in req.history],
             current_draft=req.draft,
+            model=anthropic_model_name(resolve_task_model("recipe_draft", db)),
         )
     except Exception as e:
         raise HTTPException(500, f"Recipe drafting failed: {e}")
@@ -248,7 +399,10 @@ def chat_customize(
 
     try:
         result = customize_recipe(
-            current.to_dict(), req.message, history=[h.model_dump() for h in req.history]
+            current.to_dict(),
+            req.message,
+            history=[h.model_dump() for h in req.history],
+            model=anthropic_model_name(resolve_task_model("recipe_customize", db)),
         )
     except LLMInvalidResponseError as e:
         raise HTTPException(502, str(e))
@@ -321,7 +475,11 @@ def generate_recipe(
         "flavor_profile": req.flavor_profile,
     }
     try:
-        result = generate_recipe_for_gap(req.dish_name, preferences)
+        result = generate_recipe_for_gap(
+            req.dish_name,
+            preferences,
+            model=anthropic_model_name(resolve_task_model("gap_generation", db)),
+        )
     except Exception as e:
         raise HTTPException(500, f"Recipe generation failed: {e}")
 

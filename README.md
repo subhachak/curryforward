@@ -52,7 +52,8 @@ Backend configuration lives in `backend/.env`:
 | `SESSION_SECRET` | recommended | Signing key for the httpOnly admin session cookie; falls back to `ADMIN_TOKEN` |
 | `ANTHROPIC_API_KEY` | for Anthropic chat/generation | Enables the default recipe chat/generate paths |
 | `OPENAI_API_KEY` / `GROQ_API_KEY` | optional | Enables those models in the research model picker through LiteLLM |
-| `DEFAULT_MODEL` | optional | LiteLLM model string for research flows; defaults to `anthropic/claude-sonnet-5` |
+| `GEMINI_API_KEY` | optional | Enables Gemini models for low-cost moderation/research defaults through LiteLLM |
+| `DEFAULT_MODEL` | optional | Legacy fallback LiteLLM model string; task-specific defaults are managed in Workspace → Models |
 | `TAVILY_API_KEY` | for web research | Enables guided-search approval and auto-research |
 | `CORS_ORIGINS` | optional | Comma-separated allowed frontend origins for cookie auth |
 | `DATABASE_URL` | optional | SQLite database URL; use `sqlite:////data/curryforward.db` with a persistent Railway Volume |
@@ -99,7 +100,13 @@ DEFAULT_MODEL=anthropic/claude-sonnet-5
 ```
 
 Optional model-provider variables such as `OPENAI_API_KEY` and `GROQ_API_KEY`
-can be added later. The Railway health check uses `/api/health`.
+can be added later. Add `GEMINI_API_KEY` to use the default low-cost Gemini
+model assignments. The Railway health check uses `/api/health`.
+
+LLM task defaults can be changed from **Workspace → Models**. The app starts
+with cheap Gemini defaults for moderation/name extraction, balanced Gemini
+defaults for research/refinement, and Anthropic defaults for the recipe
+generation paths that still depend on Anthropic's server-side web search.
 
 ## Checks and migrations
 
