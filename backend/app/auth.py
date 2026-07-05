@@ -1,9 +1,9 @@
 """
 Minimal role model for local/personal use:
 - Admin (you): full access — fork, persist chat edits, and manage recipes.
-- Guest (anyone else you share the app with): can browse recipes and use chat
-  to customize DURING THEIR SESSION, but nothing they do is persisted or
-  forkable. This is enforced server-side, not just hidden in the UI.
+- Guest (anyone else): can browse recipes and leave moderated feedback. Public
+  users cannot call assistant, generation, drafting, or research endpoints.
+  This is enforced server-side, not just hidden in the UI.
 
 Still a single-shared-secret model (ADMIN_TOKEN in .env) — appropriate for
 "share my laptop's local app with family/friends for testing", not a

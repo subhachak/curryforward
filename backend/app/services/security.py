@@ -25,10 +25,6 @@ def is_production() -> bool:
     )
 
 
-def guest_llm_enabled() -> bool:
-    return env_bool("GUEST_LLM_ENABLED", default=False)
-
-
 def _int_env(name: str, default: int) -> int:
     try:
         return int(os.environ.get(name, default))

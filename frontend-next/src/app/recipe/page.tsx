@@ -131,12 +131,14 @@ function RecipeDetailInner() {
 
           <RecipeFeedbackPanel recipeId={recipe.recipe_id} />
 
-          <Card className="border-dashed">
-            <CardBody className="text-sm text-muted">
-              Want changes? Use the <span className="font-medium text-foreground">search bar</span>{" "}
-              above — it&apos;s already focused on this recipe.
-            </CardBody>
-          </Card>
+          {isAdmin && (
+            <Card className="border-dashed">
+              <CardBody className="text-sm text-muted">
+                Want changes? Use the <span className="font-medium text-foreground">search bar</span>{" "}
+                above — it&apos;s already focused on this recipe.
+              </CardBody>
+            </Card>
+          )}
 
           {isAdmin && <VersionHistory versions={history} />}
         </div>

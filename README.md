@@ -51,7 +51,6 @@ Backend configuration lives in `backend/.env`:
 | `ADMIN_TOKEN` | yes | Shared admin password for `/login` and `X-Admin-Token` API access |
 | `SESSION_SECRET` | recommended | Signing key for the httpOnly admin session cookie; falls back to `ADMIN_TOKEN` |
 | `APP_ENV=production` | recommended in production | Enables secure cookies and HSTS when Railway's production env flag is absent |
-| `GUEST_LLM_ENABLED` | optional | Defaults to `false`; set `true` only if public visitors may trigger paid AI calls |
 | `RATE_LIMIT_*` | optional | Tunes login, feedback, upload, and LLM request limits |
 | `ANTHROPIC_API_KEY` | for Anthropic chat/generation | Enables the default recipe chat/generate paths |
 | `OPENAI_API_KEY` / `GROQ_API_KEY` | optional | Enables those models in the research model picker through LiteLLM |
@@ -145,7 +144,7 @@ secret never sits in `localStorage` or gets attached to every request.
 | Role | How | Can do |
 |---|---|---|
 | **Admin** (you) | Click the small icon near the footer → `/login` with the `ADMIN_TOKEN` value → lands on `/admin` | Start/edit recipes from the dashboard, copy/delete drafts, persist chat customizations as new versions, draft and save new recipes conversationally, moderate public feedback |
-| **Guest** (anyone else) | Not logged in | Browse all recipes and leave moderated feedback. AI customization/generation is blocked unless `GUEST_LLM_ENABLED=true`. |
+| **Guest** (anyone else) | Not logged in | Browse/search recipes, ask read-only questions about the recipe currently open, and leave moderated feedback. Public users cannot trigger generation, drafting, research, or recipe-changing LLM calls. |
 
 The rest of the app doesn't call out roles at all — `/recipes` and recipe pages render
 as browsing surfaces. Dashboard-only controls stay on `/admin` rather than being
@@ -246,15 +245,13 @@ curryforward/
   keep both versions as separate recipes.
   Guests hitting it directly get a neutral "log in to access this" prompt.
 - **The search bar *is* the assistant** (`components/assistant/AssistantSearchBar.tsx`,
-  lives in the nav) — type a search, a customization request, or a whole
-  recipe draft into the same box; a dropdown below it carries the
-  conversation. Off a recipe page it searches recipes (client-side keyword
-  match) and, for admins, drafts a new recipe conversationally. On a recipe
-  page it's automatically focused on that recipe and forwards messages to
-  `/api/recipes/{id}/chat` — guests get a session-only preview, admins get a
-  persisted new version. There's no backend intent-classifier; routing
-  between search/customize/create is light keyword heuristics in
-  `lib/assistantHeuristics.ts`.
+  lives in the nav) — public guests get client-side recipe search off recipe
+  pages, and read-only recipe-context Q&A on recipe pages. Guest chat sees only
+  the current recipe document and must refuse unrelated topics. Admins can also
+  type customization requests or full recipe drafts into the same box; admin
+  recipe-page chat persists changes as a new version. There's no backend
+  intent-classifier; routing between search/customize/create is light keyword
+  heuristics in `lib/assistantHeuristics.ts`.
 - **Conversational recipe drafting** (admin only): paste a messy recipe you
   found somewhere, or just name a dish, into the search bar. It's sent to
   `POST /api/recipes/draft`, which structures/invents a recipe (web search

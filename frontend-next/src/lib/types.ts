@@ -300,8 +300,9 @@ export type ResearchPatchPayload = Partial<{
 }>;
 
 export interface ChatResult {
-  change_summary: string;
-  new_version: RecipeDetail;
+  change_summary?: string;
+  reply?: string;
+  new_version?: RecipeDetail;
   persisted: boolean;
 }
 

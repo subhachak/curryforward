@@ -102,7 +102,7 @@ export function AssistantSearchBar() {
     if (!target) return;
     try {
       const result = await api.chat(target.recipe.recipe_id, message, chatHistory);
-      const summary = result.change_summary || "Done.";
+      const summary = result.reply || result.change_summary || "Done.";
       addMessage("assistant", summary);
       setChatHistory((prev) => [
         ...prev,
@@ -111,7 +111,7 @@ export function AssistantSearchBar() {
       ]);
       if (result.persisted) {
         target.onPersisted();
-      } else {
+      } else if (result.new_version) {
         target.onPreview(result.new_version);
       }
     } catch (e) {
@@ -268,7 +268,15 @@ export function AssistantSearchBar() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onFocus={() => setOpen(true)}
-            placeholder={target ? `Ask about ${target.recipe.name}…` : "Search, ask, or paste a recipe…"}
+            placeholder={
+              target
+                ? isAdmin
+                  ? `Ask about ${target.recipe.name}…`
+                  : `Ask about this recipe…`
+                : isAdmin
+                  ? "Search, ask, or paste a recipe…"
+                  : "Search recipes…"
+            }
             className="w-full rounded-full border border-border bg-surface-muted py-2 pl-9 pr-3 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
           />
         </div>
@@ -279,7 +287,7 @@ export function AssistantSearchBar() {
           <div className="flex items-center justify-between border-b border-border bg-surface-muted px-4 py-2.5">
             <div className="text-sm font-semibold text-ink">Assistant</div>
             <div className="text-xs text-muted">
-              {target ? `Focused on ${target.recipe.name}` : "Search & create"}
+              {target ? `Focused on ${target.recipe.name}` : isAdmin ? "Search & create" : "Recipe search"}
             </div>
           </div>
 
@@ -288,13 +296,10 @@ export function AssistantSearchBar() {
               <div className="rounded-lg bg-surface-muted px-3 py-2 text-sm text-foreground">
                 {target ? (
                   <>
-                    Hi! I&apos;m focused on <strong>{target.recipe.name}</strong>. Tell me what to
-                    change — e.g. &ldquo;make it spicier&rdquo; or &ldquo;halve the sugar&rdquo;.
-                    {!isAdmin && (
-                      <div className="mt-1 text-xs text-muted">
-                        Changes preview for this session only.
-                      </div>
-                    )}
+                    Hi! I&apos;m focused on <strong>{target.recipe.name}</strong>.{" "}
+                    {isAdmin
+                      ? "Tell me what to change — e.g. “make it spicier” or “halve the sugar”."
+                      : "Ask a question about this recipe’s ingredients, steps, timing, serving, or substitutions."}
                   </>
                 ) : isAdmin ? (
                   <>
@@ -305,7 +310,7 @@ export function AssistantSearchBar() {
                 ) : (
                   <>
                     Hi! Ask me to find a recipe — e.g. &ldquo;show me something spicy with
-                    chicken&rdquo;. Open a recipe and I can help customize it too.
+                    chicken&rdquo;.
                   </>
                 )}
               </div>

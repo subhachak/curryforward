@@ -97,6 +97,38 @@ def test_guest_cannot_access_draft_endpoint():
     assert r.status_code == 403
 
 
+def test_guest_chat_is_read_only_recipe_context(monkeypatch):
+    calls = []
+
+    class FakeChoice:
+        message = type("Message", (), {"content": "Use an airtight container for this recipe."})()
+
+    class FakeResponse:
+        choices = [FakeChoice()]
+        usage = {"prompt_tokens": 10, "completion_tokens": 8, "total_tokens": 18}
+
+    def fake_completion(**kwargs):
+        calls.append(kwargs)
+        return FakeResponse()
+
+    monkeypatch.setattr(recipes_router, "is_litellm_configured", lambda: True)
+    monkeypatch.setattr(recipes_router, "is_model_available", lambda model: True)
+    monkeypatch.setattr(recipes_router, "litellm_completion", fake_completion)
+
+    r = client.post("/api/recipes/bonde/chat", json={"message": "make it spicier"})
+    body = r.json()
+
+    assert r.status_code == 200
+    assert body == {"reply": "Use an airtight container for this recipe.", "persisted": False}
+    assert "Recipe context JSON" in calls[0]["messages"][0]["content"]
+    assert "Do not change, rewrite, or generate a recipe" in calls[0]["messages"][0]["content"]
+
+
+def test_guest_cannot_generate_recipe():
+    r = client.post("/api/recipes/generate", json={"dish_name": "personal protein bowl"})
+    assert r.status_code == 403
+
+
 def test_admin_draft_without_api_key_returns_clear_error(monkeypatch):
     # Force the "not configured" path deterministically — a real key may be
     # present in backend/.env for local dev, and these tests shouldn't

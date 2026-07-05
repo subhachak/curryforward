@@ -21,6 +21,11 @@ TASK_DEFAULTS = {
         "default_model": "gemini/gemini-2.5-flash",
         "description": "Balanced cost and quality for iterative recipe research.",
     },
+    "recipe_context_chat": {
+        "label": "Public recipe Q&A",
+        "default_model": "gemini/gemini-2.5-flash-lite",
+        "description": "Low-cost, strictly recipe-contextual answers for public guests.",
+    },
     "research_plan": {
         "label": "Auto-research planning",
         "default_model": "gemini/gemini-2.5-flash-lite",

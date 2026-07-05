@@ -33,7 +33,6 @@ from ..schemas import (
 from ..services.llm_settings import anthropic_model_name, resolve_task_model
 from ..services.audit import audit_admin_action
 from ..services.llm_usage import record_llm_usage
-from ..services.security import guest_llm_enabled
 from ..services.recipe_versions import (
     create_chat_edit_version,
     create_manual_recipe,
@@ -97,6 +96,69 @@ def _visible_recipe_or_404(recipe_id: str, db: Session, role: str) -> RecipeVers
     if not version or ((version.status or "published") != "published" and role != "admin"):
         raise HTTPException(404, "Recipe not found")
     return version
+
+
+def _recipe_context_chat(recipe: RecipeVersion, message: str, history: list[dict], db: Session) -> str:
+    """Guest-safe recipe Q&A. No tools, no web, no recipe mutation.
+
+    The model sees only the current recipe document and must refuse unrelated
+    topics. This endpoint is intentionally not a general assistant.
+    """
+    model = resolve_task_model("recipe_context_chat", db)
+    if not is_litellm_configured():
+        raise HTTPException(400, "AI recipe chat is unavailable.")
+    if not is_model_available(model):
+        raise HTTPException(400, f"No API key configured for model '{model}'.")
+
+    recipe_context = {
+        "name": recipe.name,
+        "category": recipe.category,
+        "cuisine_tags": recipe.cuisine_tags or [],
+        "base_servings": {"amount": recipe.base_servings_amount, "unit": recipe.base_servings_unit},
+        "serving_size": {"amount": recipe.serving_size_amount, "unit": recipe.serving_size_unit},
+        "components": recipe.components or [],
+        "steps": recipe.steps or [],
+        "nutrition": recipe.nutrition or {},
+        "intro": recipe.intro,
+        "history": recipe.history,
+        "tips": recipe.tips or [],
+        "watch_outs": recipe.watch_outs or [],
+    }
+    safe_history = [
+        {"role": turn.get("role"), "content": str(turn.get("content", ""))[:800]}
+        for turn in history[-6:]
+        if turn.get("role") in {"user", "assistant"}
+    ]
+    prompt = (
+        "Answer the user's question using only the recipe context below. "
+        "You may explain ingredients, steps, substitutions, timing, serving, storage, "
+        "nutrition shown in the recipe, and cooking technique directly relevant to this recipe. "
+        "Do not change, rewrite, or generate a recipe. Do not answer unrelated questions, "
+        "including finance, politics, news, world affairs, coding, medical/legal advice, or general trivia. "
+        "If the question is outside this recipe context, reply exactly: "
+        "\"I can only answer questions about this recipe.\" Keep answers concise.\n\n"
+        f"Recipe context JSON:\n{json.dumps(recipe_context)}"
+    )
+    try:
+        response = litellm_completion(
+            model=model,
+            messages=[
+                {"role": "system", "content": prompt},
+                *safe_history,
+                {"role": "user", "content": message},
+            ],
+            temperature=0.2,
+            max_tokens=350,
+        )
+        record_llm_usage(task="recipe_context_chat", model=model, role="guest", response=response)
+        reply = (response.choices[0].message.content or "").strip()
+    except HTTPException:
+        raise
+    except Exception as e:
+        record_llm_usage(task="recipe_context_chat", model=model, role="guest", status="error", error=str(e))
+        logger.exception("Recipe context chat failed")
+        raise HTTPException(502, "The recipe assistant is unavailable right now.")
+    return reply or "I can only answer questions about this recipe."
 
 
 def _scan_feedback_with_ai(
@@ -402,16 +464,17 @@ def chat_customize(
 ):
     """
     Conversational customization.
+    - Guest: read-only contextual Q&A about the current published recipe.
     - Admin: creates a NEW VERSION (linear update), persisted, same recipe_id.
-    - Guest: returns the customized draft for THIS SESSION ONLY — nothing is
-      written to the database. Refreshing the page loses it, and there is
-      no way for a guest to make it permanent (no fork, no save).
     """
     current = current_head_query(db, recipe_id).first()
     if not current or ((current.status or "published") != "published" and role != "admin"):
         raise HTTPException(404, "Recipe not found")
-    if role != "admin" and not guest_llm_enabled():
-        raise HTTPException(403, "Guest AI customization is disabled.")
+
+    if role != "admin":
+        reply = _recipe_context_chat(current, req.message, [h.model_dump() for h in req.history], db)
+        return {"reply": reply, "persisted": False}
+
     if not is_configured():
         raise HTTPException(400, "ANTHROPIC_API_KEY not set — add it to backend/.env")
 
@@ -436,22 +499,6 @@ def chat_customize(
     record_llm_usage(task="recipe_customize", model=model, role=role)
 
     nutrition = compute_nutrition(result["components"])
-
-    if role != "admin":
-        # Guest path: return the draft, persist nothing.
-        return {
-            "change_summary": result.get("change_summary", ""),
-            "new_version": {
-                **current.to_dict(),
-                "components": result["components"],
-                "steps": result["steps"],
-                "nutrition": nutrition,
-                "version_id": "session-preview-not-saved",
-                "lineage": "session_preview",
-                "source": "guest_session_only",
-            },
-            "persisted": False,
-        }
 
     new_version = create_chat_edit_version(current, result)
     db.add(new_version)
@@ -503,17 +550,15 @@ def generate_recipe(
     req: GenerateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    role: str = Depends(get_role),
+    role: str = Depends(require_admin),
 ):
     """
     Called when a requested dish isn't in the seed. Web-search-informed
     ORIGINAL generation (not retrieval) — new recipe_id, lineage='generated'.
-    Guests get a session-only preview; only admin persists to the Recipe Store.
+    Admin-only; public guests cannot trigger recipe generation.
     """
     if not is_configured():
         raise HTTPException(400, "ANTHROPIC_API_KEY not set — add it to backend/.env")
-    if role != "admin" and not guest_llm_enabled():
-        raise HTTPException(403, "Guest recipe generation is disabled.")
 
     preferences = {
         "dietary": req.dietary,
@@ -533,23 +578,6 @@ def generate_recipe(
     record_llm_usage(task="gap_generation", model=model, role=role)
 
     nutrition = compute_nutrition(result["components"])
-
-    if role != "admin":
-        return {
-            "recipe_id": f"session-preview-{req.dish_name[:20]}",
-            "name": result["name"],
-            "category": result.get("category", "main"),
-            "cuisine_tags": result.get("cuisine_tags", []),
-            "base_servings": result["base_servings"],
-            "serving_size": result.get("serving_size") or {"amount": None, "unit": None},
-            "components": result["components"],
-            "steps": result["steps"],
-            "nutrition": nutrition,
-            "lineage": "session_preview",
-            "source": "guest_session_only",
-            "persisted": False,
-            "note": "This generated recipe isn't saved and can't be forked.",
-        }
 
     recipe_id = f"gen-{uuid.uuid4().hex[:8]}"
     version = RecipeVersion(
