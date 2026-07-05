@@ -65,6 +65,27 @@ def upgrade() -> None:
     )
 
     op.create_table(
+        "recipe_feedback",
+        sa.Column("feedback_id", sa.String(), primary_key=True),
+        sa.Column("recipe_id", sa.String(), nullable=False),
+        sa.Column("author_name", sa.String(), nullable=True),
+        sa.Column("rating", sa.Integer(), nullable=True),
+        sa.Column("comment", sa.Text(), nullable=False),
+        sa.Column("status", sa.String(), nullable=False),
+        sa.Column("moderation_reason", sa.Text(), nullable=True),
+        sa.Column("created_at", sa.DateTime(), nullable=True),
+        sa.Column("updated_at", sa.DateTime(), nullable=True),
+    )
+    op.create_index("ix_recipe_feedback_recipe_id", "recipe_feedback", ["recipe_id"])
+
+    op.create_table(
+        "llm_settings",
+        sa.Column("key", sa.String(), primary_key=True),
+        sa.Column("model", sa.String(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(), nullable=True),
+    )
+
+    op.create_table(
         "research_jobs",
         sa.Column("job_id", sa.String(), primary_key=True),
         sa.Column("recipe_id", sa.String(), nullable=False),
@@ -80,10 +101,41 @@ def upgrade() -> None:
     )
     op.create_index("ix_research_jobs_recipe_id", "research_jobs", ["recipe_id"])
 
+    op.create_table(
+        "admin_audit_logs",
+        sa.Column("log_id", sa.String(), primary_key=True),
+        sa.Column("action", sa.String(), nullable=False),
+        sa.Column("target_type", sa.String(), nullable=True),
+        sa.Column("target_id", sa.String(), nullable=True),
+        sa.Column("ip_address", sa.String(), nullable=True),
+        sa.Column("details", sa.JSON(), nullable=True),
+        sa.Column("created_at", sa.DateTime(), nullable=True),
+    )
+
+    op.create_table(
+        "llm_usage_logs",
+        sa.Column("usage_id", sa.String(), primary_key=True),
+        sa.Column("task", sa.String(), nullable=False),
+        sa.Column("model", sa.String(), nullable=True),
+        sa.Column("provider", sa.String(), nullable=True),
+        sa.Column("role", sa.String(), nullable=True),
+        sa.Column("status", sa.String(), nullable=False),
+        sa.Column("prompt_tokens", sa.Integer(), nullable=True),
+        sa.Column("completion_tokens", sa.Integer(), nullable=True),
+        sa.Column("total_tokens", sa.Integer(), nullable=True),
+        sa.Column("error", sa.Text(), nullable=True),
+        sa.Column("created_at", sa.DateTime(), nullable=True),
+    )
+
 
 def downgrade() -> None:
+    op.drop_table("llm_usage_logs")
+    op.drop_table("admin_audit_logs")
     op.drop_index("ix_research_jobs_recipe_id", table_name="research_jobs")
     op.drop_table("research_jobs")
+    op.drop_table("llm_settings")
+    op.drop_index("ix_recipe_feedback_recipe_id", table_name="recipe_feedback")
+    op.drop_table("recipe_feedback")
     op.drop_table("recipe_analytics")
     op.drop_index("ix_recipe_versions_recipe_id", table_name="recipe_versions")
     op.drop_table("recipe_versions")

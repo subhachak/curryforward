@@ -15,8 +15,10 @@ import { useToast } from "@/context/ToastContext";
 import { useRecipes } from "@/context/RecipesContext";
 import { api, ApiError } from "@/lib/api";
 import type {
+  AdminAuditLog,
   AdminRecipeSummary,
   LLMSettingsResponse,
+  LLMUsageResponse,
   PendingRecipeFeedback,
   TrashedRecipeSummary,
 } from "@/lib/types";
@@ -43,6 +45,9 @@ export default function AdminPage() {
   const [loadingFeedback, setLoadingFeedback] = useState(true);
   const [llmSettings, setLLMSettings] = useState<LLMSettingsResponse | null>(null);
   const [loadingLLMSettings, setLoadingLLMSettings] = useState(true);
+  const [llmUsage, setLLMUsage] = useState<LLMUsageResponse | null>(null);
+  const [auditLog, setAuditLog] = useState<AdminAuditLog[]>([]);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(true);
   const [adminRecipes, setAdminRecipes] = useState<AdminRecipeSummary[]>([]);
   const [trash, setTrash] = useState<TrashedRecipeSummary[]>([]);
   const [loadingRecipes, setLoadingRecipes] = useState(true);
@@ -89,14 +94,28 @@ export default function AdminPage() {
     }
   }, [push]);
 
+  const loadAnalytics = useCallback(async () => {
+    setLoadingAnalytics(true);
+    try {
+      const [usage, audit] = await Promise.all([api.getLLMUsage(), api.getAuditLog()]);
+      setLLMUsage(usage);
+      setAuditLog(audit);
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Failed to load analytics", "error");
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  }, [push]);
+
   useEffect(() => {
     if (isAdmin) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       loadFeedbackQueue();
       loadRecipeManagement();
       loadLLMSettings();
+      loadAnalytics();
     }
-  }, [isAdmin, loadFeedbackQueue, loadLLMSettings, loadRecipeManagement]);
+  }, [isAdmin, loadAnalytics, loadFeedbackQueue, loadLLMSettings, loadRecipeManagement]);
 
   async function handleStartResearch(e: FormEvent) {
     e.preventDefault();
@@ -250,6 +269,9 @@ export default function AdminPage() {
           draftCount={draftCount}
           pendingFeedback={pendingFeedbackCount}
           trashCount={trash.length}
+          loadingAnalytics={loadingAnalytics}
+          llmUsage={llmUsage}
+          auditLog={auditLog}
         />
       )}
 
@@ -516,12 +538,21 @@ function AnalyticsTab({
   draftCount,
   pendingFeedback,
   trashCount,
+  loadingAnalytics,
+  llmUsage,
+  auditLog,
 }: {
   topRecipes: AdminRecipeSummary[];
   draftCount: number;
   pendingFeedback: number;
   trashCount: number;
+  loadingAnalytics: boolean;
+  llmUsage: LLMUsageResponse | null;
+  auditLog: AdminAuditLog[];
 }) {
+  const totalModelCalls = llmUsage?.summary.reduce((sum, row) => sum + row.call_count, 0) ?? 0;
+  const totalTokens = llmUsage?.summary.reduce((sum, row) => sum + row.total_tokens, 0) ?? 0;
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
@@ -573,10 +604,42 @@ function AnalyticsTab({
       <Card>
         <CardBody>
           <div className="font-semibold">Model usage</div>
-          <p className="mt-3 text-sm text-muted">
-            Research drafts store their selected model, but completed model-call counts and token usage are not logged
-            yet. Add request logging before using this for cost reporting.
-          </p>
+          {loadingAnalytics ? (
+            <PageSpinner label="Loading model usage..." />
+          ) : (
+            <>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-md border border-border bg-surface-muted p-3">
+                  <div className="text-xs uppercase text-muted">Logged calls</div>
+                  <div className="mt-1 text-lg font-semibold text-ink">{totalModelCalls}</div>
+                </div>
+                <div className="rounded-md border border-border bg-surface-muted p-3">
+                  <div className="text-xs uppercase text-muted">Tokens</div>
+                  <div className="mt-1 text-lg font-semibold text-ink">{totalTokens || "Partial"}</div>
+                </div>
+              </div>
+              <div className="mt-3 space-y-2">
+                {(llmUsage?.summary ?? []).slice(0, 5).map((row) => (
+                  <div
+                    key={`${row.task}-${row.model}`}
+                    className="flex items-center justify-between gap-3 border-b border-border pb-2 text-sm last:border-0 last:pb-0"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-foreground">{row.task}</div>
+                      <div className="truncate text-xs text-muted">{row.model || "unknown model"}</div>
+                    </div>
+                    <div className="shrink-0 text-right text-xs text-muted">
+                      <div>{row.call_count} calls</div>
+                      <div>{row.total_tokens || "no token data"}</div>
+                    </div>
+                  </div>
+                ))}
+                {(llmUsage?.summary ?? []).length === 0 && (
+                  <div className="text-sm text-muted">No model calls logged yet.</div>
+                )}
+              </div>
+            </>
+          )}
         </CardBody>
       </Card>
 
@@ -599,8 +662,41 @@ function AnalyticsTab({
           </div>
         </CardBody>
       </Card>
+
+      <Card>
+        <CardBody>
+          <div className="font-semibold">Recent admin activity</div>
+          {loadingAnalytics ? (
+            <PageSpinner label="Loading audit log..." />
+          ) : auditLog.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {auditLog.slice(0, 8).map((row) => (
+                <div
+                  key={row.log_id}
+                  className="flex items-center justify-between gap-3 border-b border-border pb-2 text-sm last:border-0 last:pb-0"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-foreground">{row.action.replaceAll("_", " ")}</div>
+                    <div className="truncate text-xs text-muted">
+                      {[row.target_type, row.target_id].filter(Boolean).join(" · ") || "workspace"}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right text-xs text-muted">{formatDate(row.created_at)}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 text-sm text-muted">No admin actions logged yet.</div>
+          )}
+        </CardBody>
+      </Card>
     </div>
   );
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "";
+  return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function ModelsTab({

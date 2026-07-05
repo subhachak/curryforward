@@ -17,7 +17,7 @@ import uuid
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -33,6 +33,8 @@ from ..llm_agent import (
 from ..llm_client import is_litellm_configured, is_model_available
 from ..models import RecipeVersion, ResearchJob
 from ..services.llm_settings import resolve_task_model
+from ..services.audit import audit_admin_action
+from ..services.llm_usage import record_llm_usage
 from ..nutrition import compute_nutrition
 
 router = APIRouter(prefix="/api/recipes/research")
@@ -132,6 +134,7 @@ def _apply_patch(row: RecipeVersion, patch: dict, allow_null: bool = False) -> N
 @router.post("")
 def start_research(
     req: StartResearchRequest,
+    request: Request,
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
@@ -147,7 +150,12 @@ def start_research(
     if not is_model_available(model):
         raise HTTPException(400, f"No API key configured for model '{model}' — add it to backend/.env")
 
-    name = extract_dish_name(req.prompt, model)
+    try:
+        name = extract_dish_name(req.prompt, model)
+    except Exception as e:
+        record_llm_usage(task="dish_name_extraction", model=model, role=role, status="error", error=str(e))
+        raise
+    record_llm_usage(task="dish_name_extraction", model=model, role=role)
     recipe_id = f"research-{uuid.uuid4().hex[:8]}"
     version = RecipeVersion(
         recipe_id=recipe_id,
@@ -167,6 +175,14 @@ def start_research(
         starting_prompt=req.prompt,
     )
     db.add(version)
+    audit_admin_action(
+        db,
+        action="research_draft_created",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={"model": req.model, "name": name},
+    )
     db.commit()
     return version.to_research_dict()
 
@@ -236,6 +252,7 @@ def get_research_recipe(
 def patch_research_recipe(
     recipe_id: str,
     req: ResearchPatchRequest,
+    request: Request,
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
@@ -246,6 +263,14 @@ def patch_research_recipe(
     if "model" in patch:
         row.research_model = patch.pop("model")
     _apply_patch(row, patch, allow_null=True)
+    audit_admin_action(
+        db,
+        action="research_draft_updated",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={"fields": sorted(patch.keys())},
+    )
     db.commit()
     return row.to_research_dict()
 
@@ -254,6 +279,7 @@ def patch_research_recipe(
 def research_chat(
     recipe_id: str,
     req: ResearchChatRequest,
+    request: Request,
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
@@ -300,7 +326,9 @@ def research_chat(
     except HTTPException:
         raise
     except Exception as e:
+        record_llm_usage(task="research_chat", model=model, role=role, status="error", error=str(e))
         raise HTTPException(500, f"Research chat failed: {e}")
+    record_llm_usage(task="research_chat", model=model, role=role)
 
     messages = messages + [envelope["assistant_message"]]
 
@@ -317,6 +345,14 @@ def research_chat(
     patch = envelope.get("recipe_patch")
     if patch:
         _apply_patch(row, patch)
+    audit_admin_action(
+        db,
+        action="research_chat_turn",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={"had_patch": bool(patch), "tool_use": bool(envelope.get("tool_use"))},
+    )
     db.commit()
     return {
         "type": "reply",
@@ -344,7 +380,9 @@ def auto_research_plan(
     try:
         plan = propose_search_batch(row.name, row.starting_prompt, model)
     except Exception as e:
+        record_llm_usage(task="research_plan", model=model, role=role, status="error", error=str(e))
         raise HTTPException(500, f"Planning failed: {e}")
+    record_llm_usage(task="research_plan", model=model, role=role)
     return plan
 
 
@@ -352,6 +390,7 @@ def auto_research_plan(
 def auto_research_run(
     recipe_id: str,
     req: AutoResearchRunRequest,
+    request: Request,
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
@@ -385,6 +424,14 @@ def auto_research_run(
     row.auto_research_error = None
     row.auto_research_progress = []
     row.auto_research_job_id = job_id
+    audit_admin_action(
+        db,
+        action="auto_research_started",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={"job_id": job_id, "model": model, "query_count": len(req.approved_queries)},
+    )
     db.commit()
     logger.info("auto_research_started", extra={"recipe_id": recipe_id, "job_id": job_id, "model": model})
 
@@ -483,8 +530,10 @@ def _run_auto_research_job(
                 job.finished_at = datetime.now(timezone.utc)
                 job.progress = row.auto_research_progress or []
             logger.info("auto_research_completed", extra={"recipe_id": recipe_id, "job_id": job_id})
+            record_llm_usage(task="auto_research_crew", model=model, role="admin")
         except Exception as e:
             logger.exception("auto_research_failed", extra={"recipe_id": recipe_id, "job_id": job_id})
+            record_llm_usage(task="auto_research_crew", model=model, role="admin", status="error", error=str(e))
             db.rollback()
             db.refresh(row)
             if row.auto_research_job_id != job_id or row.deleted_at is not None:
@@ -505,6 +554,7 @@ def _run_auto_research_job(
 @router.post("/{recipe_id}/auto/cancel")
 def auto_research_cancel(
     recipe_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
@@ -525,6 +575,14 @@ def auto_research_cancel(
         if job:
             job.status = "cancelled"
             job.finished_at = datetime.now(timezone.utc)
+    audit_admin_action(
+        db,
+        action="auto_research_cancelled",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={"job_id": job_id},
+    )
     db.commit()
     logger.info("auto_research_cancelled", extra={"recipe_id": recipe_id, "job_id": job_id})
     return row.to_research_dict()
@@ -534,6 +592,7 @@ def auto_research_cancel(
 def refine_recipe_section(
     recipe_id: str,
     req: RefineSectionRequest,
+    request: Request,
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
@@ -549,8 +608,18 @@ def refine_recipe_section(
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:
+        record_llm_usage(task="section_refine", model=model, role=role, status="error", error=str(e))
         raise HTTPException(500, f"Refinement failed: {e}")
+    record_llm_usage(task="section_refine", model=model, role=role)
     _apply_patch(row, patch)
+    audit_admin_action(
+        db,
+        action="research_section_refined",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={"section": req.section},
+    )
     db.commit()
     return row.to_research_dict()
 
@@ -558,6 +627,7 @@ def refine_recipe_section(
 @router.post("/{recipe_id}/publish")
 def publish_research_recipe(
     recipe_id: str,
+    request: Request,
     req: PublishResearchRequest | None = None,
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
@@ -619,10 +689,25 @@ def publish_research_recipe(
         row.is_current_head = False
         row.deleted_at = datetime.now(timezone.utc)
         db.add(replacement)
+        audit_admin_action(
+            db,
+            action="recipe_published_replace_original",
+            target_type="recipe",
+            target_id=original.recipe_id,
+            request=request,
+            details={"draft_recipe_id": recipe_id, "replacement_version_id": replacement.version_id},
+        )
         db.commit()
         return replacement.to_dict()
 
     row.status = "published"
+    audit_admin_action(
+        db,
+        action="recipe_published_keep_both",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+    )
     db.commit()
     return row.to_dict()
 
@@ -630,6 +715,7 @@ def publish_research_recipe(
 @router.post("/{recipe_id}/unpublish")
 def unpublish_research_recipe(
     recipe_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
@@ -647,5 +733,6 @@ def unpublish_research_recipe(
     if row.status != "published":
         raise HTTPException(400, "This recipe is not published")
     row.status = "draft"
+    audit_admin_action(db, action="recipe_unpublished", target_type="recipe", target_id=recipe_id, request=request)
     db.commit()
     return row.to_research_dict()

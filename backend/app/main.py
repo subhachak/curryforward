@@ -25,8 +25,12 @@ from .routers.recipes import router as recipes_router
 from .routers.research import router as research_router
 from .routers.uploads import router as uploads_router, UPLOADS_DIR
 from .seed_loader import load_seed_data
+from .services.security import RateLimitMiddleware, SecurityHeadersMiddleware
 
 app = FastAPI(title="Curryforward")
+
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 # Cookie-based sessions require explicit origins (not "*") once
 # allow_credentials is on. CORS_ORIGINS lets you add deployed frontend

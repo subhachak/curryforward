@@ -9,9 +9,12 @@ import os
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
 from ..auth import require_admin
+from ..db import get_db
+from ..services.audit import audit_admin_action
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/uploads")
 
@@ -40,7 +43,12 @@ def _sniff_image_extension(body: bytes) -> str | None:
 
 
 @router.post("")
-async def upload_image(file: UploadFile = File(...), role: str = Depends(require_admin)):
+async def upload_image(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
     ext = ALLOWED_CONTENT_TYPES.get(file.content_type)
     if ext is None:
         raise HTTPException(400, "Only JPEG, PNG, WEBP, or GIF images are allowed")
@@ -56,4 +64,13 @@ async def upload_image(file: UploadFile = File(...), role: str = Depends(require
 
     filename = f"{uuid.uuid4().hex}{ext}"
     (UPLOADS_DIR / filename).write_bytes(body)
+    audit_admin_action(
+        db,
+        action="image_uploaded",
+        target_type="upload",
+        target_id=filename,
+        request=request,
+        details={"content_type": file.content_type, "bytes": len(body)},
+    )
+    db.commit()
     return {"url": f"/uploads/{filename}"}

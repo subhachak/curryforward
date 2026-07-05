@@ -50,6 +50,9 @@ Backend configuration lives in `backend/.env`:
 |---|---:|---|
 | `ADMIN_TOKEN` | yes | Shared admin password for `/login` and `X-Admin-Token` API access |
 | `SESSION_SECRET` | recommended | Signing key for the httpOnly admin session cookie; falls back to `ADMIN_TOKEN` |
+| `APP_ENV=production` | recommended in production | Enables secure cookies and HSTS when Railway's production env flag is absent |
+| `GUEST_LLM_ENABLED` | optional | Defaults to `false`; set `true` only if public visitors may trigger paid AI calls |
+| `RATE_LIMIT_*` | optional | Tunes login, feedback, upload, and LLM request limits |
 | `ANTHROPIC_API_KEY` | for Anthropic chat/generation | Enables the default recipe chat/generate paths |
 | `OPENAI_API_KEY` / `GROQ_API_KEY` | optional | Enables those models in the research model picker through LiteLLM |
 | `GEMINI_API_KEY` | optional | Enables Gemini models for low-cost moderation/research defaults through LiteLLM |
@@ -131,9 +134,10 @@ lint/build on pushes to `main` and pull requests.
 
 ## Access model
 
-Still single-shared-secret (`ADMIN_TOKEN`), not multi-user accounts — appropriate
-for "I'm running this on my own laptop and might let family/friends try it," not
-a production auth system. What changed from v0: instead of pasting that secret
+Still single-shared-secret (`ADMIN_TOKEN`), not multi-user accounts. For this
+single-admin app, production hardening adds secure cookies, security headers,
+rate limiting, admin audit logs, and default-off guest LLM access. What changed
+from v0: instead of pasting that secret
 into a token field on every visit, there's a real **/login** page. It exchanges
 the secret for a signed, httpOnly session cookie (`app/auth.py`), so the raw
 secret never sits in `localStorage` or gets attached to every request.
@@ -141,7 +145,7 @@ secret never sits in `localStorage` or gets attached to every request.
 | Role | How | Can do |
 |---|---|---|
 | **Admin** (you) | Click the small icon near the footer → `/login` with the `ADMIN_TOKEN` value → lands on `/admin` | Start/edit recipes from the dashboard, copy/delete drafts, persist chat customizations as new versions, draft and save new recipes conversationally, moderate public feedback |
-| **Guest** (anyone else) | Not logged in | Browse all recipes, use the assistant to search or customize a recipe — but the result is a **session-only preview**: not saved, not forkable, gone on refresh |
+| **Guest** (anyone else) | Not logged in | Browse all recipes and leave moderated feedback. AI customization/generation is blocked unless `GUEST_LLM_ENABLED=true`. |
 
 The rest of the app doesn't call out roles at all — `/recipes` and recipe pages render
 as browsing surfaces. Dashboard-only controls stay on `/admin` rather than being
@@ -151,6 +155,10 @@ Enforced server-side (`app/auth.py`), not just hidden in the UI — a guest hitt
 the API directly gets a `403` on admin-only actions, not just a missing button.
 The old `X-Admin-Token` header still works too (useful for scripts/tests), checked
 alongside the session cookie.
+
+Admin actions are written to `admin_audit_logs`, and model calls are written to
+`llm_usage_logs` when the app can observe them. Workspace → Analytics shows recent
+activity and model usage summaries.
 
 ## Research, provenance, and uploads
 

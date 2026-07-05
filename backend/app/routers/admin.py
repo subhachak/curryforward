@@ -9,14 +9,15 @@ were created (manual, research, or fork).
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..auth import require_admin
 from ..db import get_db
-from ..models import RecipeAnalytics, RecipeFeedback, RecipeVersion
+from ..models import AdminAuditLog, LLMUsageLog, RecipeAnalytics, RecipeFeedback, RecipeVersion
+from ..services.audit import audit_admin_action
 from ..services.llm_settings import available_models, get_llm_settings, set_llm_setting
 from ..services.recipe_versions import fork_recipe_version
 
@@ -80,17 +81,33 @@ def list_llm_settings(db: Session = Depends(get_db), role: str = Depends(require
 def update_llm_setting(
     key: str,
     req: LLMSettingUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
     try:
-        return set_llm_setting(db, key, req.model)
+        result = set_llm_setting(db, key, req.model)
+        audit_admin_action(
+            db,
+            action="llm_setting_updated",
+            target_type="llm_setting",
+            target_id=key,
+            request=request,
+            details={"model": req.model},
+        )
+        db.commit()
+        return result
     except ValueError as e:
         raise HTTPException(400, str(e))
 
 
 @router.post("/recipes/{recipe_id}/edit-draft")
-def create_edit_draft(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(require_admin)):
+def create_edit_draft(
+    recipe_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
     """Dashboard-only edit entry point.
 
     Draft recipes can be edited in place. Published recipes get a linked draft
@@ -109,6 +126,15 @@ def create_edit_draft(recipe_id: str, db: Session = Depends(get_db), role: str =
     if not current:
         raise HTTPException(404, "Recipe not found")
     if (current.status or "published") == "draft":
+        audit_admin_action(
+            db,
+            action="draft_opened",
+            target_type="recipe",
+            target_id=recipe_id,
+            request=request,
+            details={"created": False},
+        )
+        db.commit()
         return {
             "draft": current.to_research_dict(),
             "created": False,
@@ -127,6 +153,15 @@ def create_edit_draft(recipe_id: str, db: Session = Depends(get_db), role: str =
         .first()
     )
     if existing:
+        audit_admin_action(
+            db,
+            action="edit_draft_opened",
+            target_type="recipe",
+            target_id=recipe_id,
+            request=request,
+            details={"draft_recipe_id": existing.recipe_id, "created": False},
+        )
+        db.commit()
         return {
             "draft": existing.to_research_dict(),
             "created": False,
@@ -137,6 +172,14 @@ def create_edit_draft(recipe_id: str, db: Session = Depends(get_db), role: str =
     draft.name = f"{current.name} (draft edit)"
     draft.source = "revision_draft"
     db.add(draft)
+    audit_admin_action(
+        db,
+        action="edit_draft_created",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={"draft_recipe_id": draft.recipe_id},
+    )
     db.commit()
     return {
         "draft": draft.to_research_dict(),
@@ -192,6 +235,7 @@ def list_pending_feedback(db: Session = Depends(get_db), role: str = Depends(req
 def decide_feedback(
     feedback_id: str,
     req: FeedbackDecision,
+    request: Request,
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
@@ -199,13 +243,26 @@ def decide_feedback(
     if not row:
         raise HTTPException(404, "Feedback not found")
     row.status = "approved" if req.approved else "rejected"
+    audit_admin_action(
+        db,
+        action="feedback_decided",
+        target_type="feedback",
+        target_id=feedback_id,
+        request=request,
+        details={"approved": req.approved, "recipe_id": row.recipe_id},
+    )
     db.commit()
     db.refresh(row)
     return row.to_dict()
 
 
 @router.post("/recipes/{recipe_id}/restore")
-def restore_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(require_admin)):
+def restore_recipe(
+    recipe_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
     """Un-deletes a trashed recipe — clears deleted_at, no other state
     changes. It comes back as whatever status it had when trashed (always
     "draft", since delete is gated to drafts-only)."""
@@ -219,12 +276,18 @@ def restore_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = De
     if row.deleted_at is None:
         raise HTTPException(400, "This recipe is not in the trash")
     row.deleted_at = None
+    audit_admin_action(db, action="recipe_restored", target_type="recipe", target_id=recipe_id, request=request)
     db.commit()
     return row.to_dict()
 
 
 @router.delete("/recipes/{recipe_id}/purge")
-def purge_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(require_admin)):
+def purge_recipe(
+    recipe_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
     """Permanent hard-delete — removes every version row for this recipe_id,
     plus its analytics row. Only allowed once the current-head row is
     already soft-deleted (in Trash), so this can't be used to bypass the
@@ -243,5 +306,41 @@ def purge_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depe
         db.delete(v)
     db.query(RecipeAnalytics).filter(RecipeAnalytics.recipe_id == recipe_id).delete()
     db.query(RecipeFeedback).filter(RecipeFeedback.recipe_id == recipe_id).delete()
+    audit_admin_action(db, action="recipe_purged", target_type="recipe", target_id=recipe_id, request=request)
     db.commit()
     return {"purged": recipe_id}
+
+
+@router.get("/audit-log")
+def list_audit_log(limit: int = 100, db: Session = Depends(get_db), role: str = Depends(require_admin)):
+    limit = max(1, min(limit, 500))
+    rows = db.query(AdminAuditLog).order_by(AdminAuditLog.created_at.desc()).limit(limit).all()
+    return [row.to_dict() for row in rows]
+
+
+@router.get("/llm-usage")
+def list_llm_usage(limit: int = 100, db: Session = Depends(get_db), role: str = Depends(require_admin)):
+    limit = max(1, min(limit, 500))
+    rows = db.query(LLMUsageLog).order_by(LLMUsageLog.created_at.desc()).limit(limit).all()
+    totals = (
+        db.query(
+            LLMUsageLog.task,
+            LLMUsageLog.model,
+            func.count(LLMUsageLog.usage_id),
+            func.sum(LLMUsageLog.total_tokens),
+        )
+        .group_by(LLMUsageLog.task, LLMUsageLog.model)
+        .all()
+    )
+    return {
+        "items": [row.to_dict() for row in rows],
+        "summary": [
+            {
+                "task": task,
+                "model": model,
+                "call_count": count,
+                "total_tokens": int(total_tokens or 0),
+            }
+            for task, model, count, total_tokens in totals
+        ],
+    }

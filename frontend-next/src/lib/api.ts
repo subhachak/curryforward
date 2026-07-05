@@ -1,5 +1,6 @@
 import type {
   AdminRecipeSummary,
+  AdminAuditLog,
   AutoResearchPlan,
   ChatHistoryTurn,
   ChatResult,
@@ -7,6 +8,7 @@ import type {
   DraftSummary,
   EditDraftResult,
   LLMSettingsResponse,
+  LLMUsageResponse,
   ModelOption,
   PendingRecipeFeedback,
   RecipeDetail,
@@ -130,6 +132,8 @@ export const api = {
     apiFetch<EditDraftResult>(`/admin/recipes/${recipeId}/edit-draft`, { method: "POST" }),
   listTrash: () => apiFetch<TrashedRecipeSummary[]>("/admin/recipes/trash"),
   getLLMSettings: () => apiFetch<LLMSettingsResponse>("/admin/llm-settings"),
+  getLLMUsage: () => apiFetch<LLMUsageResponse>("/admin/llm-usage"),
+  getAuditLog: () => apiFetch<AdminAuditLog[]>("/admin/audit-log"),
   updateLLMSetting: (key: string, model: string) =>
     apiFetch<{ key: string; model: string; updated_at: string | null }>(`/admin/llm-settings/${key}`, {
       method: "PUT",

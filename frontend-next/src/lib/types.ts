@@ -142,6 +142,42 @@ export interface RecipeFeedbackList extends RecipeFeedbackSummary {
   items: RecipeFeedback[];
 }
 
+export interface AdminAuditLog {
+  log_id: string;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  ip_address: string | null;
+  details: Record<string, unknown>;
+  created_at: string | null;
+}
+
+export interface LLMUsageLog {
+  usage_id: string;
+  task: string;
+  model: string | null;
+  provider: string | null;
+  role: string | null;
+  status: string;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  error: string | null;
+  created_at: string | null;
+}
+
+export interface LLMUsageSummary {
+  task: string;
+  model: string | null;
+  call_count: number;
+  total_tokens: number;
+}
+
+export interface LLMUsageResponse {
+  items: LLMUsageLog[];
+  summary: LLMUsageSummary[];
+}
+
 /** Admin-only shape — adds the research scratchpad, never sent to guests. */
 export interface RecipeResearchDetail extends RecipeDetail {
   notes: string | null;

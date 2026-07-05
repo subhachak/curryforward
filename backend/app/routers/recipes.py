@@ -5,7 +5,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,9 @@ from ..schemas import (
     RecipeUpsertRequest,
 )
 from ..services.llm_settings import anthropic_model_name, resolve_task_model
+from ..services.audit import audit_admin_action
+from ..services.llm_usage import record_llm_usage
+from ..services.security import guest_llm_enabled
 from ..services.recipe_versions import (
     create_chat_edit_version,
     create_manual_recipe,
@@ -133,12 +136,14 @@ def _scan_feedback_with_ai(
             temperature=0,
             max_tokens=160,
         )
+        record_llm_usage(task="feedback_moderation", model=model, role="guest", response=response)
         content = response.choices[0].message.content
         parsed = json.loads(content)
         approved = bool(parsed.get("approved"))
         reason = str(parsed.get("reason") or ("Approved by AI scan" if approved else "Flagged by AI scan"))
         return {"approved": approved, "reason": reason[:500]}
-    except Exception:
+    except Exception as e:
+        record_llm_usage(task="feedback_moderation", model=model, role="guest", status="error", error=str(e))
         logger.exception("Feedback moderation scan failed")
         return {"approved": False, "reason": "AI scanner failed; queued for admin review."}
 
@@ -295,6 +300,7 @@ def get_history(recipe_id: str, db: Session = Depends(get_db), role: str = Depen
 @router.post("/recipes")
 def create_recipe(
     req: RecipeUpsertRequest,
+    request: Request,
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
@@ -304,6 +310,14 @@ def create_recipe(
     ready" rule as fork and research, rather than going instantly live."""
     version = create_manual_recipe(req)
     db.add(version)
+    audit_admin_action(
+        db,
+        action="recipe_created",
+        target_type="recipe",
+        target_id=version.recipe_id,
+        request=request,
+        details={"name": version.name},
+    )
     db.commit()
     return version.to_dict()
 
@@ -326,6 +340,7 @@ def update_recipe(
 @router.delete("/recipes/{recipe_id}")
 def delete_recipe(
     recipe_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
@@ -341,6 +356,7 @@ def delete_recipe(
     if (current.status or "published") != "draft":
         raise HTTPException(400, "Unpublish this recipe before deleting it.")
     current.deleted_at = datetime.now(timezone.utc)
+    audit_admin_action(db, action="recipe_deleted", target_type="recipe", target_id=recipe_id, request=request)
     db.commit()
     return {"deleted": recipe_id}
 
@@ -361,15 +377,18 @@ def draft_recipe(
     if not is_configured():
         raise HTTPException(400, "ANTHROPIC_API_KEY not set — add it to backend/.env")
 
+    model = anthropic_model_name(resolve_task_model("recipe_draft", db))
     try:
         result = draft_recipe_from_conversation(
             req.message,
             history=[h.model_dump() for h in req.history],
             current_draft=req.draft,
-            model=anthropic_model_name(resolve_task_model("recipe_draft", db)),
+            model=model,
         )
     except Exception as e:
+        record_llm_usage(task="recipe_draft", model=model, role=role, status="error", error=str(e))
         raise HTTPException(500, f"Recipe drafting failed: {e}")
+    record_llm_usage(task="recipe_draft", model=model, role=role)
     return result
 
 
@@ -377,6 +396,7 @@ def draft_recipe(
 def chat_customize(
     recipe_id: str,
     req: ChatRequest,
+    request: Request,
     db: Session = Depends(get_db),
     role: str = Depends(get_role),
 ):
@@ -390,24 +410,30 @@ def chat_customize(
     current = current_head_query(db, recipe_id).first()
     if not current or ((current.status or "published") != "published" and role != "admin"):
         raise HTTPException(404, "Recipe not found")
+    if role != "admin" and not guest_llm_enabled():
+        raise HTTPException(403, "Guest AI customization is disabled.")
     if not is_configured():
         raise HTTPException(400, "ANTHROPIC_API_KEY not set — add it to backend/.env")
 
+    model = anthropic_model_name(resolve_task_model("recipe_customize", db))
     try:
         result = customize_recipe(
             current.to_dict(),
             req.message,
             history=[h.model_dump() for h in req.history],
-            model=anthropic_model_name(resolve_task_model("recipe_customize", db)),
+            model=model,
         )
     except LLMInvalidResponseError as e:
+        record_llm_usage(task="recipe_customize", model=model, role=role, status="error", error=str(e))
         raise HTTPException(502, str(e))
-    except Exception:
+    except Exception as e:
+        record_llm_usage(task="recipe_customize", model=model, role=role, status="error", error=str(e))
         logger.exception("Unexpected recipe customization failure")
         raise HTTPException(
             500,
             "The assistant could not apply that recipe edit. Try again or ask for a smaller change.",
         )
+    record_llm_usage(task="recipe_customize", model=model, role=role)
 
     nutrition = compute_nutrition(result["components"])
 
@@ -429,12 +455,25 @@ def chat_customize(
 
     new_version = create_chat_edit_version(current, result)
     db.add(new_version)
+    audit_admin_action(
+        db,
+        action="recipe_chat_customized",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={"new_version_id": new_version.version_id},
+    )
     db.commit()
     return {"change_summary": result.get("change_summary", ""), "new_version": new_version.to_dict(), "persisted": True}
 
 
 @router.post("/recipes/{recipe_id}/fork")
-def fork_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(require_admin)):
+def fork_recipe(
+    recipe_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
     """
     Fork: NEW recipe_id, independent history, parent_version_id points back
     to the version it was forked from. Does not affect the original's
@@ -447,6 +486,14 @@ def fork_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depen
 
     forked = fork_recipe_version(current)
     db.add(forked)
+    audit_admin_action(
+        db,
+        action="recipe_forked",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={"fork_recipe_id": forked.recipe_id},
+    )
     db.commit()
     return forked.to_dict()
 
@@ -454,6 +501,7 @@ def fork_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depen
 @router.post("/recipes/generate")
 def generate_recipe(
     req: GenerateRequest,
+    request: Request,
     db: Session = Depends(get_db),
     role: str = Depends(get_role),
 ):
@@ -464,20 +512,25 @@ def generate_recipe(
     """
     if not is_configured():
         raise HTTPException(400, "ANTHROPIC_API_KEY not set — add it to backend/.env")
+    if role != "admin" and not guest_llm_enabled():
+        raise HTTPException(403, "Guest recipe generation is disabled.")
 
     preferences = {
         "dietary": req.dietary,
         "cuisine_style": req.cuisine_style,
         "flavor_profile": req.flavor_profile,
     }
+    model = anthropic_model_name(resolve_task_model("gap_generation", db))
     try:
         result = generate_recipe_for_gap(
             req.dish_name,
             preferences,
-            model=anthropic_model_name(resolve_task_model("gap_generation", db)),
+            model=model,
         )
     except Exception as e:
+        record_llm_usage(task="gap_generation", model=model, role=role, status="error", error=str(e))
         raise HTTPException(500, f"Recipe generation failed: {e}")
+    record_llm_usage(task="gap_generation", model=model, role=role)
 
     nutrition = compute_nutrition(result["components"])
 
@@ -517,6 +570,14 @@ def generate_recipe(
         is_current_head=True,
     )
     db.add(version)
+    audit_admin_action(
+        db,
+        action="recipe_generated",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={"name": version.name},
+    )
     db.commit()
     return {**version.to_dict(), "persisted": True}
 

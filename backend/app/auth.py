@@ -27,6 +27,8 @@ from fastapi import APIRouter, Header, HTTPException, Request, Response
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from pydantic import BaseModel
 
+from .services.security import is_production
+
 SESSION_COOKIE_NAME = "curryforward_session"
 SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7  # 7 days
 
@@ -87,6 +89,7 @@ def login(req: LoginRequest, response: Response):
         SESSION_COOKIE_NAME,
         _create_session_cookie_value(),
         httponly=True,
+        secure=is_production(),
         samesite="lax",
         max_age=SESSION_MAX_AGE_SECONDS,
     )
@@ -95,5 +98,5 @@ def login(req: LoginRequest, response: Response):
 
 @router.post("/logout")
 def logout(response: Response):
-    response.delete_cookie(SESSION_COOKIE_NAME)
+    response.delete_cookie(SESSION_COOKIE_NAME, secure=is_production(), samesite="lax")
     return {"role": "guest"}

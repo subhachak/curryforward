@@ -229,3 +229,59 @@ class ResearchJob(Base):
             "finished_at": self.finished_at.isoformat() if self.finished_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+class AdminAuditLog(Base):
+    """Append-only record of privileged changes made through the admin surface."""
+    __tablename__ = "admin_audit_logs"
+
+    log_id = Column(String, primary_key=True, default=_uid)
+    action = Column(String, nullable=False)
+    target_type = Column(String, nullable=True)
+    target_id = Column(String, nullable=True)
+    ip_address = Column(String, nullable=True)
+    details = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "log_id": self.log_id,
+            "action": self.action,
+            "target_type": self.target_type,
+            "target_id": self.target_id,
+            "ip_address": self.ip_address,
+            "details": self.details or {},
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class LLMUsageLog(Base):
+    """Best-effort usage/cost trace for every app-owned LLM call we can observe."""
+    __tablename__ = "llm_usage_logs"
+
+    usage_id = Column(String, primary_key=True, default=_uid)
+    task = Column(String, nullable=False)
+    model = Column(String, nullable=True)
+    provider = Column(String, nullable=True)
+    role = Column(String, nullable=True)
+    status = Column(String, nullable=False)
+    prompt_tokens = Column(Integer, nullable=True)
+    completion_tokens = Column(Integer, nullable=True)
+    total_tokens = Column(Integer, nullable=True)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "usage_id": self.usage_id,
+            "task": self.task,
+            "model": self.model,
+            "provider": self.provider,
+            "role": self.role,
+            "status": self.status,
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
+            "total_tokens": self.total_tokens,
+            "error": self.error,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
