@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+<title id="title">CurryForward vector asset</title>
+<desc id="desc">Scalable vector graphic for the CurryForward website brand system.</desc>
+<rect x="18" y="18" width="220" height="220" rx="48" fill="#FFF3E0"/><path d="M48.32000000000001 129.84 H100.16" fill="none" stroke="#3B2A1F" stroke-width="2.88" stroke-linecap="round" opacity="0.95"/>
+<path d="M48.32000000000001 144.24 H90.08000000000001" fill="none" stroke="#3B2A1F" stroke-width="2.88" stroke-linecap="round" opacity="0.95"/>
+<path d="M48.32000000000001 158.64 H80.0" fill="none" stroke="#3B2A1F" stroke-width="2.88" stroke-linecap="round" opacity="0.95"/>
+<path d="M59.84 191.76 C82.88 198.96 176.48 198.96 200.95999999999998 191.76" fill="none" stroke="#3B2A1F" stroke-width="2.88" stroke-linecap="round"/>
+<path d="M65.6 185.28 H196.64" fill="none" stroke="#3B2A1F" stroke-width="2.88" stroke-linecap="round"/>
+<path d="M81.44 184.56 C84.32 124.8 123.2 87.36 159.2 99.6 C185.12 108.24000000000001 200.95999999999998 144.24 196.64 184.56" fill="none" stroke="#3B2A1F" stroke-width="3.88" stroke-linecap="round"/>
+<path d="M92.96000000000001 168.0 C100.16 125.52 117.44 108.24000000000001 137.6 103.2" fill="none" stroke="#D35400" stroke-width="3.5999999999999996" stroke-linecap="round"/>
+<circle cx="139.76" cy="84.48" r="6.4799999999999995" fill="none" stroke="#3B2A1F" stroke-width="2.88"/>
+<path d="M139.76 69.36 L148.4 81.60000000000001 H131.12 Z" fill="none" stroke="#3B2A1F" stroke-width="2.88" stroke-linejoin="round"/>
+</svg>

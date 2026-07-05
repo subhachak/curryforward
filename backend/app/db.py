@@ -52,6 +52,10 @@ _RECIPE_FEEDBACK_COLUMN_ADDITIONS = [
     ("moderation_reason", "TEXT"),
 ]
 
+_RECIPE_ANALYTICS_COLUMN_ADDITIONS = [
+    ("like_count", "INTEGER"),
+]
+
 
 def _run_lightweight_migrations():
     inspector = sqlalchemy.inspect(engine)
@@ -76,6 +80,18 @@ def _run_lightweight_migrations():
             for name, coltype in _RECIPE_FEEDBACK_COLUMN_ADDITIONS:
                 if name not in existing_feedback:
                     conn.execute(sqlalchemy.text(f"ALTER TABLE recipe_feedback ADD COLUMN {name} {coltype}"))
+    if "recipe_analytics" in inspector.get_table_names():
+        existing_analytics = {c["name"] for c in inspector.get_columns("recipe_analytics")}
+        with engine.begin() as conn:
+            for name, coltype in _RECIPE_ANALYTICS_COLUMN_ADDITIONS:
+                if name not in existing_analytics:
+                    conn.execute(sqlalchemy.text(f"ALTER TABLE recipe_analytics ADD COLUMN {name} {coltype}"))
+            if "like_count" not in existing_analytics:
+                # Raw ALTER TABLE ADD COLUMN leaves existing rows NULL regardless
+                # of the ORM's Python-side default — backfill explicitly.
+                conn.execute(sqlalchemy.text(
+                    "UPDATE recipe_analytics SET like_count = 0 WHERE like_count IS NULL"
+                ))
 
 
 def _backfill_expanded_nutrition():

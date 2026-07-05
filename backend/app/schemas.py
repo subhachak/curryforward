@@ -88,6 +88,7 @@ class RecipeDetailResponse(BaseModel):
     updated_at: str | None
     metadata: dict[str, Any] | None = None
     feedback_summary: dict[str, Any] | None = None
+    like_count: int = 0
 
 
 class RecipeFeedbackCreateRequest(BaseModel):
@@ -137,3 +138,4 @@ class RecipeSummaryResponse(BaseModel):
     hero_image_url: str | None
     created_at: str | None
     status: Literal["draft", "published"] | str | None = None
+    like_count: int = 0

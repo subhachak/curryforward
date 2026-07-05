@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { HeartIcon } from "@/components/ui/icons";
 import type { RecipeSummary } from "@/lib/types";
 import { lineageLabel } from "@/lib/lineage";
 
@@ -22,14 +23,23 @@ export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
           <img src={recipe.hero_image_url} alt="" className="h-32 w-full object-cover" />
         ) : (
           <div
-            className="flex h-32 w-full items-center justify-center bg-gradient-to-br from-brand-soft to-accent-soft text-3xl"
+            className="flex h-32 w-full items-center justify-center bg-gradient-to-br from-brand-soft to-accent-soft"
             aria-hidden
           >
-            🍛
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/mark-cloche-forward.svg" alt="" className="h-14 w-auto opacity-80" />
           </div>
         )}
         <div className="p-4">
-          <div className="font-semibold">{recipe.name}</div>
+          <div className="flex items-start justify-between gap-2">
+            <div className="font-semibold">{recipe.name}</div>
+            {recipe.like_count > 0 && (
+              <div className="flex shrink-0 items-center gap-1 text-xs text-muted">
+                <HeartIcon className="h-3.5 w-3.5" fill="currentColor" />
+                <span>{recipe.like_count}</span>
+              </div>
+            )}
+          </div>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {recipe.category && <Badge tone="neutral">{recipe.category}</Badge>}
             {recipe.cuisine_tags.slice(0, 2).map((tag) => (

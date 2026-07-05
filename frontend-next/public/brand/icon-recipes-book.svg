@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+<title id="title">CurryForward vector asset</title>
+<desc id="desc">Scalable vector graphic for the CurryForward website brand system.</desc>
+<rect x="74" y="38" width="108" height="178" rx="10" fill="none" stroke="#3B2A1F" stroke-width="6"/><path d="M94 38 V216" fill="none" stroke="#3B2A1F" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M106 62 H164" stroke="#3B2A1F" stroke-width="5"/><path d="M111 198 L128 184 L145 198 V146 H111 Z" fill="#D35400"/><g transform="translate(15,20) scale(.42)"><path d="M213.2 291.2 H329.6 C338.6 291.2 338.0 297.2 328.4 299.6 H214.4 C203.6 297.2 202.4 292.4 213.2 291.2 Z" fill="#D35400"/>
+<path d="M230.0 290.0 C231.2 243.2 263.0 210.8 297.2 219.2 C320.6 225.2 333.8 257.6 328.4 290.0 Z" fill="#D35400"/>
+<path d="M240.8 275.0 C247.4 240.8 260.6 226.4 278.0 222.2" fill="none" stroke="#FFF9F2" stroke-width="3.5999999999999996" stroke-linecap="round" opacity="0.95"/>
+<rect x="272.6" y="208.4" width="15.0" height="6.0" rx="3.0" fill="#D35400"/>
+<circle cx="280.1" cy="203.6" r="7.199999999999999" fill="#D35400"/>
+<path d="M280.1 188.60000000000002 L288.8 201.2 H271.4 Z" fill="#D35400"/></g>
+</svg>

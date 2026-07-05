@@ -53,7 +53,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-(cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000) &
+(cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000 --forwarded-allow-ips=) &
 BACKEND_PID=$!
 
 echo "Backend starting on http://127.0.0.1:8000 (pid $BACKEND_PID)"

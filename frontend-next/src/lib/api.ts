@@ -63,6 +63,10 @@ export const api = {
       body: JSON.stringify(body),
     }),
   getHistory: (recipeId: string) => apiFetch<RecipeDetail[]>(`/recipes/${recipeId}/history`),
+  likeRecipe: (recipeId: string) =>
+    apiFetch<{ like_count: number }>(`/recipes/${recipeId}/like`, { method: "POST" }),
+  unlikeRecipe: (recipeId: string) =>
+    apiFetch<{ like_count: number }>(`/recipes/${recipeId}/like`, { method: "DELETE" }),
   forkRecipe: (recipeId: string) =>
     apiFetch<RecipeDetail>(`/recipes/${recipeId}/fork`, { method: "POST" }),
   createRecipe: (req: RecipeUpsertRequest) =>
@@ -70,7 +74,7 @@ export const api = {
   deleteRecipe: (recipeId: string) =>
     apiFetch<{ deleted: string }>(`/recipes/${recipeId}`, { method: "DELETE" }),
   chat: (recipeId: string, message: string, history: ChatHistoryTurn[] = []) =>
-    apiFetch<ChatResult>(`/recipes/${recipeId}/chat/`, {
+    apiFetch<ChatResult>(`/recipes/${recipeId}/chat`, {
       method: "POST",
       body: JSON.stringify({ message, history }),
     }),
@@ -95,7 +99,7 @@ export const api = {
     recipeId: string,
     body: { message?: string; tool_use_id?: string; query?: string; approved?: boolean }
   ) =>
-    apiFetch<ResearchTurnResult>(`/recipes/research/${recipeId}/chat/`, {
+    apiFetch<ResearchTurnResult>(`/recipes/research/${recipeId}/chat`, {
       method: "POST",
       body: JSON.stringify(body),
     }),

@@ -121,7 +121,7 @@ def test_guest_chat_is_read_only_recipe_context(monkeypatch):
     assert r.status_code == 200
     assert body == {"reply": "Use an airtight container for this recipe.", "persisted": False}
     assert "Recipe context JSON" in calls[0]["messages"][0]["content"]
-    assert "Do not change, rewrite, or generate a recipe" in calls[0]["messages"][0]["content"]
+    assert "Do not output a full rewritten recipe or claim to have changed the saved recipe" in calls[0]["messages"][0]["content"]
 
 
 def test_guest_cannot_generate_recipe():

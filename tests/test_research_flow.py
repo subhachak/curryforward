@@ -62,14 +62,15 @@ def test_guest_cannot_publish_or_unpublish():
 
 
 def test_chat_without_anthropic_key_400s(monkeypatch):
-    # A fresh draft's model resolves to DEFAULT_MODEL (Anthropic-based unless
-    # overridden), so removing ANTHROPIC_API_KEY still 400s via the
-    # is_model_available() gate — just with a model-name-aware message now
-    # that the chat loop is routed through LiteLLM instead of hardcoded to
-    # Anthropic. Draft creation happens BEFORE the key is removed — it now
-    # needs a working model itself (to extract the name).
+    # research_chat's task default is Gemini, not DEFAULT_MODEL — delete every
+    # provider key this task could resolve to (not just Anthropic) so "no
+    # model available" holds regardless of which optional provider keys
+    # happen to be configured in the local .env (e.g. Gemini/OpenAI added for
+    # manual QA testing). Draft creation happens BEFORE the keys are removed
+    # — it still needs a working model itself (to extract the name).
     draft = _start_draft()
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    for key in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY", "GROQ_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
     r = client.post(
         f"/api/recipes/research/{draft['recipe_id']}/chat",
         json={"message": "let's research this dish"},

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380" role="img" aria-labelledby="title desc">
+<title id="title">CurryForward vector asset</title>
+<desc id="desc">Scalable vector graphic for the CurryForward website brand system.</desc>
+<path d="M215.39999999999998 124.8 H280.2" fill="none" stroke="#D35400" stroke-width="3.6" stroke-linecap="round" opacity="0.95"/>
+<path d="M215.39999999999998 142.8 H267.59999999999997" fill="none" stroke="#D35400" stroke-width="3.6" stroke-linecap="round" opacity="0.95"/>
+<path d="M215.39999999999998 160.8 H254.99999999999997" fill="none" stroke="#D35400" stroke-width="3.6" stroke-linecap="round" opacity="0.95"/>
+<path d="M229.8 196.8 H404.4 C417.9 196.8 417.0 205.8 402.6 209.4 H231.6 C215.39999999999998 205.8 213.6 198.6 229.8 196.8 Z" fill="#D35400"/>
+<path d="M255.0 195.0 C256.8 124.8 304.5 76.2 355.8 88.8 C390.9 97.8 410.7 146.4 402.6 195.0 Z" fill="#D35400"/>
+<path d="M271.2 172.5 C281.1 121.2 300.9 99.6 327.0 93.3" fill="none" stroke="#FFF9F2" stroke-width="5.4" stroke-linecap="round" opacity="0.95"/>
+<rect x="318.9" y="72.6" width="22.5" height="9.0" rx="4.5" fill="#D35400"/>
+<circle cx="330.15" cy="65.39999999999999" r="10.8" fill="#D35400"/>
+<path d="M330.15 42.89999999999999 L343.2 61.8 H317.1 Z" fill="#D35400"/><text x="128" y="275" font-family="Inter, Avenir Next, Arial, sans-serif" font-size="64" font-weight="700"><tspan fill="#D35400">Curry</tspan><tspan fill="#1F1A17">Forward</tspan></text><path d="M205 322 H255 M455 322 H505" stroke="#D35400" stroke-width="3"/><text x="274" y="330" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="8" fill="#1F1A17">FOOD. FORWARD.</text>
+</svg>

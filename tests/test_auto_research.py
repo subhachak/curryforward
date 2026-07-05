@@ -85,7 +85,7 @@ def test_guest_cannot_refine_section():
 
 
 def test_start_research_without_model_key_400s(monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    _delenv_all_provider_keys(monkeypatch)
     r = client.post("/api/recipes/research", json={"prompt": "Some Dish"}, headers=ADMIN_HEADERS)
     assert r.status_code == 400
     assert "No API key configured" in r.json()["detail"]
@@ -98,9 +98,18 @@ def test_plan_without_litellm_installed_400s(monkeypatch):
     assert r.status_code == 400
 
 
+def _delenv_all_provider_keys(monkeypatch):
+    # Delete every provider key this task could possibly resolve to — not
+    # just Anthropic — so the test's "no model available" precondition holds
+    # regardless of which optional provider keys happen to be configured in
+    # the local .env (e.g. Gemini/OpenAI added for manual QA testing).
+    for key in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY", "GROQ_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+
+
 def test_plan_without_model_key_400s(monkeypatch):
     draft = _start_draft()
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    _delenv_all_provider_keys(monkeypatch)
     r = client.post(f"/api/recipes/research/{draft['recipe_id']}/auto/plan", headers=ADMIN_HEADERS)
     assert r.status_code == 400
     assert "No API key configured" in r.json()["detail"]
@@ -120,7 +129,7 @@ def test_run_without_tavily_key_400s(monkeypatch):
 def test_run_without_model_key_400s(monkeypatch):
     draft = _start_draft()
     monkeypatch.setenv("TAVILY_API_KEY", "fake-key-for-test")
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    _delenv_all_provider_keys(monkeypatch)
     r = client.post(
         f"/api/recipes/research/{draft['recipe_id']}/auto/run",
         json={"approved_queries": []},
@@ -131,7 +140,7 @@ def test_run_without_model_key_400s(monkeypatch):
 
 def test_refine_without_model_key_400s(monkeypatch):
     draft = _start_draft()
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    _delenv_all_provider_keys(monkeypatch)
     r = client.post(
         f"/api/recipes/research/{draft['recipe_id']}/refine",
         json={"section": "history", "instruction": "shorter"},

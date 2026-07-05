@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+<title id="title">CurryForward vector asset</title>
+<desc id="desc">Scalable vector graphic for the CurryForward website brand system.</desc>
+<path d="M55 135 C65 204 191 204 201 135 Z" fill="none" stroke="#3B2A1F" stroke-width="6"/><path d="M67 132 C92 104 163 104 190 132" fill="#D35400" stroke="#3B2A1F" stroke-width="6"/><path d="M82 205 H174" fill="none" stroke="#3B2A1F" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M94 76 C84 60 84 46 96 31 M128 76 C118 58 118 43 130 28 M162 76 C152 60 152 46 164 31" fill="none" stroke="#D35400" stroke-width="6"/><path d="M150 105 C174 86 191 92 194 111 C174 113 162 113 150 105 Z" fill="#FFF9F2" stroke="#3B2A1F" stroke-width="5"/><circle cx="130" cy="125" r="6" fill="#FFF9F2"/>
+</svg>

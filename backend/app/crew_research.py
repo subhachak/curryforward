@@ -225,12 +225,14 @@ def run_auto_research_crew(
         goal="Write an accurate, well-grounded history and intro section for this dish",
         backstory="A food historian who never invents unsourced claims.",
         llm=model,
+        max_execution_time=120,
     )
     ingredients_agent = Agent(
         role="Ingredients & Nutrition Specialist",
         goal="Produce a complete, gram-preferred ingredients list organized by component",
         backstory="A recipe developer obsessive about precise, weighable quantities.",
         llm=model,
+        max_execution_time=120,
     )
     steps_agent = Agent(
         role="Steps & Technique Specialist",
@@ -241,18 +243,21 @@ def run_auto_research_crew(
             "gram amounts inline, since those live in the separate ingredients list."
         ),
         llm=model,
+        max_execution_time=120,
     )
     tips_agent = Agent(
         role="Tips & Troubleshooting Specialist",
         goal="Produce practical tips and common-mistake warnings",
         backstory="A seasoned home-cooking instructor who's seen every way this dish goes wrong.",
         llm=model,
+        max_execution_time=120,
     )
     orchestrator_agent = Agent(
         role="Recipe Orchestrator",
         goal="Merge all four specialists' sections into one coherent, complete recipe patch",
         backstory="A meticulous editor who reconciles four specialists' work into one document.",
         llm=model,
+        max_execution_time=120,
     )
 
     history_task = Task(

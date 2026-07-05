@@ -24,4 +24,12 @@ COPY --from=frontend-builder /app/frontend-next/out /app/frontend-next/out
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# --forwarded-allow-ips defaults to trusting nothing: X-Forwarded-For is a
+# client-supplied header, and uvicorn's own ProxyHeadersMiddleware rewrites
+# request.client based on it *before* the app ever sees the request — so
+# trusting it from an untrusted hop lets any caller spoof their apparent IP
+# and bypass per-IP rate limiting. Only widen this (via the
+# FORWARDED_ALLOW_IPS env var, e.g. to Railway's edge) if this container is
+# actually deployed behind a reverse proxy that overwrites the header itself
+# rather than a client being able to reach this port directly.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --forwarded-allow-ips=${FORWARDED_ALLOW_IPS:-}"]

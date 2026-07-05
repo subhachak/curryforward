@@ -59,6 +59,7 @@ export interface RecipeSummary {
   created_at: string | null;
   // Only present for admin callers.
   status?: "draft" | "published";
+  like_count: number;
 }
 
 /** GET /api/admin/recipes — the unified published+draft dashboard list. */
@@ -113,6 +114,7 @@ export interface RecipeDetail {
   updated_at: string | null;
   metadata?: RecipeMetadata | null;
   feedback_summary?: RecipeFeedbackSummary | null;
+  like_count: number;
 }
 
 export interface RecipeMetadata {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -55,6 +56,26 @@ def _increment_analytics(db: Session, recipe_id: str, field: str) -> None:
         db.flush()
     setattr(row, field, getattr(row, field) + 1)
     db.commit()
+
+
+def _adjust_like_count(db: Session, recipe_id: str, delta: int) -> int:
+    """Same get-or-create-then-adjust pattern as _increment_analytics, but
+    clamped at 0 (an unlike can't be called more times than a like was,
+    but nothing stops a client from trying — e.g. two tabs racing) and
+    returns the resulting count so the endpoint can hand it straight back."""
+    row = db.query(RecipeAnalytics).filter(RecipeAnalytics.recipe_id == recipe_id).first()
+    if row is None:
+        row = RecipeAnalytics(recipe_id=recipe_id)
+        db.add(row)
+        db.flush()
+    row.like_count = max(0, row.like_count + delta)
+    db.commit()
+    return row.like_count
+
+
+def _like_count(db: Session, recipe_id: str) -> int:
+    row = db.query(RecipeAnalytics).filter(RecipeAnalytics.recipe_id == recipe_id).first()
+    return row.like_count if row else 0
 
 
 def _recipe_metadata(db: Session, recipe_id: str, current: RecipeVersion) -> dict:
@@ -133,7 +154,10 @@ def _recipe_context_chat(recipe: RecipeVersion, message: str, history: list[dict
         "Answer the user's question using only the recipe context below. "
         "You may explain ingredients, steps, substitutions, timing, serving, storage, "
         "nutrition shown in the recipe, and cooking technique directly relevant to this recipe. "
-        "Do not change, rewrite, or generate a recipe. Do not answer unrelated questions, "
+        "Suggesting an ingredient substitution or answering 'can I use X instead of Y' is "
+        "expected and allowed — that is answering a question, not rewriting the recipe. "
+        "Do not output a full rewritten recipe or claim to have changed the saved recipe. "
+        "Do not answer unrelated questions, "
         "including finance, politics, news, world affairs, coding, medical/legal advice, or general trivia. "
         "If the question is outside this recipe context, reply exactly: "
         "\"I can only answer questions about this recipe.\" Keep answers concise.\n\n"
@@ -159,6 +183,19 @@ def _recipe_context_chat(recipe: RecipeVersion, message: str, history: list[dict
         logger.exception("Recipe context chat failed")
         raise HTTPException(502, "The recipe assistant is unavailable right now.")
     return reply or "I can only answer questions about this recipe."
+
+
+def _extract_json_object(text: str) -> dict:
+    """Some models (Gemini in particular) wrap JSON in a ```json fence or add
+    surrounding prose despite being told to return only JSON — try a direct
+    parse first, then fall back to pulling out the first {...} block."""
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if not match:
+            raise
+        return json.loads(match.group(0))
 
 
 def _scan_feedback_with_ai(
@@ -200,7 +237,7 @@ def _scan_feedback_with_ai(
         )
         record_llm_usage(task="feedback_moderation", model=model, role="guest", response=response)
         content = response.choices[0].message.content
-        parsed = json.loads(content)
+        parsed = _extract_json_object(content)
         approved = bool(parsed.get("approved"))
         reason = str(parsed.get("reason") or ("Approved by AI scan" if approved else "Flagged by AI scan"))
         return {"approved": approved, "reason": reason[:500]}
@@ -246,6 +283,12 @@ def list_recipes(db: Session = Depends(get_db), role: str = Depends(get_role)):
     if role != "admin":
         query = query.filter(RecipeVersion.status == "published")
     heads = query.all()
+    like_counts = {
+        a.recipe_id: a.like_count
+        for a in db.query(RecipeAnalytics).filter(
+            RecipeAnalytics.recipe_id.in_([r.recipe_id for r in heads])
+        ).all()
+    }
     return [
         {
             "recipe_id": r.recipe_id,
@@ -257,6 +300,7 @@ def list_recipes(db: Session = Depends(get_db), role: str = Depends(get_role)):
             "source": r.source,
             "hero_image_url": r.hero_image_url,
             "created_at": r.created_at.isoformat() if r.created_at else None,
+            "like_count": like_counts.get(r.recipe_id, 0),
             **({"status": r.status or "published"} if role == "admin" else {}),
         }
         for r in heads
@@ -274,7 +318,26 @@ def get_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depend
         **version.to_dict(),
         "metadata": _recipe_metadata(db, recipe_id, version),
         "feedback_summary": _feedback_summary(db, recipe_id),
+        "like_count": _like_count(db, recipe_id),
     }
+
+
+@router.post("/recipes/{recipe_id}/like")
+def like_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
+    """Open to guests and admins alike — liking is a deliberate, explicit
+    click (unlike views, which fire just from visiting a page), so unlike
+    the view/download counters, admin's own likes count the same as
+    anyone's. No accounts exist for guests, so there's no real per-visitor
+    dedup — the frontend uses localStorage to keep its own toggle honest
+    for normal use; this endpoint just adjusts the shared count."""
+    _visible_recipe_or_404(recipe_id, db, role)
+    return {"like_count": _adjust_like_count(db, recipe_id, 1)}
+
+
+@router.delete("/recipes/{recipe_id}/like")
+def unlike_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
+    _visible_recipe_or_404(recipe_id, db, role)
+    return {"like_count": _adjust_like_count(db, recipe_id, -1)}
 
 
 @router.get("/recipes/{recipe_id}/feedback", response_model=RecipeFeedbackListResponse)

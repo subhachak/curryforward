@@ -4,18 +4,13 @@ from fastapi import Request
 from sqlalchemy.orm import Session
 
 from ..models import AdminAuditLog
+from .security import client_ip as _client_ip
 
 
 def client_ip(request: Request | None) -> str | None:
     if request is None:
         return None
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
-    real_ip = request.headers.get("x-real-ip")
-    if real_ip:
-        return real_ip.strip()
-    return request.client.host if request.client else None
+    return _client_ip(request)
 
 
 def audit_admin_action(

@@ -39,10 +39,11 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
         />
       ) : (
         <div
-          className="flex h-40 w-full items-center justify-center rounded-lg border border-border bg-gradient-to-br from-brand-soft to-accent-soft text-5xl"
+          className="flex h-40 w-full items-center justify-center rounded-lg border border-border bg-gradient-to-br from-brand-soft to-accent-soft"
           aria-hidden
         >
-          🍛
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/mark-cloche-forward.svg" alt="" className="h-20 w-auto opacity-80" />
         </div>
       )}
 
@@ -113,7 +114,11 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
         {recipe.components.map((c) => (
           <Card key={c.component_name}>
             <CardBody>
-              <div className="mb-2 font-semibold">{c.component_name}</div>
+              <div className="mb-2 flex items-center gap-1.5 font-semibold">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/brand/icon-ingredients-leaf.svg" alt="" aria-hidden className="h-4 w-4" />
+                {c.component_name}
+              </div>
               <ul className="space-y-1 text-sm">
                 {c.ingredients.map((ing, idx) => (
                   <li key={ing.ingredient_id ?? idx} className="flex items-center justify-between gap-2">

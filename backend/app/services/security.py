@@ -32,6 +32,26 @@ def _int_env(name: str, default: int) -> int:
         return default
 
 
+def client_ip(request: Request) -> str:
+    """The client IP for rate-limiting and audit logging.
+
+    Deliberately does NOT parse X-Forwarded-For/X-Real-IP itself — those are
+    client-supplied headers, and parsing them here a second time would just
+    duplicate (and risk conflicting with) uvicorn's own ProxyHeadersMiddleware,
+    which already rewrites `request.client` for us when it decides to trust
+    the immediate upstream hop (see --forwarded-allow-ips in run.sh/Dockerfile/
+    launch.json). That's the single place this decision should be made: by
+    default uvicorn trusts nothing, so this always reflects the real TCP
+    peer; only when explicitly deployed behind a known reverse proxy (with
+    --forwarded-allow-ips set to that proxy's address) does uvicorn — and
+    therefore this — honor the forwarded headers. Trusting the header here
+    too, independently, is exactly how the earlier version of this function
+    was trivially spoofable: any direct caller could set X-Forwarded-For to
+    whatever it wanted and get a fresh rate-limit bucket every request.
+    """
+    return request.client.host if request.client else "unknown"
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         response = await call_next(request)
@@ -75,7 +95,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         key_name, limit = self._bucket_for(request)
         if limit <= 0:
             return await call_next(request)
-        ip = self._client_ip(request)
+        ip = client_ip(request)
         bucket = self._hits[(ip, key_name)]
         now = time.monotonic()
         while bucket and now - bucket[0] > self.window_seconds:
@@ -110,13 +130,3 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         ):
             return "llm", self.llm_limit
         return "default", self.default_limit
-
-    @staticmethod
-    def _client_ip(request: Request) -> str:
-        forwarded_for = request.headers.get("x-forwarded-for")
-        if forwarded_for:
-            return forwarded_for.split(",")[0].strip()
-        real_ip = request.headers.get("x-real-ip")
-        if real_ip:
-            return real_ip.strip()
-        return request.client.host if request.client else "unknown"

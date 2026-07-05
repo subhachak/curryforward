@@ -115,6 +115,7 @@ def list_all_recipes(db: Session = Depends(get_db), role: str = Depends(require_
             "updated_at": r.updated_at.isoformat() if r.updated_at else None,
             "view_count": analytics[r.recipe_id].view_count if r.recipe_id in analytics else 0,
             "download_count": analytics[r.recipe_id].download_count if r.recipe_id in analytics else 0,
+            "like_count": analytics[r.recipe_id].like_count if r.recipe_id in analytics else 0,
         })
     return result
 
@@ -229,6 +230,7 @@ def create_edit_draft(
         .filter(
             RecipeVersion.parent_version_id == current.version_id,
             RecipeVersion.status == "draft",
+            RecipeVersion.source == "revision_draft",
             RecipeVersion.is_current_head == True,  # noqa: E712
             RecipeVersion.deleted_at.is_(None),
         )

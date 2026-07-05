@@ -142,6 +142,7 @@ class RecipeAnalytics(Base):
     recipe_id = Column(String, primary_key=True)
     view_count = Column(Integer, default=0, nullable=False)
     download_count = Column(Integer, default=0, nullable=False)
+    like_count = Column(Integer, default=0, nullable=False)
     updated_at = Column(DateTime, default=_now, onupdate=_now)
 
     def to_dict(self) -> dict:
@@ -149,6 +150,7 @@ class RecipeAnalytics(Base):
             "recipe_id": self.recipe_id,
             "view_count": self.view_count,
             "download_count": self.download_count,
+            "like_count": self.like_count,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 

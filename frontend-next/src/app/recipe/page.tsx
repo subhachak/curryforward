@@ -11,6 +11,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/IconButton";
 import { DownloadIcon } from "@/components/ui/icons";
+import { LikeButton } from "@/components/LikeButton";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { useAuth } from "@/context/AuthContext";
 import { useAssistant } from "@/context/AssistantContext";
@@ -117,7 +118,8 @@ function RecipeDetailInner() {
             {isAdmin && recipe.status === "draft" && <Badge tone="warning">Draft — not published</Badge>}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <LikeButton key={recipe.recipe_id} recipeId={recipe.recipe_id} likeCount={recipe.like_count} />
           {(recipe.status === "published" || isAdmin) && (
             <IconButton label="Download recipe" icon={<DownloadIcon />} onClick={handleDownload} />
           )}
