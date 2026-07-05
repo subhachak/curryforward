@@ -1,5 +1,16 @@
 import pytest
 
+pytest_plugins = []
+
+
+def pytest_configure():
+    # Research draft creation only checks that the selected provider key exists;
+    # tests monkeypatch the actual LLM calls. Keep CI/local test runs independent
+    # of a developer's real .env.
+    import os
+
+    os.environ.setdefault("ANTHROPIC_API_KEY", "test-anthropic-key")
+
 
 @pytest.fixture(autouse=True)
 def _fake_dish_name_extraction(monkeypatch):
