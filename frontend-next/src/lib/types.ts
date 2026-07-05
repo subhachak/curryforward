@@ -57,6 +57,7 @@ export interface RecipeSummary {
   source: string;
   hero_image_url: string | null;
   created_at: string | null;
+  intro: string | null;
   // Only present for admin callers.
   status?: "draft" | "published";
   like_count: number;

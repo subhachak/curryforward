@@ -33,13 +33,12 @@ export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
         <div className="p-4">
           <div className="flex items-start justify-between gap-2">
             <div className="font-semibold">{recipe.name}</div>
-            {recipe.like_count > 0 && (
-              <div className="flex shrink-0 items-center gap-1 text-xs text-muted">
-                <HeartIcon className="h-3.5 w-3.5" fill="currentColor" />
-                <span>{recipe.like_count}</span>
-              </div>
-            )}
+            <div className="flex shrink-0 items-center gap-1 text-xs text-muted">
+              <HeartIcon className="h-3.5 w-3.5" fill={recipe.like_count > 0 ? "currentColor" : "none"} />
+              <span>{recipe.like_count}</span>
+            </div>
           </div>
+          {recipe.intro && <p className="mt-1 line-clamp-2 text-sm text-muted">{recipe.intro}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {recipe.category && <Badge tone="neutral">{recipe.category}</Badge>}
             {recipe.cuisine_tags.slice(0, 2).map((tag) => (

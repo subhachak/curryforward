@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/IconButton";
-import { CopyIcon, EyeIcon, PencilIcon, TrashIcon, XIcon, CheckIcon } from "@/components/ui/icons";
+import { MoreMenu, type MenuItem } from "@/components/ui/Menu";
+import { CopyIcon, EyeIcon, EyeOffIcon, PencilIcon, TrashIcon, XIcon, CheckIcon } from "@/components/ui/icons";
 import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
 import type { AdminRecipeSummary } from "@/lib/types";
@@ -71,12 +72,25 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
     }
   }
 
+  async function unpublish(recipe: AdminRecipeSummary) {
+    setPendingId(recipe.recipe_id);
+    try {
+      await api.unpublishResearch(recipe.recipe_id);
+      push("Unpublished — recipe is now a draft", "success");
+      onChanged();
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Unpublish failed", "error");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
   return (
     <Card>
       <CardBody>
         <div className="mb-1 font-semibold">Recipes ({recipes.length})</div>
         <div className="mb-3 text-xs text-muted">
-          Published recipes are live. Edits create a draft copy; duplicates are always drafts; only drafts can move to Trash.
+          Published recipes are live. Edits create a draft copy; duplicates are always drafts. Unpublish a recipe before moving it to Trash.
         </div>
         <div className="space-y-2">
           {recipes.map((r) => {
@@ -85,6 +99,25 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
                 ? `/recipe?id=${encodeURIComponent(r.recipe_id)}`
                 : `/recipe/research?id=${encodeURIComponent(r.recipe_id)}`;
             const busy = pendingId === r.recipe_id;
+            const menuItems: MenuItem[] = [
+              {
+                label: r.status === "published" ? "Create or open edit draft" : "Edit draft",
+                icon: <PencilIcon />,
+                onClick: () => editRecipe(r),
+              },
+              { label: "Duplicate as draft", icon: <CopyIcon />, onClick: () => copyRecipe(r) },
+              ...(r.status === "published"
+                ? [{ label: "Unpublish", icon: <EyeOffIcon />, onClick: () => unpublish(r) }]
+                : []),
+              {
+                label: "Move to Trash",
+                icon: <TrashIcon />,
+                onClick: () => setConfirmingDeleteId(r.recipe_id),
+                disabled: r.status === "published",
+                disabledReason: "Unpublish this recipe first",
+                danger: true,
+              },
+            ];
             return (
               <div key={r.recipe_id} className="rounded-md border border-border bg-surface p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -101,7 +134,10 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
                       <span>{r.download_count} downloads</span>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {busy && (
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent text-muted" />
+                    )}
                     <Link
                       href={href}
                       className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface text-foreground transition-colors hover:bg-surface-muted"
@@ -112,26 +148,7 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
                         <EyeIcon />
                       </span>
                     </Link>
-                    <IconButton
-                      label={r.status === "published" ? "Create or open edit draft" : "Edit draft"}
-                      icon={<PencilIcon />}
-                      loading={busy}
-                      onClick={() => editRecipe(r)}
-                    />
-                    <IconButton
-                      label="Duplicate as draft"
-                      icon={<CopyIcon />}
-                      loading={busy}
-                      onClick={() => copyRecipe(r)}
-                    />
-                    {r.status === "draft" && (
-                      <IconButton
-                        label="Move draft to Trash"
-                        icon={<TrashIcon />}
-                        variant="danger"
-                        onClick={() => setConfirmingDeleteId(r.recipe_id)}
-                      />
-                    )}
+                    <MoreMenu items={menuItems} label={`More actions for ${r.name}`} />
                   </div>
                 </div>
 

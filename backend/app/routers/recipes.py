@@ -300,6 +300,7 @@ def list_recipes(db: Session = Depends(get_db), role: str = Depends(get_role)):
             "source": r.source,
             "hero_image_url": r.hero_image_url,
             "created_at": r.created_at.isoformat() if r.created_at else None,
+            "intro": r.intro,
             "like_count": like_counts.get(r.recipe_id, 0),
             **({"status": r.status or "published"} if role == "admin" else {}),
         }

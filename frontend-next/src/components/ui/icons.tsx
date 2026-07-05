@@ -158,6 +158,25 @@ export function HeartIcon(props: IconProps) {
   );
 }
 
+export function MoreIcon(props: IconProps) {
+  return (
+    <Svg {...props} fill="currentColor" stroke="none">
+      <circle cx="5" cy="12" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="19" cy="12" r="1.8" />
+    </Svg>
+  );
+}
+
+export function EyeOffIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M2 12s3.5-6 10-6c1.4 0 2.7.24 3.9.66M22 12s-1.13 1.94-3.15 3.47M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+      <path d="M6.3 6.3 2 2m20 20-4.3-4.3" />
+    </Svg>
+  );
+}
+
 export function SparklesIcon(props: IconProps) {
   return (
     <Svg {...props}>

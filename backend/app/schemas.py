@@ -137,5 +137,6 @@ class RecipeSummaryResponse(BaseModel):
     source: str | None
     hero_image_url: str | None
     created_at: str | None
+    intro: str | None = None
     status: Literal["draft", "published"] | str | None = None
     like_count: int = 0
