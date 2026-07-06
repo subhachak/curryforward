@@ -9,6 +9,8 @@ class IngredientPayload(BaseModel):
     name: str
     amount: float | None = None
     unit: str = ""
+    gram_amount: float | None = None
+    display_unit: str | None = None
     gram_equivalent: float | None = None
     unit_options: list[dict[str, Any]] = Field(default_factory=list)
 

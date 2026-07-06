@@ -52,6 +52,56 @@ def test_admin_can_create_recipe():
     assert body["nutrition"]["calories"] > 0
 
 
+def test_admin_can_reset_existing_recipe_ingredients_to_grams():
+    payload = {
+        **NEW_RECIPE,
+        "components": [
+            {
+                "component_name": "main",
+                "ingredients": [
+                    {
+                        "name": "unsalted butter",
+                        "amount": 2,
+                        "unit": "Cup",
+                        "unit_options": [{"amount": 454, "unit": "Gram"}],
+                    }
+                ],
+            }
+        ],
+    }
+    created = client.post("/api/recipes", json=payload, headers=ADMIN_HEADERS).json()
+
+    r = client.post(f"/api/recipes/{created['recipe_id']}/ingredients/reset-grams", headers=ADMIN_HEADERS)
+
+    assert r.status_code == 200
+    ingredient = r.json()["components"][0]["ingredients"][0]
+    assert ingredient["amount"] == 454
+    assert ingredient["gram_amount"] == 454
+    assert ingredient["unit"] == "g"
+    assert ingredient["unit_options"][0]["unit"] == "Cup"
+    assert r.json()["nutrition"]["calories"] > 0
+
+
+def test_non_weight_amount_without_grams_stays_incomplete():
+    payload = {
+        **NEW_RECIPE,
+        "components": [
+            {
+                "component_name": "main",
+                "ingredients": [{"name": "mushrooms", "amount": 2, "unit": "Cup"}],
+            }
+        ],
+    }
+
+    created = client.post("/api/recipes", json=payload, headers=ADMIN_HEADERS).json()
+    ingredient = created["components"][0]["ingredients"][0]
+
+    assert ingredient["amount"] is None
+    assert ingredient["gram_amount"] is None
+    assert ingredient["unit"] == "g"
+    assert ingredient["unit_options"][0]["unit"] == "Cup"
+
+
 def test_created_recipe_appears_in_list():
     # Manual creation now starts as a draft (same "everything starts as a
     # draft" rule as fork/research) — visible to admin, hidden from guests

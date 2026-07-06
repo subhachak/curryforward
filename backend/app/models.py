@@ -237,6 +237,39 @@ class ResearchJob(Base):
         }
 
 
+class IngredientNutritionCache(Base):
+    """USDA-backed ingredient nutrition corpus.
+
+    Keyed by the normalized ingredient query we use for lookup. The nutrient
+    payload stores per-100g values in the same field names expected by
+    backend.app.nutrition.NutrientProfile, so recipe nutrition can be computed
+    without another external call until the cache expires.
+    """
+    __tablename__ = "ingredient_nutrition_cache"
+
+    cache_key = Column(String, primary_key=True)
+    ingredient_name = Column(String, nullable=False)
+    source = Column(String, default="usda_fdc", nullable=False)
+    source_food_id = Column(String, nullable=True)
+    source_food_name = Column(String, nullable=True)
+    nutrients = Column(JSON, default=dict, nullable=False)
+    raw_result = Column(JSON, default=dict)
+    fetched_at = Column(DateTime, default=_now, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+
+    def to_dict(self) -> dict:
+        return {
+            "cache_key": self.cache_key,
+            "ingredient_name": self.ingredient_name,
+            "source": self.source,
+            "source_food_id": self.source_food_id,
+            "source_food_name": self.source_food_name,
+            "nutrients": self.nutrients or {},
+            "fetched_at": self.fetched_at.isoformat() if self.fetched_at else None,
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+        }
+
+
 class AdminAuditLog(Base):
     """Append-only record of privileged changes made through the admin surface."""
     __tablename__ = "admin_audit_logs"

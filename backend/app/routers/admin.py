@@ -27,6 +27,7 @@ from ..llm_client import is_litellm_configured, is_model_available, litellm_comp
 from ..models import AdminAuditLog, LLMUsageLog, RecipeAnalytics, RecipeFeedback, RecipeVersion
 from ..nutrition import compute_nutrition
 from ..services.audit import audit_admin_action
+from ..services.ingredient_canonical import normalize_components_to_grams
 from ..services.llm_settings import available_models, get_llm_settings, resolve_task_model, set_llm_setting
 from ..services.llm_usage import record_llm_usage
 from ..services.recipe_versions import fork_recipe_version
@@ -731,6 +732,7 @@ def commit_recipe_import(
                 "issues": row.issues,
             })
             continue
+        components = normalize_components_to_grams(row.components)
         recipe = RecipeVersion(
             recipe_id=f"import-{uuid.uuid4().hex[:8]}",
             parent_version_id=None,
@@ -740,9 +742,9 @@ def commit_recipe_import(
             cuisine_tags=row.cuisine_tags,
             base_servings_amount=row.base_servings_amount,
             base_servings_unit=row.base_servings_unit,
-            components=row.components,
+            components=components,
             steps=row.steps,
-            nutrition=compute_nutrition(row.components),
+            nutrition=compute_nutrition(components, db),
             intro=row.intro,
             history=row.history,
             tips=row.tips,

@@ -213,9 +213,11 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
                     <label className="flex min-w-0 items-center gap-2">
                       <input type="checkbox" className="h-4 w-4 rounded border-[#BDE8CB] accent-[#2E9B57]" />
                       <span className="min-w-0">
-                        <span className="font-semibold text-[#2E1B14]">
-                          {formatIngredient(ing, selectedUnits[`${c.component_name}-${idx}`] ?? 0, multiplier)}
-                        </span>{" "}
+                        <IngredientAmount
+                          ingredient={ing}
+                          selectedIndex={selectedUnits[`${c.component_name}-${idx}`] ?? 0}
+                          multiplier={multiplier}
+                        />{" "}
                         <span className="text-[#5A4038]">{ing.name}</span>
                       </span>
                     </label>
@@ -374,17 +376,56 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
   );
 }
 
-function unitChoices(ingredient: Ingredient): IngredientUnitOption[] {
-  return [
-    { amount: ingredient.amount, unit: ingredient.unit, label: ingredient.unit || "base" },
-    ...(ingredient.unit_options || []),
-  ];
+function IngredientAmount({
+  ingredient,
+  selectedIndex,
+  multiplier,
+}: {
+  ingredient: Ingredient;
+  selectedIndex: number;
+  multiplier: number;
+}) {
+  const grams = gramAmount(ingredient);
+  if (grams == null) {
+    return <span className="text-sm font-medium text-[#A36A00]">Add grams</span>;
+  }
+
+  const option = unitChoices(ingredient)[selectedIndex] || unitChoices(ingredient)[0];
+  const amount = roundAmount((option.amount ?? grams) * multiplier);
+  const primary = `${amount} ${option.unit || "g"}`.trim();
+  const gramText = `${roundAmount(grams * multiplier)} g`;
+
+  return (
+    <>
+      <span className="font-semibold text-[#2E1B14]">{primary}</span>
+      {option.unit !== "g" && gramText && (
+        <span className="ml-1 text-xs text-[#8A766C]">({gramText})</span>
+      )}
+    </>
+  );
 }
 
-function formatIngredient(ingredient: Ingredient, selectedIndex: number, multiplier: number): string {
-  const option = unitChoices(ingredient)[selectedIndex] || unitChoices(ingredient)[0];
-  const amount = option.amount == null ? "?" : roundAmount(option.amount * multiplier);
-  return `${amount} ${option.unit || ingredient.unit || ""}`.trim();
+function unitChoices(ingredient: Ingredient): IngredientUnitOption[] {
+  const grams = gramAmount(ingredient);
+  if (grams == null) return [];
+  const choices: IngredientUnitOption[] = [
+    { amount: grams, unit: "g", label: "g" },
+    { amount: grams / 1000, unit: "kg", label: "kg" },
+    { amount: grams / 28.3495, unit: "oz", label: "oz" },
+    { amount: grams / 453.592, unit: "lb", label: "lb" },
+  ];
+  for (const option of ingredient.unit_options || []) {
+    if (option.amount == null || !option.unit || option.unit.toLowerCase() === "g") continue;
+    choices.push(option);
+  }
+  return choices;
+}
+
+function gramAmount(ingredient: Ingredient): number | null {
+  if (ingredient.gram_amount != null) return ingredient.gram_amount;
+  if (ingredient.gram_equivalent != null) return ingredient.gram_equivalent;
+  if ((ingredient.unit || "").toLowerCase() === "g") return ingredient.amount;
+  return null;
 }
 
 function roundAmount(value: number): number {

@@ -33,6 +33,7 @@ from ..schemas import (
 )
 from ..services.llm_settings import anthropic_model_name, resolve_task_model
 from ..services.audit import audit_admin_action
+from ..services.ingredient_canonical import normalize_components_to_grams
 from ..services.llm_usage import record_llm_usage
 from ..services.recipe_versions import (
     create_chat_edit_version,
@@ -455,7 +456,7 @@ def create_recipe(
     New recipe_id, own lineage (distinct from 'generated' or 'seed'). Starts
     as a draft — same "everything starts as a draft, publish explicitly when
     ready" rule as fork and research, rather than going instantly live."""
-    version = create_manual_recipe(req)
+    version = create_manual_recipe(req, db)
     db.add(version)
     audit_admin_action(
         db,
@@ -508,6 +509,36 @@ def delete_recipe(
     return {"deleted": recipe_id}
 
 
+@router.post("/recipes/{recipe_id}/ingredients/reset-grams", response_model=RecipeDetailResponse)
+def reset_recipe_ingredients_to_grams(
+    recipe_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
+    current = current_head_query(db, recipe_id).first()
+    if not current:
+        raise HTTPException(404, "Recipe not found")
+    current.components = normalize_components_to_grams(current.components or [])
+    current.nutrition = compute_nutrition(current.components or [], db)
+    audit_admin_action(
+        db,
+        action="recipe_ingredients_reset_to_grams",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={"ingredient_count": sum(len(c.get("ingredients", [])) for c in current.components or [])},
+    )
+    db.commit()
+    db.refresh(current)
+    return {
+        **current.to_dict(),
+        "metadata": _recipe_metadata(db, recipe_id, current),
+        "feedback_summary": _feedback_summary(db, recipe_id),
+        "like_count": _like_count(db, recipe_id),
+    }
+
+
 @router.post("/recipes/draft")
 def draft_recipe(
     req: DraftRequest,
@@ -536,6 +567,8 @@ def draft_recipe(
         record_llm_usage(task="recipe_draft", model=model, role=role, status="error", error=str(e))
         raise HTTPException(500, f"Recipe drafting failed: {e}")
     record_llm_usage(task="recipe_draft", model=model, role=role)
+    if "components" in result:
+        result["components"] = normalize_components_to_grams(result["components"])
     return result
 
 
@@ -583,9 +616,7 @@ def chat_customize(
         )
     record_llm_usage(task="recipe_customize", model=model, role=role)
 
-    nutrition = compute_nutrition(result["components"])
-
-    new_version = create_chat_edit_version(current, result)
+    new_version = create_chat_edit_version(current, result, db)
     db.add(new_version)
     audit_admin_action(
         db,
@@ -662,7 +693,8 @@ def generate_recipe(
         raise HTTPException(500, f"Recipe generation failed: {e}")
     record_llm_usage(task="gap_generation", model=model, role=role)
 
-    nutrition = compute_nutrition(result["components"])
+    components = normalize_components_to_grams(result["components"])
+    nutrition = compute_nutrition(components, db)
 
     recipe_id = f"gen-{uuid.uuid4().hex[:8]}"
     version = RecipeVersion(
@@ -676,7 +708,7 @@ def generate_recipe(
         base_servings_unit=result["base_servings"]["unit"],
         serving_size_amount=(result.get("serving_size") or {}).get("amount"),
         serving_size_unit=(result.get("serving_size") or {}).get("unit"),
-        components=result["components"],
+        components=components,
         steps=result["steps"],
         nutrition=nutrition,
         source="generated",

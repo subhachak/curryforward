@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 os.environ["ADMIN_TOKEN"] = "test-token-123"
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
@@ -17,6 +18,13 @@ _db.close()
 
 client = TestClient(app)
 ADMIN_HEADERS = {"X-Admin-Token": "test-token-123"}
+
+
+def _fake_response(text: str):
+    return SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content=text))],
+        usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+    )
 
 
 def _start_draft(name="Test Research Dish"):
@@ -49,6 +57,15 @@ def test_guest_cannot_patch_research_recipe():
 def test_guest_cannot_chat():
     draft = _start_draft()
     r = client.post(f"/api/recipes/research/{draft['recipe_id']}/chat", json={"message": "hi"})
+    assert r.status_code == 403
+
+
+def test_guest_cannot_use_admin_assistant():
+    draft = _start_draft()
+    r = client.post(
+        f"/api/recipes/research/{draft['recipe_id']}/ask",
+        json={"question": "what is 2 cups almond flour in grams"},
+    )
     assert r.status_code == 403
 
 
@@ -152,6 +169,79 @@ def test_patch_recomputes_nutrition_when_components_change():
     )
     assert r.status_code == 200
     assert r.json()["nutrition"]["calories"] > 0
+
+
+def test_refresh_nutrition_recomputes_current_draft():
+    draft = _start_draft()
+    components = [
+        {"component_name": "main", "ingredients": [{"name": "chicken", "amount": 200, "unit": "g"}]}
+    ]
+    client.patch(
+        f"/api/recipes/research/{draft['recipe_id']}",
+        json={"components": components},
+        headers=ADMIN_HEADERS,
+    )
+
+    r = client.post(f"/api/recipes/research/{draft['recipe_id']}/nutrition/refresh", headers=ADMIN_HEADERS)
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["nutrition"]["calories"] > 0
+    assert body["nutrition"]["nutrition_sources"]
+
+
+def test_admin_assistant_answers_without_mutating_draft(monkeypatch):
+    monkeypatch.setattr("app.routers.research.is_litellm_configured", lambda: True)
+    monkeypatch.setattr("app.routers.research.is_model_available", lambda model: True)
+    monkeypatch.setattr("app.routers.research.is_tavily_configured", lambda: False)
+    monkeypatch.setattr(
+        "app.routers.research.litellm_completion",
+        lambda **kwargs: _fake_response("About 192 g for 2 cups of almond flour, depending on grind."),
+    )
+    draft = _start_draft()
+    before = client.get(f"/api/recipes/research/{draft['recipe_id']}", headers=ADMIN_HEADERS).json()
+
+    r = client.post(
+        f"/api/recipes/research/{draft['recipe_id']}/ask",
+        json={"question": "what is 2 cups almond flour in grams"},
+        headers=ADMIN_HEADERS,
+    )
+
+    assert r.status_code == 200
+    assert "192 g" in r.json()["reply"]
+    after = client.get(f"/api/recipes/research/{draft['recipe_id']}", headers=ADMIN_HEADERS).json()
+    assert after["components"] == before["components"]
+    assert after["steps"] == before["steps"]
+
+
+def test_admin_assistant_can_attach_web_context(monkeypatch):
+    captured = {}
+
+    def fake_completion(**kwargs):
+        captured["messages"] = kwargs["messages"]
+        return _fake_response("Use about 190-200 g; the web context supports treating this as density-dependent.")
+
+    monkeypatch.setattr("app.routers.research.is_litellm_configured", lambda: True)
+    monkeypatch.setattr("app.routers.research.is_model_available", lambda model: True)
+    monkeypatch.setattr("app.routers.research.is_tavily_configured", lambda: True)
+    monkeypatch.setattr(
+        "app.routers.research.run_tavily_search",
+        lambda query: "Search result: almond flour cup weights vary by brand; common references list about 96 g per cup.",
+    )
+    monkeypatch.setattr("app.routers.research.litellm_completion", fake_completion)
+    draft = _start_draft()
+
+    r = client.post(
+        f"/api/recipes/research/{draft['recipe_id']}/ask",
+        json={"question": "what is 2 cups almond flour in grams"},
+        headers=ADMIN_HEADERS,
+    )
+
+    assert r.status_code == 200
+    prompt = captured["messages"][-1]["content"]
+    assert "Internal schema and local data context" in prompt
+    assert "External web context" in prompt
+    assert "about 96 g per cup" in prompt
 
 
 def test_publish_requires_minimal_completeness():

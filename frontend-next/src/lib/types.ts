@@ -5,6 +5,8 @@ export interface Ingredient {
   name: string;
   amount: number | null;
   unit: string;
+  gram_amount?: number | null;
+  display_unit?: string | null;
   gram_equivalent?: number | null;
   unit_options?: IngredientUnitOption[];
 }
@@ -45,6 +47,8 @@ export interface Nutrition {
   potassium_mg?: number;
   data_completeness?: "complete" | "partial";
   unmatched_ingredients?: string[];
+  nutrition_sources?: string[];
+  cache_expires_days?: number | null;
 }
 
 export interface RecipeSummary {
@@ -338,6 +342,10 @@ export interface RecipeWideEditResult {
   recipe: RecipeResearchDetail;
   changed_fields: string[];
   review_notes: string | null;
+}
+
+export interface AdminAssistantResult {
+  reply: string;
 }
 
 /** Partial direct-edit payload for PATCH /api/recipes/research/{id} — every

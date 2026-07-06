@@ -23,14 +23,9 @@ function RecipesMenu() {
     <div className="relative" onMouseEnter={openNow} onMouseLeave={closeSoon}>
       <Link
         href="/recipes"
-        className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-brand-hover"
+        className="text-sm font-medium text-foreground hover:text-brand-hover"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/icon-recipes-book.svg" alt="" aria-hidden className="h-6 w-6" />
         Recipes
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
       </Link>
       {open && categories.length > 0 && (
         <div className="absolute left-0 top-full z-50 mt-2 w-48 rounded-lg border border-border bg-surface py-1.5 shadow-lg">
@@ -137,7 +132,8 @@ function MobileMenu() {
 }
 
 export function NavBar() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading } = useAuth();
+  const showWorkspace = isAdmin && !loading;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur">
@@ -158,11 +154,16 @@ export function NavBar() {
           <Link href="/#hard-to-find" className="text-sm font-medium text-foreground hover:text-brand-hover">
             Classics
           </Link>
-          {isAdmin && (
-            <Link href="/admin" className="text-sm font-medium text-foreground hover:text-brand-hover">
-              Workspace
-            </Link>
-          )}
+          <Link
+            href="/admin"
+            aria-hidden={!showWorkspace}
+            tabIndex={showWorkspace ? undefined : -1}
+            className={`text-sm font-medium text-foreground hover:text-brand-hover ${
+              showWorkspace ? "" : "pointer-events-none invisible"
+            }`}
+          >
+            Workspace
+          </Link>
         </nav>
 
         <AssistantSearchBar />

@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { IconButton } from "@/components/ui/IconButton";
-import { CheckIcon, PlusIcon, SparklesIcon, UploadIcon, XIcon } from "@/components/ui/icons";
+import { CheckIcon, PlusIcon, RefreshIcon, SparklesIcon, UploadIcon, XIcon } from "@/components/ui/icons";
 import { NutritionCard } from "@/components/NutritionCard";
 import { RecipeContent } from "@/components/RecipeContent";
 import { CopyAssistField } from "@/components/research/CopyAssistField";
@@ -83,7 +83,7 @@ function RefineBox({ section, label, onRefine }: RefineBoxProps) {
 interface IngredientRow {
   name: string;
   amount: string;
-  unit: string;
+  displayUnit: string;
   unitOptionsText: string;
 }
 interface ComponentRow {
@@ -97,7 +97,7 @@ interface StepRow {
 }
 
 function emptyIngredient(): IngredientRow {
-  return { name: "", amount: "", unit: "g", unitOptionsText: "" };
+  return { name: "", amount: "", displayUnit: "g", unitOptionsText: "" };
 }
 function emptyComponent(): ComponentRow {
   return { component_name: "main", ingredients: [emptyIngredient()] };
@@ -113,13 +113,20 @@ function toComponentRows(recipe: RecipeResearchDetail): ComponentRow[] {
         ingredients: c.ingredients.length
           ? c.ingredients.map((i) => ({
               name: i.name,
-              amount: i.amount != null ? String(i.amount) : "",
-              unit: i.unit ?? "g",
+              amount: canonicalGramValue(i) != null ? String(canonicalGramValue(i)) : "",
+              displayUnit: i.display_unit ?? (i.unit && i.unit.toLowerCase() !== "g" ? i.unit : "g"),
               unitOptionsText: formatUnitOptions(i.unit_options || []),
             }))
           : [emptyIngredient()],
       }))
     : [emptyComponent()];
+}
+
+function canonicalGramValue(ingredient: RecipeResearchDetail["components"][number]["ingredients"][number]) {
+  if (ingredient.gram_amount != null) return ingredient.gram_amount;
+  if (ingredient.gram_equivalent != null) return ingredient.gram_equivalent;
+  if ((ingredient.unit || "").toLowerCase() === "g") return ingredient.amount;
+  return null;
 }
 
 function toStepRows(recipe: RecipeResearchDetail): StepRow[] {
@@ -142,7 +149,10 @@ function buildComponentsPatch(rows: ComponentRow[]) {
         .map((i) => ({
           name: i.name.trim(),
           amount: i.amount.trim() ? Number(i.amount) : null,
-          unit: i.unit.trim(),
+          unit: "g",
+          gram_amount: i.amount.trim() ? Number(i.amount) : null,
+          gram_equivalent: i.amount.trim() ? Number(i.amount) : null,
+          display_unit: i.displayUnit.trim() || "g",
           unit_options: parseUnitOptions(i.unitOptionsText),
         })),
     }));
@@ -226,6 +236,8 @@ interface ResearchDocumentPreviewProps {
   previewMode: boolean;
   onCommit: (patch: ResearchPatchPayload) => void;
   onRefine: (section: string, instruction: string) => Promise<void>;
+  onRefreshNutrition?: () => Promise<void>;
+  refreshingNutrition?: boolean;
   highlightedFields?: string[];
   onClearHighlights?: () => void;
 }
@@ -235,6 +247,8 @@ export function ResearchDocumentPreview({
   previewMode,
   onCommit,
   onRefine,
+  onRefreshNutrition,
+  refreshingNutrition = false,
   highlightedFields = [],
   onClearHighlights,
 }: ResearchDocumentPreviewProps) {
@@ -278,7 +292,20 @@ export function ResearchDocumentPreview({
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
         <RecipeContent recipe={recipe} />
         <aside className="lg:sticky lg:top-20 lg:self-start">
-          <NutritionCard recipe={recipe} />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold text-ink">Nutrition</div>
+              {onRefreshNutrition && (
+                <IconButton
+                  label="Refresh nutrition facts"
+                  icon={<RefreshIcon />}
+                  loading={refreshingNutrition}
+                  onClick={() => void onRefreshNutrition()}
+                />
+              )}
+            </div>
+            <NutritionCard recipe={recipe} />
+          </div>
         </aside>
       </div>
     );
@@ -631,21 +658,21 @@ export function ResearchDocumentPreview({
                 {component.ingredients.map((ing, ii) => (
                   <div key={ii} className="space-y-2 rounded-md bg-surface-muted p-2">
                     <div className="flex gap-2">
-                      <div className="w-20 shrink-0">
+                      <div className="w-24 shrink-0">
                         <Input
                           value={ing.amount}
                           onChange={(e) => updateIngredient(ci, ii, { amount: e.target.value })}
                           onBlur={() => commitComponents(components)}
-                          placeholder="Amt"
+                          placeholder="Grams"
                           inputMode="decimal"
                         />
                       </div>
                       <div className="w-20 shrink-0">
                         <Input
-                          value={ing.unit}
-                          onChange={(e) => updateIngredient(ci, ii, { unit: e.target.value })}
+                          value={ing.displayUnit}
+                          onChange={(e) => updateIngredient(ci, ii, { displayUnit: e.target.value })}
                           onBlur={() => commitComponents(components)}
-                          placeholder="g"
+                          placeholder="Display"
                           list="ingredient-unit-options"
                         />
                       </div>
@@ -665,7 +692,7 @@ export function ResearchDocumentPreview({
                       value={ing.unitOptionsText}
                       onChange={(e) => updateIngredient(ci, ii, { unitOptionsText: e.target.value })}
                       onBlur={() => commitComponents(components)}
-                      placeholder="Alternate units, e.g. 1 cup; 240 ml"
+                      placeholder="Display conversions, e.g. 1 cup; 240 ml. Grams remain canonical."
                       className="text-xs"
                     />
                   </div>

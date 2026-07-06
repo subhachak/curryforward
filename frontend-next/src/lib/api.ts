@@ -1,5 +1,6 @@
 import type {
   AdminRecipeSummary,
+  AdminAssistantResult,
   AdminAuditLog,
   AutoResearchPlan,
   ChatHistoryTurn,
@@ -76,6 +77,8 @@ export const api = {
     apiFetch<RecipeDetail>("/recipes", { method: "POST", body: JSON.stringify(req) }),
   deleteRecipe: (recipeId: string) =>
     apiFetch<{ deleted: string }>(`/recipes/${recipeId}`, { method: "DELETE" }),
+  resetRecipeIngredientsToGrams: (recipeId: string) =>
+    apiFetch<RecipeDetail>(`/recipes/${recipeId}/ingredients/reset-grams`, { method: "POST" }),
   chat: (recipeId: string, message: string, history: ChatHistoryTurn[] = []) =>
     apiFetch<ChatResult>(`/recipes/${recipeId}/chat`, {
       method: "POST",
@@ -111,6 +114,8 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(patch),
     }),
+  refreshResearchNutrition: (recipeId: string) =>
+    apiFetch<RecipeResearchDetail>(`/recipes/research/${recipeId}/nutrition/refresh`, { method: "POST" }),
   publishResearch: (recipeId: string, mode: "keep_both" | "replace_original" = "keep_both") =>
     apiFetch<RecipeDetail>(`/recipes/research/${recipeId}/publish`, {
       method: "POST",
@@ -138,6 +143,11 @@ export const api = {
     apiFetch<RecipeWideEditResult>(`/recipes/research/${recipeId}/wide-edit`, {
       method: "POST",
       body: JSON.stringify({ instruction }),
+    }),
+  askResearchAssistant: (recipeId: string, body: { question: string; history?: ChatHistoryTurn[] }) =>
+    apiFetch<AdminAssistantResult>(`/recipes/research/${recipeId}/ask`, {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
   rewriteCopy: (
     recipeId: string,

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..models import RecipeVersion
 from ..nutrition import compute_nutrition
 from ..schemas import RecipeUpsertRequest
+from .ingredient_canonical import normalize_components_to_grams
 
 
 RICH_CONTENT_FIELDS = [
@@ -42,8 +43,8 @@ def _copy_rich_fields(source: RecipeVersion, target_kwargs: dict[str, Any]) -> N
         target_kwargs[field] = getattr(source, field)
 
 
-def create_manual_recipe(req: RecipeUpsertRequest) -> RecipeVersion:
-    components = req.normalized_components()
+def create_manual_recipe(req: RecipeUpsertRequest, db: Session | None = None) -> RecipeVersion:
+    components = normalize_components_to_grams(req.normalized_components())
     return RecipeVersion(
         recipe_id=f"manual-{uuid.uuid4().hex[:8]}",
         parent_version_id=None,
@@ -57,7 +58,7 @@ def create_manual_recipe(req: RecipeUpsertRequest) -> RecipeVersion:
         serving_size_unit=req.serving_size_unit,
         components=components,
         steps=req.normalized_steps(),
-        nutrition=compute_nutrition(components),
+        nutrition=compute_nutrition(components, db),
         hero_image_url=req.hero_image_url,
         status="draft",
         source="manual",
@@ -65,8 +66,8 @@ def create_manual_recipe(req: RecipeUpsertRequest) -> RecipeVersion:
     )
 
 
-def create_chat_edit_version(current: RecipeVersion, result: dict) -> RecipeVersion:
-    components = result["components"]
+def create_chat_edit_version(current: RecipeVersion, result: dict, db: Session | None = None) -> RecipeVersion:
+    components = normalize_components_to_grams(result["components"])
     kwargs: dict[str, Any] = {
         "recipe_id": current.recipe_id,
         "parent_version_id": current.version_id,
@@ -80,7 +81,7 @@ def create_chat_edit_version(current: RecipeVersion, result: dict) -> RecipeVers
         "serving_size_unit": current.serving_size_unit,
         "components": components,
         "steps": steps_preserving_images(current.steps, result["steps"]),
-        "nutrition": compute_nutrition(components),
+        "nutrition": compute_nutrition(components, db),
         "hero_image_url": current.hero_image_url,
         "source": "user_customized",
         "status": current.status,

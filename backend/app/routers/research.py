@@ -33,11 +33,14 @@ from ..llm_agent import (
     start_research_turn,
 )
 from ..llm_client import is_litellm_configured, is_model_available, litellm_completion
-from ..models import RecipeVersion, ResearchJob
+from ..models import Base, IngredientNutritionCache, RecipeVersion, ResearchJob
+from ..schemas import ComponentPayload, IngredientPayload, RecipeResearchResponse, StepPayload
 from ..services.llm_settings import resolve_task_model
 from ..services.audit import audit_admin_action
+from ..services.ingredient_canonical import normalize_components_to_grams
 from ..services.llm_usage import record_llm_usage
-from ..nutrition import compute_nutrition
+from ..nutrition import _lookup as lookup_builtin_nutrition
+from ..nutrition import _normalize_cache_key, compute_nutrition
 
 router = APIRouter(prefix="/api/recipes/research")
 logger = logging.getLogger(__name__)
@@ -123,6 +126,15 @@ class RecipeWideEditResponse(BaseModel):
     review_notes: str | None = None
 
 
+class AdminAssistantRequest(BaseModel):
+    question: str
+    history: list[dict] | None = None
+
+
+class AdminAssistantResponse(BaseModel):
+    reply: str
+
+
 def _get_draft(db: Session, recipe_id: str) -> RecipeVersion:
     row = (
         db.query(RecipeVersion)
@@ -140,7 +152,7 @@ def _get_draft(db: Session, recipe_id: str) -> RecipeVersion:
     return row
 
 
-def _apply_patch(row: RecipeVersion, patch: dict, allow_null: bool = False) -> None:
+def _apply_patch(row: RecipeVersion, patch: dict, db: Session | None = None, allow_null: bool = False) -> None:
     """Shallow-merges `patch` onto `row`. `allow_null=True` (direct admin
     edits) treats an explicit null as "clear this field". `allow_null=False`
     (LLM-sourced recipe_patch) skips nulls instead, since a model asked to
@@ -151,9 +163,11 @@ def _apply_patch(row: RecipeVersion, patch: dict, allow_null: bool = False) -> N
             continue
         if value is None and not allow_null:
             continue
+        if key == "components" and value is not None:
+            value = normalize_components_to_grams(value)
         setattr(row, key, value)
     if "components" in patch and (patch["components"] is not None or allow_null):
-        row.nutrition = compute_nutrition(row.components or [])
+        row.nutrition = compute_nutrition(row.components or [], db)
 
 
 def _extract_json_object(text: str) -> dict:
@@ -164,6 +178,94 @@ def _extract_json_object(text: str) -> dict:
         if not match:
             raise
         return json.loads(match.group(0))
+
+
+def _schema_context() -> dict:
+    """Read-only internal shape context for the admin assistant."""
+    return {
+        "pydantic": {
+            "ingredient": IngredientPayload.model_json_schema(),
+            "component": ComponentPayload.model_json_schema(),
+            "step": StepPayload.model_json_schema(),
+            "research_recipe": RecipeResearchResponse.model_json_schema(),
+        },
+        "tables": {
+            table.name: [column.name for column in table.columns]
+            for table in Base.metadata.sorted_tables
+        },
+    }
+
+
+def _extract_recipe_ingredient_names(row: RecipeVersion) -> list[str]:
+    names = []
+    for component in row.components or []:
+        for ingredient in component.get("ingredients") or []:
+            name = str(ingredient.get("name") or "").strip()
+            if name:
+                names.append(name)
+    return sorted(set(names))
+
+
+def _question_ingredient_candidates(question: str) -> list[str]:
+    normalized = re.sub(r"[^a-zA-Z0-9\s-]", " ", question.lower())
+    stopwords = {
+        "a", "an", "are", "conversion", "convert", "cup", "cups", "for", "from",
+        "gram", "grams", "how", "in", "into", "is", "lb", "lbs", "many", "much",
+        "of", "ounce", "ounces", "oz", "pound", "pounds", "tablespoon",
+        "tablespoons", "tbsp", "teaspoon", "teaspoons", "the", "this", "to",
+        "tsp", "what", "with",
+    }
+    tokens = [token for token in normalized.split() if token and token not in stopwords and not token.isdigit()]
+    candidates: list[str] = []
+    for size in range(min(4, len(tokens)), 0, -1):
+        for index in range(0, len(tokens) - size + 1):
+            phrase = " ".join(tokens[index:index + size]).strip()
+            if len(phrase) >= 3 and phrase not in candidates:
+                candidates.append(phrase)
+    return candidates[:12]
+
+
+def _ingredient_knowledge_context(db: Session, row: RecipeVersion, question: str) -> dict:
+    names = _extract_recipe_ingredient_names(row)
+    candidates = names + [candidate for candidate in _question_ingredient_candidates(question) if candidate not in names]
+    entries = []
+    for name in candidates[:24]:
+        key = _normalize_cache_key(name)
+        cache_row = db.get(IngredientNutritionCache, key)
+        builtin = lookup_builtin_nutrition(name)
+        if not cache_row and not builtin:
+            continue
+        entries.append({
+            "ingredient": name,
+            "cache_key": key,
+            "cached_usda": cache_row.to_dict() if cache_row else None,
+            "builtin_per_100g": builtin._asdict() if builtin else None,
+        })
+    return {
+        "recipe_ingredients": names,
+        "matched_ingredient_knowledge": entries,
+    }
+
+
+def _assistant_should_search_web(question: str, local_context: dict) -> bool:
+    text = question.lower()
+    trigger_words = {
+        "authentic", "convert", "conversion", "density", "fdc", "gram", "grams",
+        "history", "latest", "look up", "lookup", "nutrition", "outside",
+        "pan conversion", "pan size", "search", "source", "sources",
+        "substitute", "substitution", "temperature", "traditional", "usda", "web",
+    }
+    if any(word in text for word in trigger_words):
+        return True
+    return not local_context["ingredients"]["matched_ingredient_knowledge"]
+
+
+def _build_assistant_web_query(row: RecipeVersion, question: str) -> str:
+    if any(unit in question.lower() for unit in ["gram", "grams", "convert", "conversion", "density"]):
+        return f"{question} ingredient weight conversion reliable cooking source"
+    if "nutrition" in question.lower() or "usda" in question.lower():
+        return f"{question} USDA FoodData Central"
+    return f"{row.name} recipe editing question: {question}"
 
 
 def _preserve_step_images(current_steps: list[dict] | None, next_steps: list[dict]) -> list[dict]:
@@ -310,7 +412,7 @@ def patch_research_recipe(
     patch = req.model_dump(exclude_unset=True)
     if "model" in patch:
         row.research_model = patch.pop("model")
-    _apply_patch(row, patch, allow_null=True)
+    _apply_patch(row, patch, db, allow_null=True)
     audit_admin_action(
         db,
         action="research_draft_updated",
@@ -318,6 +420,36 @@ def patch_research_recipe(
         target_id=recipe_id,
         request=request,
         details={"fields": sorted(patch.keys())},
+    )
+    db.commit()
+    return row.to_research_dict()
+
+
+@router.post("/{recipe_id}/nutrition/refresh")
+def refresh_research_nutrition(
+    recipe_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
+    """Explicit admin action to recompute nutrition for the current draft.
+
+    Uses the USDA-backed ingredient cache when configured, refreshes missing
+    or expired ingredient rows, and falls back to the local heuristic engine
+    when external data is unavailable.
+    """
+    row = _get_draft(db, recipe_id)
+    row.nutrition = compute_nutrition(row.components or [], db)
+    audit_admin_action(
+        db,
+        action="research_nutrition_refreshed",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={
+            "sources": row.nutrition.get("nutrition_sources", []),
+            "unmatched_ingredients": row.nutrition.get("unmatched_ingredients", []),
+        },
     )
     db.commit()
     return row.to_research_dict()
@@ -392,7 +524,7 @@ def research_chat(
     row.research_conversation = {"messages": messages, "pending_tool_use": None}
     patch = envelope.get("recipe_patch")
     if patch:
-        _apply_patch(row, patch)
+        _apply_patch(row, patch, db)
     audit_admin_action(
         db,
         action="research_chat_turn",
@@ -568,7 +700,7 @@ def _run_auto_research_job(
                     job.finished_at = datetime.now(timezone.utc)
                     db.commit()
                 return
-            _apply_patch(row, patch)
+            _apply_patch(row, patch, db)
             row.auto_research_status = None
             row.auto_research_error = None
             row.auto_research_job_id = None
@@ -659,7 +791,7 @@ def refine_recipe_section(
         record_llm_usage(task="section_refine", model=model, role=role, status="error", error=str(e))
         raise HTTPException(500, f"Refinement failed: {e}")
     record_llm_usage(task="section_refine", model=model, role=role)
-    _apply_patch(row, patch)
+    _apply_patch(row, patch, db)
     audit_admin_action(
         db,
         action="research_section_refined",
@@ -737,7 +869,7 @@ def recipe_wide_edit(
         changed_fields = list(patch.keys())
     changed_fields = [field for field in changed_fields if field in patch]
     if patch:
-        _apply_patch(row, patch, allow_null=False)
+        _apply_patch(row, patch, db, allow_null=False)
     audit_admin_action(
         db,
         action="recipe_wide_edit_applied",
@@ -752,6 +884,101 @@ def recipe_wide_edit(
         "changed_fields": changed_fields,
         "review_notes": payload.get("review_notes") if isinstance(payload.get("review_notes"), str) else None,
     }
+
+
+@router.post("/{recipe_id}/ask", response_model=AdminAssistantResponse)
+def ask_admin_assistant(
+    recipe_id: str,
+    req: AdminAssistantRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
+    """Admin-only utility assistant for edit pages.
+
+    Answers operational questions such as conversions, ingredient reasoning,
+    technique checks, or draft-review questions. It has no side effects and
+    never patches the recipe.
+    """
+    row = _get_draft(db, recipe_id)
+    question = req.question.strip()
+    if not question:
+        raise HTTPException(400, "Question is required")
+    if not is_litellm_configured():
+        raise HTTPException(400, "litellm is not installed — check backend/requirements.txt")
+    model = resolve_task_model("admin_assistant", db, row.research_model)
+    if not is_model_available(model):
+        raise HTTPException(400, f"No API key configured for model '{model}' — add it to backend/.env")
+
+    history = []
+    for item in (req.history or [])[-6:]:
+        role_name = item.get("role")
+        content = str(item.get("content") or "").strip()
+        if role_name in {"user", "assistant"} and content:
+            history.append({"role": role_name, "content": content[:1200]})
+
+    local_context = {
+        "schemas": _schema_context(),
+        "ingredients": _ingredient_knowledge_context(db, row, question),
+    }
+    web_context = None
+    web_query = None
+    if _assistant_should_search_web(question, local_context):
+        web_query = _build_assistant_web_query(row, question)
+        if is_tavily_configured():
+            try:
+                web_context = run_tavily_search(web_query)
+            except Exception as e:
+                web_context = f"Web search was attempted but failed: {e}"
+        else:
+            web_context = "Web search is unavailable because TAVILY_API_KEY is not configured."
+
+    system_prompt = (
+        "You are CurryForward's admin editing assistant. Answer concise, practical "
+        "recipe-editing questions for the admin. You may calculate unit conversions, "
+        "reason about ingredient substitutions, explain technique, inspect internal "
+        "recipe schemas/data, and use provided web context when local data is not "
+        "enough. Do not claim you changed the recipe. Do not return JSON patches. "
+        "For grams/conversions, clearly state assumptions when a conversion depends "
+        "on ingredient density or form. If exact conversion is uncertain, give a "
+        "useful range and say it should be verified. Prefer local USDA/cache data "
+        "when present; otherwise use web context cautiously and name the uncertainty."
+    )
+    recipe_context = row.to_research_dict()
+    messages = [
+        {"role": "system", "content": system_prompt},
+        *history,
+        {
+            "role": "user",
+            "content": (
+                "Current draft recipe context:\n"
+                f"{json.dumps(recipe_context, ensure_ascii=False)[:12000]}\n\n"
+                "Internal schema and local data context:\n"
+                f"{json.dumps(local_context, ensure_ascii=False)[:16000]}\n\n"
+                "External web context, if needed:\n"
+                f"Query: {web_query or 'not used'}\n"
+                f"{web_context or 'No web search was needed for this question.'}\n\n"
+                f"Admin question:\n{question}"
+            ),
+        },
+    ]
+    try:
+        response = litellm_completion(model=model, messages=messages, temperature=0.2)
+        reply = (response.choices[0].message.content or "").strip()
+    except Exception as e:
+        record_llm_usage(task="admin_assistant", model=model, role=role, status="error", error=str(e))
+        raise HTTPException(500, f"Assistant failed: {e}")
+    record_llm_usage(task="admin_assistant", model=model, role=role, response=response)
+    audit_admin_action(
+        db,
+        action="admin_assistant_asked",
+        target_type="recipe",
+        target_id=recipe_id,
+        request=request,
+        details={"model": model, "web_query": web_query, "used_web": bool(web_query and web_context)},
+    )
+    db.commit()
+    return {"reply": reply or "I could not produce a useful answer for that."}
 
 
 @router.post("/{recipe_id}/rewrite", response_model=CopyRewriteResponse)
@@ -872,7 +1099,7 @@ def publish_research_recipe(
             serving_size_unit=row.serving_size_unit,
             components=row.components,
             steps=row.steps,
-            nutrition=row.nutrition or compute_nutrition(row.components or []),
+            nutrition=row.nutrition or compute_nutrition(row.components or [], db),
             hero_image_url=row.hero_image_url,
             intro=row.intro,
             history=row.history,

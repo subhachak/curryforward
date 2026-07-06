@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from .models import RecipeVersion
 from .nutrition import compute_nutrition
+from .services.ingredient_canonical import normalize_components_to_grams
 
 SEED_DIR = Path(__file__).parent.parent / "seed_data"
 
@@ -25,7 +26,8 @@ def load_seed_data(db: Session):
     if seed_path.exists():
         recipes = json.loads(seed_path.read_text())
         for r in recipes:
-            nutrition = compute_nutrition(r["components"])
+            components = normalize_components_to_grams(r["components"])
+            nutrition = compute_nutrition(components)
             version = RecipeVersion(
                 recipe_id=r["recipe_id"],
                 parent_version_id=None,
@@ -35,7 +37,7 @@ def load_seed_data(db: Session):
                 cuisine_tags=[],
                 base_servings_amount=r["base_servings"]["amount"],
                 base_servings_unit=r["base_servings"]["unit"],
-                components=r["components"],
+                components=components,
                 steps=r["steps"],
                 nutrition=nutrition,
                 source="seed",

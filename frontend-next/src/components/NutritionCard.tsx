@@ -50,6 +50,32 @@ export function NutritionCard({ recipe }: { recipe: RecipeDetail }) {
     );
   }
 
+  const hasComputedNutrients = [
+    nutrition.calories,
+    nutrition.protein_g,
+    nutrition.fat_g,
+    nutrition.carbs_g,
+    nutrition.sodium_mg,
+    nutrition.fiber_g,
+    nutrition.sugars_g,
+  ].some((value) => (value ?? 0) > 0);
+
+  if (!hasComputedNutrients) {
+    return (
+      <div className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
+        <div className="font-semibold text-foreground">No usable nutrition data yet</div>
+        <p className="mt-1">
+          Add measurable ingredient amounts or refresh after the USDA nutrition key is configured.
+        </p>
+        {nutrition.unmatched_ingredients?.length ? (
+          <p className="mt-2 text-xs">
+            Unmatched: {nutrition.unmatched_ingredients.join(", ")}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
   const servings = base_servings.amount && base_servings.amount > 0 ? base_servings.amount : 1;
   const perServing = (total?: number) => Math.round(((total ?? 0) / servings) * 10) / 10;
 

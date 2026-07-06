@@ -46,6 +46,11 @@ TASK_DEFAULTS = {
         "default_model": "gemini/gemini-2.5-flash-lite",
         "description": "Cheap admin-only rewrites for individual editable text fields.",
     },
+    "admin_assistant": {
+        "label": "Admin edit assistant",
+        "default_model": "gemini/gemini-2.5-flash-lite",
+        "description": "Fast admin-only Q&A for edit-page conversions, technique checks, and draft review.",
+    },
     "recipe_import": {
         "label": "Recipe CSV import",
         "default_model": "gemini/gemini-2.5-flash",

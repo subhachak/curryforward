@@ -9,7 +9,7 @@ import { ResearchChatPanel, type DisplayMessage } from "@/components/research/Re
 import { ResearchDocumentPreview } from "@/components/research/ResearchDocumentPreview";
 import { Card, CardBody } from "@/components/ui/Card";
 import { IconButton } from "@/components/ui/IconButton";
-import { CheckIcon, CopyIcon, EyeIcon, PencilIcon, SendIcon, XIcon } from "@/components/ui/icons";
+import { CheckIcon, CopyIcon, EyeIcon, PencilIcon, RefreshIcon, SendIcon, XIcon } from "@/components/ui/icons";
 import { Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { PageSpinner } from "@/components/ui/Spinner";
@@ -41,6 +41,7 @@ function ResearchWorkspaceInner() {
   const [previewMode, setPreviewMode] = useState(false);
   const [confirmingPublish, setConfirmingPublish] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [refreshingNutrition, setRefreshingNutrition] = useState(false);
   const [mode, setMode] = useState<"guided" | "auto">("auto");
   const [wideEditPrompt, setWideEditPrompt] = useState("");
   const [wideEditing, setWideEditing] = useState(false);
@@ -158,6 +159,36 @@ function ResearchWorkspaceInner() {
     } catch (e) {
       setSaveStatus("error");
       push(e instanceof ApiError ? e.message : "Save failed", "error");
+    }
+  }
+
+  async function handleRefreshNutrition() {
+    if (!recipeId) return;
+    setRefreshingNutrition(true);
+    try {
+      const updated = await api.refreshResearchNutrition(recipeId);
+      setRecipe(updated);
+      setSaveStatus("saved");
+      const hasComputedNutrients = [
+        updated.nutrition.calories,
+        updated.nutrition.protein_g,
+        updated.nutrition.fat_g,
+        updated.nutrition.carbs_g,
+        updated.nutrition.sodium_mg,
+      ].some((value) => (value ?? 0) > 0);
+      const sources = updated.nutrition.nutrition_sources?.length
+        ? ` (${updated.nutrition.nutrition_sources.join(", ")})`
+        : "";
+      push(
+        hasComputedNutrients
+          ? `Nutrition facts refreshed${sources}`
+          : "Nutrition refreshed, but no usable values could be calculated yet.",
+        hasComputedNutrients ? "success" : "info"
+      );
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Nutrition refresh failed", "error");
+    } finally {
+      setRefreshingNutrition(false);
     }
   }
 
@@ -304,6 +335,12 @@ function ResearchWorkspaceInner() {
                 onClick={() => setPreviewMode((v) => !v)}
               />
               <IconButton
+                label="Refresh nutrition facts"
+                icon={<RefreshIcon />}
+                loading={refreshingNutrition}
+                onClick={handleRefreshNutrition}
+              />
+              <IconButton
                 label="Publish"
                 icon={<SendIcon />}
                 disabled={!canPublish}
@@ -430,45 +467,45 @@ function ResearchWorkspaceInner() {
           <div className="space-y-4">
             {!previewMode && (
               <Card className={reviewHighlights.length ? "border-brand/50 bg-brand-soft/30" : ""}>
-                <CardBody className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <div className="font-semibold text-ink">Recipe-wide AI edit</div>
-                      <div className="text-xs text-muted">Apply one broad instruction across the draft, then review highlighted sections.</div>
-                    </div>
-                    {reviewHighlights.length > 0 && (
-                      <IconButton
-                        label="Clear review highlights"
-                        icon={<CheckIcon />}
-                        onClick={() => {
-                          setReviewHighlights([]);
-                          setReviewNotes(null);
-                        }}
-                      />
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Textarea
-                      value={wideEditPrompt}
-                      onChange={(e) => setWideEditPrompt(e.target.value)}
-                      rows={3}
-                      placeholder="Make this recipe keto friendly; make it kid friendly; turn it into a weeknight version..."
-                    />
-                    <IconButton
-                      label="Apply recipe-wide edit"
-                      icon={<SendIcon />}
-                      loading={wideEditing}
-                      disabled={!wideEditPrompt.trim()}
-                      onClick={handleWideEdit}
-                    />
-                  </div>
-                  {(reviewHighlights.length > 0 || reviewNotes) && (
-                    <div className="rounded-md border border-brand/30 bg-surface px-3 py-2 text-xs text-muted">
+                  <CardBody className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="font-semibold text-ink">Recipe-wide AI edit</div>
+                        <div className="text-xs text-muted">Apply one broad instruction across the draft, then review highlighted sections.</div>
+                      </div>
                       {reviewHighlights.length > 0 && (
-                        <div>
-                          Review: <span className="font-medium text-foreground">{reviewHighlights.join(", ")}</span>
-                        </div>
+                        <IconButton
+                          label="Clear review highlights"
+                          icon={<CheckIcon />}
+                          onClick={() => {
+                            setReviewHighlights([]);
+                            setReviewNotes(null);
+                          }}
+                        />
                       )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Textarea
+                        value={wideEditPrompt}
+                        onChange={(e) => setWideEditPrompt(e.target.value)}
+                        rows={3}
+                        placeholder="Make this recipe keto friendly; make it kid friendly; turn it into a weeknight version..."
+                      />
+                      <IconButton
+                        label="Apply recipe-wide edit"
+                        icon={<SendIcon />}
+                        loading={wideEditing}
+                        disabled={!wideEditPrompt.trim()}
+                        onClick={handleWideEdit}
+                      />
+                    </div>
+                    {(reviewHighlights.length > 0 || reviewNotes) && (
+                      <div className="rounded-md border border-brand/30 bg-surface px-3 py-2 text-xs text-muted">
+                        {reviewHighlights.length > 0 && (
+                          <div>
+                            Review: <span className="font-medium text-foreground">{reviewHighlights.join(", ")}</span>
+                          </div>
+                        )}
                       {reviewNotes && <div className="mt-1">{reviewNotes}</div>}
                     </div>
                   )}
@@ -481,6 +518,8 @@ function ResearchWorkspaceInner() {
               previewMode={previewMode}
               onCommit={handleCommit}
               onRefine={handleRefineSection}
+              onRefreshNutrition={isDraft ? handleRefreshNutrition : undefined}
+              refreshingNutrition={refreshingNutrition}
               highlightedFields={reviewHighlights}
               onClearHighlights={() => {
                 setReviewHighlights([]);

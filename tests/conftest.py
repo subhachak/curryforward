@@ -10,6 +10,8 @@ def pytest_configure():
     import os
 
     os.environ.setdefault("ANTHROPIC_API_KEY", "test-anthropic-key")
+    os.environ.pop("USDA_FDC_API_KEY", None)
+    os.environ.pop("USDA_API_KEY", None)
 
 
 @pytest.fixture(autouse=True)

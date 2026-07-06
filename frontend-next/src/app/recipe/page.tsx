@@ -11,17 +11,19 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
-import { CopyIcon, DownloadIcon, SparklesIcon } from "@/components/ui/icons";
+import { CopyIcon, DownloadIcon, RefreshIcon, SparklesIcon } from "@/components/ui/icons";
 import { LikeButton } from "@/components/LikeButton";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { useAuth } from "@/context/AuthContext";
 import { useAssistant } from "@/context/AssistantContext";
+import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
 import type { RecipeDetail } from "@/lib/types";
 import { lineageLabel } from "@/lib/lineage";
 
 function RecipeDetailInner() {
   const { isAdmin } = useAuth();
+  const { push } = useToast();
   const { setOpen, setTarget } = useAssistant();
   const searchParams = useSearchParams();
   const recipeId = searchParams.get("id");
@@ -29,6 +31,7 @@ function RecipeDetailInner() {
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [history, setHistory] = useState<RecipeDetail[]>([]);
   const [loading, setLoading] = useState(true);
+  const [resettingIngredients, setResettingIngredients] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -80,6 +83,31 @@ function RecipeDetailInner() {
     const a = document.createElement("a");
     a.href = api.downloadRecipe(recipe.recipe_id);
     a.click();
+  }
+
+  async function handleResetIngredientsToGrams() {
+    if (!recipe) return;
+    setResettingIngredients(true);
+    try {
+      const updated = await api.resetRecipeIngredientsToGrams(recipe.recipe_id);
+      setRecipe(updated);
+      if (isAdmin) {
+        setHistory(await api.getHistory(recipe.recipe_id));
+      }
+      const missingGrams = updated.components
+        .flatMap((component) => component.ingredients)
+        .filter((ingredient) => ingredient.gram_amount == null && ingredient.gram_equivalent == null).length;
+      push(
+        missingGrams
+          ? `Ingredients reset. ${missingGrams} ingredient${missingGrams === 1 ? "" : "s"} still need grams.`
+          : "Ingredients reset to canonical grams",
+        missingGrams ? "info" : "success",
+      );
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Ingredient reset failed", "error");
+    } finally {
+      setResettingIngredients(false);
+    }
   }
 
   if (loading) return <RecipeLoadingState />;
@@ -149,6 +177,14 @@ function RecipeDetailInner() {
             </Button>
             {(recipe.status === "published" || isAdmin) && (
               <IconButton label="Download recipe" icon={<DownloadIcon />} onClick={handleDownload} />
+            )}
+            {isAdmin && (
+              <IconButton
+                label="Reset ingredients to grams"
+                icon={<RefreshIcon />}
+                loading={resettingIngredients}
+                onClick={handleResetIngredientsToGrams}
+              />
             )}
           </div>
         </div>
