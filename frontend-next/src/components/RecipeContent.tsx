@@ -1,9 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import type { Ingredient, IngredientUnitOption, RecipeDetail } from "@/lib/types";
+
+type WakeLockSentinelLike = {
+  released: boolean;
+  release: () => Promise<void>;
+  addEventListener: (type: "release", listener: () => void) => void;
+  removeEventListener: (type: "release", listener: () => void) => void;
+};
+
+type WakeLockNavigator = Navigator & {
+  wakeLock?: {
+    request: (type: "screen") => Promise<WakeLockSentinelLike>;
+  };
+};
 
 /**
  * The recipe body - everything between the page header and the sidebar.
@@ -16,6 +29,10 @@ import type { Ingredient, IngredientUnitOption, RecipeDetail } from "@/lib/types
 export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
   const [multiplier, setMultiplier] = useState(1);
   const [selectedUnits, setSelectedUnits] = useState<Record<string, number>>({});
+  const [cookModeActive, setCookModeActive] = useState(false);
+  const [cookModeError, setCookModeError] = useState<string | null>(null);
+  const wakeLockRef = useRef<WakeLockSentinelLike | null>(null);
+  const wantsCookModeRef = useRef(false);
   const suggestedUtensils = recipe.suggested_utensils || [];
   const panConversions = recipe.pan_conversions || [];
   const [selectedPanIndex, setSelectedPanIndex] = useState(0);
@@ -26,6 +43,92 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
     const scaled = roundAmount(base * multiplier);
     return `${scaled} ${recipe.base_servings.unit}`;
   }, [recipe.base_servings.amount, recipe.base_servings.unit, multiplier]);
+
+  const handleWakeLockRelease = useCallback(() => {
+    wakeLockRef.current = null;
+    setCookModeActive(false);
+  }, []);
+
+  const requestWakeLock = useCallback(async () => {
+    setCookModeError(null);
+
+    if (typeof navigator === "undefined" || !("wakeLock" in navigator)) {
+      wantsCookModeRef.current = false;
+      setCookModeActive(false);
+      setCookModeError("Cook mode needs a browser that supports screen wake lock.");
+      return;
+    }
+
+    try {
+      const sentinel = await (navigator as WakeLockNavigator).wakeLock?.request("screen");
+      if (!sentinel) throw new Error("Screen wake lock is unavailable.");
+
+      wakeLockRef.current?.removeEventListener("release", handleWakeLockRelease);
+      wakeLockRef.current = sentinel;
+      sentinel.addEventListener("release", handleWakeLockRelease);
+      setCookModeActive(true);
+    } catch (error) {
+      wantsCookModeRef.current = false;
+      wakeLockRef.current = null;
+      setCookModeActive(false);
+      setCookModeError(
+        error instanceof Error
+          ? error.message
+          : "Cook mode could not keep this screen awake.",
+      );
+    }
+  }, [handleWakeLockRelease]);
+
+  const releaseWakeLock = useCallback(async () => {
+    wantsCookModeRef.current = false;
+    setCookModeError(null);
+
+    const sentinel = wakeLockRef.current;
+    wakeLockRef.current = null;
+    setCookModeActive(false);
+
+    if (!sentinel) return;
+    sentinel.removeEventListener("release", handleWakeLockRelease);
+    if (!sentinel.released) {
+      await sentinel.release().catch(() => undefined);
+    }
+  }, [handleWakeLockRelease]);
+
+  const toggleCookMode = useCallback(async () => {
+    if (cookModeActive) {
+      await releaseWakeLock();
+      return;
+    }
+
+    wantsCookModeRef.current = true;
+    await requestWakeLock();
+  }, [cookModeActive, releaseWakeLock, requestWakeLock]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (
+        document.visibilityState === "visible" &&
+        wantsCookModeRef.current &&
+        !wakeLockRef.current
+      ) {
+        void requestWakeLock();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [requestWakeLock]);
+
+  useEffect(() => {
+    return () => {
+      wantsCookModeRef.current = false;
+      const sentinel = wakeLockRef.current;
+      wakeLockRef.current = null;
+      if (sentinel && !sentinel.released) {
+        void sentinel.release();
+      }
+    };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -147,12 +250,28 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-2xl font-bold text-[#2E1B14]">Instructions</h2>
-          <button
-            type="button"
-            className="rounded-md bg-[#FF6B00] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#E6462D]"
-          >
-            Start cook mode
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              aria-pressed={cookModeActive}
+              onClick={() => void toggleCookMode()}
+              className={`rounded-md px-3 py-2 text-sm font-semibold text-white transition ${
+                cookModeActive ? "bg-[#2E9B57] hover:bg-[#257C47]" : "bg-[#FF6B00] hover:bg-[#E6462D]"
+              }`}
+            >
+              {cookModeActive ? "End cook mode" : "Start cook mode"}
+            </button>
+            {cookModeActive && (
+              <span className="text-right text-xs font-medium text-[#2E9B57]">
+                Screen stays awake while this tab is open.
+              </span>
+            )}
+            {cookModeError && (
+              <span className="max-w-xs text-right text-xs font-medium text-[#A6321B]">
+                {cookModeError}
+              </span>
+            )}
+          </div>
         </div>
           <ol className="space-y-3 text-sm">
             {recipe.steps.map((s, idx) => (
