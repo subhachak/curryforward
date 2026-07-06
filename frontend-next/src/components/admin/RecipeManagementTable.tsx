@@ -261,7 +261,7 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
                       </div>
                       {r.intro && <p className="mt-1 line-clamp-2 text-sm text-muted">{r.intro}</p>}
                       <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-muted">
-                        <span>Published {formatDate(r.first_published_at)}</span>
+                        <span>{r.first_published_at ? `Published ${formatDate(r.first_published_at)}` : "Not published yet"}</span>
                         <span>Updated {formatDate(r.updated_at)}</span>
                         <span className="inline-flex items-center gap-1">
                           <EyeIcon className="h-3.5 w-3.5" />
