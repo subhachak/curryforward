@@ -7,8 +7,9 @@ from sqlalchemy.engine import make_url
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from .models import Base, RecipeVersion
+from .models import Base, RecipeVersion, _secure_public_url
 from .nutrition import compute_nutrition
+from .services.recipe_identity import ensure_recipe_identity
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./curryforward.db")
 
@@ -46,6 +47,8 @@ _RECIPE_VERSION_COLUMN_ADDITIONS = [
     ("serving_size_unit", "TEXT"),
     ("suggested_utensils", "TEXT"),
     ("pan_conversions", "TEXT"),
+    ("public_slug", "TEXT"),
+    ("admin_ref", "TEXT"),
 ]
 
 _RECIPE_FEEDBACK_COLUMN_ADDITIONS = [
@@ -115,9 +118,64 @@ def _backfill_expanded_nutrition():
             db.commit()
 
 
+def _backfill_recipe_identity():
+    """Populate public slugs and opaque admin refs for older rows.
+
+    Public recipes get stable human-readable slugs. Drafts intentionally do
+    not get public slugs until publish, but they do get admin refs so edit
+    URLs no longer expose internal recipe_id values such as research-*.
+    """
+    from sqlalchemy.orm import Session
+
+    with Session(engine) as db:
+        rows = db.query(RecipeVersion).order_by(RecipeVersion.created_at, RecipeVersion.version_id).all()
+        changed = False
+        for row in rows:
+            before = (row.public_slug, row.admin_ref)
+            ensure_recipe_identity(row, db)
+            changed = changed or before != (row.public_slug, row.admin_ref)
+        if changed:
+            db.commit()
+
+
+def _backfill_secure_recipe_media_urls():
+    """Persistently upgrade remote http media URLs to https.
+
+    Browsers mark an HTTPS page as "Not secure" when it loads HTTP images.
+    Recipe media often comes from AI/imported content, so normalize old rows
+    in addition to sanitizing response output.
+    """
+    from sqlalchemy.orm import Session
+
+    with Session(engine) as db:
+        rows = db.query(RecipeVersion).all()
+        changed = False
+        for row in rows:
+            next_hero = _secure_public_url(row.hero_image_url)
+            if next_hero != row.hero_image_url:
+                row.hero_image_url = next_hero
+                changed = True
+            next_steps = []
+            steps_changed = False
+            for step in row.steps or []:
+                next_step = dict(step)
+                next_url = _secure_public_url(next_step.get("image_url"))
+                if next_url != next_step.get("image_url"):
+                    next_step["image_url"] = next_url
+                    steps_changed = True
+                next_steps.append(next_step)
+            if steps_changed:
+                row.steps = next_steps
+                changed = True
+        if changed:
+            db.commit()
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
     _run_lightweight_migrations()
+    _backfill_recipe_identity()
+    _backfill_secure_recipe_media_urls()
     _backfill_expanded_nutrition()
 
 

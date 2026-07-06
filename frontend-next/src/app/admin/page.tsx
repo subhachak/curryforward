@@ -29,6 +29,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { useRecipes } from "@/context/RecipesContext";
 import { api, ApiError } from "@/lib/api";
+import { adminRecipeHref, adminRecipeRef, publicRecipeHref } from "@/lib/recipeLinks";
 import type {
   AdminAuditLog,
   AdminRecipeSummary,
@@ -222,7 +223,7 @@ export default function AdminPage() {
     setActiveResearchDraft((prev) => (prev ? { ...prev, starting_prompt: value } : prev));
     if (!activeResearchDraft) return;
     try {
-      const updated = await api.patchResearch(activeResearchDraft.recipe_id, { starting_prompt: value });
+      const updated = await api.patchResearch(adminRecipeRef(activeResearchDraft), { starting_prompt: value });
       setActiveResearchDraft(updated);
     } catch {
       // Keep typing responsive; explicit planning/run calls will surface errors.
@@ -232,7 +233,7 @@ export default function AdminPage() {
   function handleResearchComplete(updated: RecipeResearchDetail) {
     setActiveResearchDraft(updated);
     push("Research complete — opening the editor for review", "success");
-    router.push(`/recipe/research?id=${encodeURIComponent(updated.recipe_id)}`);
+    router.push(adminRecipeHref(updated));
   }
 
   async function handleImportPreview(file: File) {
@@ -791,7 +792,7 @@ function WorkspaceSearchResults({
                 recipes.map((recipe) => (
                   <Link
                     key={recipe.recipe_id}
-                    href={recipe.status === "published" ? `/recipe?id=${encodeURIComponent(recipe.recipe_id)}` : `/recipe/research?id=${encodeURIComponent(recipe.recipe_id)}`}
+                    href={recipe.status === "published" ? publicRecipeHref(recipe) : adminRecipeHref(recipe)}
                     className="block rounded-md border border-border bg-surface px-3 py-2 text-sm transition-colors hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
                   >
                     <div className="font-medium text-foreground">{recipe.name}</div>

@@ -28,6 +28,11 @@ const nextConfig: NextConfig = {
           return [
             { source: "/api/:path*", destination: `${backendOrigin}/api/:path*` },
             { source: "/uploads/:path*", destination: `${backendOrigin}/uploads/:path*` },
+            {
+              source:
+                "/:slug((?!api|uploads|_next|admin|recipes|recipe|login|home-v2|home-classic|apple-icon.png|icon.svg|favicon.ico|robots.txt|sitemap.xml)[^/]+)",
+              destination: "/recipe?slug=:slug",
+            },
           ];
         },
       }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useRecipes } from "@/context/RecipesContext";
 import { HeartIcon } from "@/components/ui/icons";
+import { publicRecipeHref } from "@/lib/recipeLinks";
 
 const CATEGORY_CARDS = [
   {
@@ -153,7 +154,7 @@ export default function HomeV2Page() {
       region: recipe.cuisine_tags[0] ?? recipe.category ?? "Indian",
       time: ["45 min", "35 min", "30 min"][index] ?? "40 min",
       spice: ["Mild", "Medium", "Mild"][index] ?? "Medium",
-      href: `/recipe?id=${encodeURIComponent(recipe.recipe_id)}`,
+      href: publicRecipeHref(recipe),
       hero_image_url: recipe.hero_image_url,
     }));
   }, [recipes]);
@@ -239,7 +240,7 @@ export default function HomeV2Page() {
                 {featured?.cuisine_tags[0] ?? "Bengali"}
               </span>
             </div>
-            <Link href={featured ? `/recipe?id=${encodeURIComponent(featured.recipe_id)}` : "/recipes"}>
+            <Link href={featured ? publicRecipeHref(featured) : "/recipes"}>
               <Button className="mt-5 bg-[#FF6B00] text-white hover:bg-[#E6462D]">View Recipe</Button>
             </Link>
           </div>

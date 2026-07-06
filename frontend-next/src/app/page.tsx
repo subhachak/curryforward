@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { useAssistant } from "@/context/AssistantContext";
 import { useRecipes } from "@/context/RecipesContext";
 import { HeartIcon } from "@/components/ui/icons";
+import { publicRecipeHref } from "@/lib/recipeLinks";
 
 const SWEETS = [
   "Nolen Gur Rosogolla",
@@ -158,7 +159,7 @@ export default function HomePage() {
       region: recipe.cuisine_tags[0] ?? recipe.category ?? "Recipe",
       time: ["45 min", "35 min", "50 min"][index] ?? "40 min",
       occasion: ["Home", "Dinner", "Festive"][index] ?? "Kitchen",
-      href: `/recipe?id=${encodeURIComponent(recipe.recipe_id)}`,
+      href: publicRecipeHref(recipe),
       hero_image_url: recipe.hero_image_url,
     }));
   }, [recipes]);
@@ -329,7 +330,7 @@ export default function HomePage() {
               </span>
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
-              <Link href={featured ? `/recipe?id=${encodeURIComponent(featured.recipe_id)}` : "/recipes"}>
+              <Link href={featured ? publicRecipeHref(featured) : "/recipes"}>
                 <Button className="bg-[#FF6B00] text-white hover:bg-[#E6392E]">View Recipe</Button>
               </Link>
               <Button className="border border-[#5A2145] bg-[#F7DDED] text-[#5A2145] hover:bg-[#EECBE1]" onClick={() => setOpen(true)}>

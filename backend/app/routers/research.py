@@ -33,6 +33,7 @@ from ..services.llm_settings import resolve_task_model
 from ..services.audit import audit_admin_action
 from ..services.ingredient_canonical import normalize_components_to_grams
 from ..services.llm_usage import record_llm_usage
+from ..services.recipe_identity import current_head_identity_query, ensure_recipe_identity, generate_admin_ref, unique_public_slug
 from ..nutrition import _lookup as lookup_builtin_nutrition
 from ..nutrition import _normalize_cache_key, compute_nutrition, estimated_yield_grams
 
@@ -124,18 +125,14 @@ class AdminAssistantResponse(BaseModel):
 
 def _get_draft(db: Session, recipe_id: str) -> RecipeVersion:
     row = (
-        db.query(RecipeVersion)
-        .filter(
-            RecipeVersion.recipe_id == recipe_id,
-            RecipeVersion.is_current_head == True,  # noqa: E712
-            RecipeVersion.deleted_at.is_(None),
-        )
+        current_head_identity_query(db, recipe_id)
         .first()
     )
     if not row:
         raise HTTPException(404, "Recipe not found")
     if row.status != "draft":
         raise HTTPException(400, "This recipe is no longer a draft")
+    ensure_recipe_identity(row, db)
     return row
 
 
@@ -301,6 +298,7 @@ def start_research(
     recipe_id = f"research-{uuid.uuid4().hex[:8]}"
     version = RecipeVersion(
         recipe_id=recipe_id,
+        admin_ref=generate_admin_ref(),
         parent_version_id=None,
         lineage="researched",
         name=name,
@@ -316,6 +314,7 @@ def start_research(
         research_model=req.model,
         starting_prompt=req.prompt,
     )
+    ensure_recipe_identity(version, db)
     db.add(version)
     audit_admin_action(
         db,
@@ -345,6 +344,8 @@ def list_drafts(db: Session = Depends(get_db), role: str = Depends(require_admin
     return [
         {
             "recipe_id": r.recipe_id,
+            "admin_ref": r.admin_ref,
+            "public_slug": r.public_slug,
             "version_id": r.version_id,
             "name": r.name,
             "category": r.category,
@@ -361,6 +362,8 @@ def list_research_jobs(
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
+    row = _get_draft(db, recipe_id)
+    recipe_id = row.recipe_id
     rows = (
         db.query(ResearchJob)
         .filter(ResearchJob.recipe_id == recipe_id)
@@ -376,17 +379,10 @@ def get_research_recipe(
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
-    row = (
-        db.query(RecipeVersion)
-        .filter(
-            RecipeVersion.recipe_id == recipe_id,
-            RecipeVersion.is_current_head == True,  # noqa: E712
-            RecipeVersion.deleted_at.is_(None),
-        )
-        .first()
-    )
+    row = current_head_identity_query(db, recipe_id).first()
     if not row:
         raise HTTPException(404, "Recipe not found")
+    ensure_recipe_identity(row, db)
     return row.to_research_dict()
 
 
@@ -401,6 +397,7 @@ def patch_research_recipe(
     """Direct field edits (notes textarea, manual ingredient/step tweaks) —
     mutates the draft row in place. Not available once published."""
     row = _get_draft(db, recipe_id)
+    recipe_id = row.recipe_id
     patch = req.model_dump(exclude_unset=True)
     if "model" in patch:
         row.research_model = patch.pop("model")
@@ -431,6 +428,7 @@ def refresh_research_nutrition(
     when external data is unavailable.
     """
     row = _get_draft(db, recipe_id)
+    recipe_id = row.recipe_id
     row.nutrition = compute_nutrition(row.components or [], db)
     row.base_servings_amount = estimated_yield_grams(row.components or [])
     row.base_servings_unit = "g"
@@ -460,6 +458,7 @@ def auto_research_plan(
     call — no side effects, no crew execution, nothing persisted. The admin
     reviews/edits/unchecks the batch client-side before calling /auto/run."""
     row = _get_draft(db, recipe_id)
+    recipe_id = row.recipe_id
     if not is_litellm_configured():
         raise HTTPException(400, "litellm is not installed — check backend/requirements.txt")
     model = resolve_task_model("research_plan", db, row.research_model)
@@ -490,6 +489,7 @@ def auto_research_run(
     GET /{recipe_id} endpoint and watches auto_research_status flip away
     from "running" instead of awaiting one long response."""
     row = _get_draft(db, recipe_id)
+    recipe_id = row.recipe_id
     if row.auto_research_status == "running":
         raise HTTPException(409, "Auto-research is already running for this recipe")
     if not is_web_search_configured():
@@ -654,6 +654,7 @@ def auto_research_cancel(
     match the row's (now-cleared) job id, so _run_auto_research_job discards
     its result instead of applying it."""
     row = _get_draft(db, recipe_id)
+    recipe_id = row.recipe_id
     row.auto_research_status = None
     row.auto_research_error = None
     row.auto_research_progress = None
@@ -689,6 +690,7 @@ def refine_recipe_section(
     tips) — a single LLM call, not a crew, so this stays synchronous like
     auto-research endpoint."""
     row = _get_draft(db, recipe_id)
+    recipe_id = row.recipe_id
     model = resolve_task_model("section_refine", db, row.research_model)
     if not is_model_available(model):
         raise HTTPException(400, f"No API key configured for model '{model}' — add it to backend/.env")
@@ -724,6 +726,7 @@ def recipe_wide_edit(
     """One broad admin instruction that can update multiple recipe fields in
     one pass. The returned `changed_fields` drives frontend review highlights."""
     row = _get_draft(db, recipe_id)
+    recipe_id = row.recipe_id
     instruction = req.instruction.strip()
     if not instruction:
         raise HTTPException(400, "Instruction is required")
@@ -810,6 +813,7 @@ def ask_admin_assistant(
     never patches the recipe.
     """
     row = _get_draft(db, recipe_id)
+    recipe_id = row.recipe_id
     question = req.question.strip()
     if not question:
         raise HTTPException(400, "Question is required")
@@ -902,6 +906,7 @@ def rewrite_recipe_copy(
     a candidate string only; the caller decides whether to apply it through
     the normal PATCH/autosave path."""
     row = _get_draft(db, recipe_id)
+    recipe_id = row.recipe_id
     if not is_litellm_configured():
         raise HTTPException(400, "litellm is not installed — check backend/requirements.txt")
     model = resolve_task_model("copy_rewrite", db, row.research_model)
@@ -968,6 +973,7 @@ def publish_research_recipe(
     role: str = Depends(require_admin),
 ):
     row = _get_draft(db, recipe_id)
+    recipe_id = row.recipe_id
     if row.auto_research_status == "running":
         raise HTTPException(409, "Wait for auto-research to finish or stop it before publishing.")
     if not row.name or not row.components or not row.steps:
@@ -997,6 +1003,8 @@ def publish_research_recipe(
 
         replacement = RecipeVersion(
             recipe_id=original.recipe_id,
+            public_slug=current_original.public_slug or unique_public_slug(db, row.name, original.recipe_id),
+            admin_ref=generate_admin_ref(),
             parent_version_id=current_original.version_id,
             lineage="edit",
             name=row.name.replace(" (draft edit)", ""),
@@ -1022,6 +1030,7 @@ def publish_research_recipe(
             source=row.source if row.source != "revision_draft" else current_original.source,
             is_current_head=True,
         )
+        ensure_recipe_identity(replacement, db)
         current_original.is_current_head = False
         row.is_current_head = False
         row.deleted_at = datetime.now(timezone.utc)
@@ -1038,6 +1047,7 @@ def publish_research_recipe(
         return replacement.to_dict()
 
     row.status = "published"
+    row.public_slug = row.public_slug or unique_public_slug(db, row.name, row.recipe_id)
     audit_admin_action(
         db,
         action="recipe_published_keep_both",
@@ -1056,17 +1066,10 @@ def unpublish_research_recipe(
     db: Session = Depends(get_db),
     role: str = Depends(require_admin),
 ):
-    row = (
-        db.query(RecipeVersion)
-        .filter(
-            RecipeVersion.recipe_id == recipe_id,
-            RecipeVersion.is_current_head == True,  # noqa: E712
-            RecipeVersion.deleted_at.is_(None),
-        )
-        .first()
-    )
+    row = current_head_identity_query(db, recipe_id).first()
     if not row:
         raise HTTPException(404, "Recipe not found")
+    recipe_id = row.recipe_id
     if row.status != "published":
         raise HTTPException(400, "This recipe is not published")
     row.status = "draft"

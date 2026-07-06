@@ -8,6 +8,7 @@ import { useRecipes } from "@/context/RecipesContext";
 import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
 import { looksLikeCreateRequest, looksLikeDraftPaste, searchRecipes } from "@/lib/assistantHeuristics";
+import { publicRecipeHref } from "@/lib/recipeLinks";
 import { RefreshIcon, SearchIcon, SendIcon, SparklesIcon, XIcon } from "@/components/ui/icons";
 import type { ChatHistoryTurn, DraftRecipeResult } from "@/lib/types";
 
@@ -364,7 +365,7 @@ export function AssistantSearchBar() {
           <button
             key={r.recipe_id}
             className="block w-full rounded-md border border-[#E8D3B8] bg-white px-3 py-2 text-left text-sm hover:bg-[#FFF8F1]"
-            onClick={() => goTo(`/recipe?id=${encodeURIComponent(r.recipe_id)}`)}
+            onClick={() => goTo(publicRecipeHref(r))}
           >
             <span className="font-semibold text-[#2E1B14]">{r.name}</span>
             <span className="mt-0.5 block text-xs text-[#8A7564]">
@@ -396,7 +397,7 @@ export function AssistantSearchBar() {
         "assistant",
         <div>
           Saved!{" "}
-          <button className="underline" onClick={() => goTo(`/recipe?id=${encodeURIComponent(created.recipe_id)}`)}>
+          <button className="underline" onClick={() => goTo(publicRecipeHref(created))}>
             View {created.name}
           </button>
         </div>

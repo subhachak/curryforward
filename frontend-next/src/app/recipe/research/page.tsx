@@ -14,6 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { useRecipes } from "@/context/RecipesContext";
 import { api, ApiError } from "@/lib/api";
+import { publicRecipeHref } from "@/lib/recipeLinks";
 import type { ResearchPatchPayload, RecipeResearchDetail } from "@/lib/types";
 
 type WorkspaceMode = "edit" | "review";
@@ -144,7 +145,7 @@ function ResearchWorkspaceInner() {
       const published = await api.publishResearch(recipeId, mode);
       await reloadRecipes();
       push(mode === "replace_original" ? "Original recipe replaced" : "Published — this recipe is now visible to guests", "success");
-      router.push(`/recipe?id=${encodeURIComponent(published.recipe_id)}`);
+      router.push(publicRecipeHref(published));
     } catch (e) {
       push(e instanceof ApiError ? e.message : "Publish failed", "error");
     } finally {

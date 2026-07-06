@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/Badge";
 import { HeartIcon } from "@/components/ui/icons";
 import type { RecipeSummary } from "@/lib/types";
 import { lineageLabel } from "@/lib/lineage";
+import { publicRecipeHref } from "@/lib/recipeLinks";
 
 const lineageTone: Record<string, "brand" | "success" | "warning"> = {
   edit: "brand",
@@ -16,7 +17,7 @@ export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
   const lineage = lineageLabel(recipe.lineage);
 
   return (
-    <Link href={`/recipe?id=${encodeURIComponent(recipe.recipe_id)}`}>
+    <Link href={publicRecipeHref(recipe)}>
       <Card className="h-full overflow-hidden p-0 transition hover:-translate-y-0.5 hover:shadow-md">
         {recipe.hero_image_url ? (
           // eslint-disable-next-line @next/next/no-img-element

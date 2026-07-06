@@ -20,7 +20,7 @@ from ..llm_agent import (
     is_configured,
 )
 from ..llm_client import is_litellm_configured, is_model_available, litellm_completion
-from ..models import RecipeAnalytics, RecipeFeedback, RecipeVersion
+from ..models import RecipeAnalytics, RecipeFeedback, RecipeVersion, _secure_public_url
 from ..nutrition import compute_nutrition, estimated_yield_grams
 from ..recipe_export import render_markdown
 from ..schemas import (
@@ -34,6 +34,7 @@ from ..schemas import (
 from ..services.llm_settings import anthropic_model_name, resolve_task_model
 from ..services.audit import audit_admin_action
 from ..services.ingredient_canonical import normalize_components_to_grams
+from ..services.recipe_identity import ensure_recipe_identity, unique_public_slug, generate_admin_ref
 from ..services.llm_usage import record_llm_usage
 from ..services.recipe_versions import (
     create_chat_edit_version,
@@ -117,6 +118,7 @@ def _visible_recipe_or_404(recipe_id: str, db: Session, role: str) -> RecipeVers
     version = current_head_query(db, recipe_id).first()
     if not version or ((version.status or "published") != "published" and role != "admin"):
         raise HTTPException(404, "Recipe not found")
+    ensure_recipe_identity(version, db)
     return version
 
 
@@ -314,13 +316,14 @@ def list_recipes(db: Session = Depends(get_db), role: str = Depends(get_role)):
     return [
         {
             "recipe_id": r.recipe_id,
+            "public_slug": r.public_slug,
             "version_id": r.version_id,
             "name": r.name,
             "category": r.category,
             "cuisine_tags": r.cuisine_tags or [],
             "lineage": r.lineage,
             "source": r.source,
-            "hero_image_url": r.hero_image_url,
+            "hero_image_url": _secure_public_url(r.hero_image_url),
             "created_at": r.created_at.isoformat() if r.created_at else None,
             "intro": r.intro,
             "like_count": like_counts.get(r.recipe_id, 0),
@@ -333,15 +336,16 @@ def list_recipes(db: Session = Depends(get_db), role: str = Depends(get_role)):
 @router.get("/recipes/{recipe_id}", response_model=RecipeDetailResponse)
 def get_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
     version = _visible_recipe_or_404(recipe_id, db, role)
+    canonical_recipe_id = version.recipe_id
     if role != "admin":
         # Guest-only, so the admin's own edit/preview traffic doesn't inflate
         # the count shown on the dashboard.
-        _increment_analytics(db, recipe_id, "view_count")
+        _increment_analytics(db, canonical_recipe_id, "view_count")
     return {
         **version.to_dict(),
-        "metadata": _recipe_metadata(db, recipe_id, version),
-        "feedback_summary": _feedback_summary(db, recipe_id),
-        "like_count": _like_count(db, recipe_id),
+        "metadata": _recipe_metadata(db, canonical_recipe_id, version),
+        "feedback_summary": _feedback_summary(db, canonical_recipe_id),
+        "like_count": _like_count(db, canonical_recipe_id),
     }
 
 
@@ -353,22 +357,23 @@ def like_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depen
     anyone's. No accounts exist for guests, so there's no real per-visitor
     dedup — the frontend uses localStorage to keep its own toggle honest
     for normal use; this endpoint just adjusts the shared count."""
-    _visible_recipe_or_404(recipe_id, db, role)
-    return {"like_count": _adjust_like_count(db, recipe_id, 1)}
+    version = _visible_recipe_or_404(recipe_id, db, role)
+    return {"like_count": _adjust_like_count(db, version.recipe_id, 1)}
 
 
 @router.delete("/recipes/{recipe_id}/like")
 def unlike_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
-    _visible_recipe_or_404(recipe_id, db, role)
-    return {"like_count": _adjust_like_count(db, recipe_id, -1)}
+    version = _visible_recipe_or_404(recipe_id, db, role)
+    return {"like_count": _adjust_like_count(db, version.recipe_id, -1)}
 
 
 @router.get("/recipes/{recipe_id}/feedback", response_model=RecipeFeedbackListResponse)
 def list_recipe_feedback(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
-    _visible_recipe_or_404(recipe_id, db, role)
+    version = _visible_recipe_or_404(recipe_id, db, role)
+    canonical_recipe_id = version.recipe_id
     rows = (
         db.query(RecipeFeedback)
-        .filter(RecipeFeedback.recipe_id == recipe_id, RecipeFeedback.status == "approved")
+        .filter(RecipeFeedback.recipe_id == canonical_recipe_id, RecipeFeedback.status == "approved")
         .order_by(RecipeFeedback.created_at.desc())
         .all()
     )
@@ -390,13 +395,14 @@ def create_recipe_feedback(
     role: str = Depends(get_role),
 ):
     version = _visible_recipe_or_404(recipe_id, db, role)
+    canonical_recipe_id = version.recipe_id
     if (version.status or "published") != "published":
         raise HTTPException(400, "Feedback can only be added to published recipes")
     comment = req.comment.strip()
     if not comment:
         raise HTTPException(400, "Comment is required")
     row = RecipeFeedback(
-        recipe_id=recipe_id,
+        recipe_id=canonical_recipe_id,
         author_name=(req.author_name or "").strip()[:80] or None,
         rating=req.rating,
         comment=comment,
@@ -412,19 +418,9 @@ def create_recipe_feedback(
 
 @router.get("/recipes/{recipe_id}/download")
 def download_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
-    version = (
-        db.query(RecipeVersion)
-        .filter(
-            RecipeVersion.recipe_id == recipe_id,
-            RecipeVersion.is_current_head == True,  # noqa: E712
-            RecipeVersion.deleted_at.is_(None),
-        )
-        .first()
-    )
-    if not version or ((version.status or "published") != "published" and role != "admin"):
-        raise HTTPException(404, "Recipe not found")
+    version = _visible_recipe_or_404(recipe_id, db, role)
     if role != "admin":
-        _increment_analytics(db, recipe_id, "download_count")
+        _increment_analytics(db, version.recipe_id, "download_count")
     text = render_markdown(version.to_dict())
     slug = "".join(c if c.isalnum() or c in " -" else "" for c in version.name).strip().replace(" ", "-").lower()
     return Response(
@@ -436,9 +432,11 @@ def download_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = D
 
 @router.get("/recipes/{recipe_id}/history", response_model=list[RecipeDetailResponse])
 def get_history(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(require_admin)):
+    current = current_head_query(db, recipe_id).first()
+    canonical_recipe_id = current.recipe_id if current else recipe_id
     versions = (
         db.query(RecipeVersion)
-        .filter(RecipeVersion.recipe_id == recipe_id)
+        .filter(RecipeVersion.recipe_id == canonical_recipe_id)
         .order_by(RecipeVersion.created_at)
         .all()
     )
@@ -457,6 +455,7 @@ def create_recipe(
     as a draft — same "everything starts as a draft, publish explicitly when
     ready" rule as fork and research, rather than going instantly live."""
     version = create_manual_recipe(req, db)
+    ensure_recipe_identity(version, db)
     db.add(version)
     audit_admin_action(
         db,
@@ -536,9 +535,9 @@ def reset_recipe_ingredients_to_grams(
     db.refresh(current)
     return {
         **current.to_dict(),
-        "metadata": _recipe_metadata(db, recipe_id, current),
-        "feedback_summary": _feedback_summary(db, recipe_id),
-        "like_count": _like_count(db, recipe_id),
+        "metadata": _recipe_metadata(db, current.recipe_id, current),
+        "feedback_summary": _feedback_summary(db, current.recipe_id),
+        "like_count": _like_count(db, current.recipe_id),
     }
 
 
@@ -703,6 +702,8 @@ def generate_recipe(
     recipe_id = f"gen-{uuid.uuid4().hex[:8]}"
     version = RecipeVersion(
         recipe_id=recipe_id,
+        public_slug=unique_public_slug(db, result["name"], recipe_id),
+        admin_ref=generate_admin_ref(),
         parent_version_id=None,
         lineage="generated",
         name=result["name"],
@@ -718,6 +719,7 @@ def generate_recipe(
         source="generated",
         is_current_head=True,
     )
+    ensure_recipe_identity(version, db)
     db.add(version)
     audit_admin_action(
         db,

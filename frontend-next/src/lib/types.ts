@@ -55,6 +55,7 @@ export interface Nutrition {
 
 export interface RecipeSummary {
   recipe_id: string;
+  public_slug?: string | null;
   version_id: string;
   name: string;
   category: string | null;
@@ -72,6 +73,8 @@ export interface RecipeSummary {
 /** GET /api/admin/recipes — the unified published+draft dashboard list. */
 export interface AdminRecipeSummary {
   recipe_id: string;
+  public_slug?: string | null;
+  admin_ref?: string | null;
   version_id: string;
   name: string;
   category: string | null;
@@ -89,6 +92,8 @@ export interface AdminRecipeSummary {
 /** GET /api/admin/recipes/trash — soft-deleted recipes awaiting restore/purge. */
 export interface TrashedRecipeSummary {
   recipe_id: string;
+  public_slug?: string | null;
+  admin_ref?: string | null;
   version_id: string;
   name: string;
   category: string | null;
@@ -98,6 +103,7 @@ export interface TrashedRecipeSummary {
 export interface RecipeDetail {
   version_id: string;
   recipe_id: string;
+  public_slug?: string | null;
   parent_version_id: string | null;
   lineage: string;
   name: string;
@@ -209,6 +215,7 @@ export interface LLMUsageResponse {
 
 /** Admin-only shape — adds the research scratchpad, never sent to guests. */
 export interface RecipeResearchDetail extends RecipeDetail {
+  admin_ref?: string | null;
   notes: string | null;
   research_conversation: unknown;
   research_model: string | null;
@@ -312,12 +319,14 @@ export interface RecipeImportPreview {
 }
 
 export interface RecipeImportCommitResult {
-  created: { recipe_id: string; name: string; sheet_name: string | null; row_number: number }[];
+  created: { recipe_id: string; admin_ref?: string | null; name: string; sheet_name: string | null; row_number: number }[];
   skipped: { sheet_name: string | null; row_number: number; name: string; issues: string[] }[];
 }
 
 export interface DraftSummary {
   recipe_id: string;
+  admin_ref?: string | null;
+  public_slug?: string | null;
   version_id: string;
   name: string;
   category: string | null;

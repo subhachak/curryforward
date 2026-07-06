@@ -20,6 +20,8 @@ def upgrade() -> None:
         "recipe_versions",
         sa.Column("version_id", sa.String(), primary_key=True),
         sa.Column("recipe_id", sa.String(), nullable=False),
+        sa.Column("public_slug", sa.String(), nullable=True),
+        sa.Column("admin_ref", sa.String(), nullable=True),
         sa.Column("parent_version_id", sa.String(), sa.ForeignKey("recipe_versions.version_id"), nullable=True),
         sa.Column("lineage", sa.String(), nullable=True),
         sa.Column("name", sa.String(), nullable=False),
@@ -57,6 +59,8 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=True),
     )
     op.create_index("ix_recipe_versions_recipe_id", "recipe_versions", ["recipe_id"])
+    op.create_index("ix_recipe_versions_public_slug", "recipe_versions", ["public_slug"])
+    op.create_index("ix_recipe_versions_admin_ref", "recipe_versions", ["admin_ref"])
 
     op.create_table(
         "recipe_analytics",
@@ -140,4 +144,6 @@ def downgrade() -> None:
     op.drop_table("recipe_feedback")
     op.drop_table("recipe_analytics")
     op.drop_index("ix_recipe_versions_recipe_id", table_name="recipe_versions")
+    op.drop_index("ix_recipe_versions_public_slug", table_name="recipe_versions")
+    op.drop_index("ix_recipe_versions_admin_ref", table_name="recipe_versions")
     op.drop_table("recipe_versions")

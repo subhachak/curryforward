@@ -18,6 +18,31 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _secure_public_url(value: str | None) -> str | None:
+    """Avoid browser mixed-content warnings from imported/researched media.
+
+    Local dev URLs are left alone; public remote media is upgraded from http
+    to https before it reaches the browser.
+    """
+    if not value or not isinstance(value, str):
+        return value
+    lowered = value.lower()
+    if not lowered.startswith("http://"):
+        return value
+    if lowered.startswith(("http://localhost", "http://127.0.0.1", "http://0.0.0.0")):
+        return value
+    return "https://" + value[len("http://"):]
+
+
+def _secure_steps(steps: list[dict] | None) -> list[dict]:
+    result = []
+    for step in steps or []:
+        next_step = dict(step)
+        next_step["image_url"] = _secure_public_url(next_step.get("image_url"))
+        result.append(next_step)
+    return result
+
+
 class RecipeVersion(Base):
     """
     Each row is one version. While `status == "draft"` a row is mutated in
@@ -29,6 +54,8 @@ class RecipeVersion(Base):
 
     version_id = Column(String, primary_key=True, default=_uid)
     recipe_id = Column(String, index=True, nullable=False)
+    public_slug = Column(String, index=True, nullable=True)
+    admin_ref = Column(String, index=True, nullable=True)
     parent_version_id = Column(String, ForeignKey("recipe_versions.version_id"), nullable=True)
     lineage = Column(String, default="seed")  # seed | edit | fork | generated | user_customized | researched
 
@@ -92,16 +119,17 @@ class RecipeVersion(Base):
         return {
             "version_id": self.version_id,
             "recipe_id": self.recipe_id,
+            "public_slug": self.public_slug,
             "parent_version_id": self.parent_version_id,
             "lineage": self.lineage,
             "name": self.name,
             "category": self.category,
             "cuisine_tags": self.cuisine_tags or [],
-            "hero_image_url": self.hero_image_url,
+            "hero_image_url": _secure_public_url(self.hero_image_url),
             "base_servings": {"amount": self.base_servings_amount, "unit": self.base_servings_unit},
             "serving_size": {"amount": self.serving_size_amount, "unit": self.serving_size_unit},
             "components": self.components or [],
-            "steps": self.steps or [],
+            "steps": _secure_steps(self.steps),
             "nutrition": self.nutrition or {},
             "intro": self.intro,
             "history": self.history,
@@ -122,6 +150,7 @@ class RecipeVersion(Base):
         """Admin-only shape for the research workspace — adds notes and draft metadata."""
         return {
             **self.to_dict(),
+            "admin_ref": self.admin_ref,
             "notes": self.notes,
             "research_conversation": self.research_conversation or {"messages": []},
             "research_model": self.research_model,

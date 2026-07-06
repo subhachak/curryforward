@@ -18,16 +18,17 @@ import uuid
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from openpyxl import load_workbook
 from pydantic import BaseModel, Field
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from ..auth import require_admin
 from ..db import get_db
 from ..llm_client import is_litellm_configured, is_model_available, litellm_completion
-from ..models import AdminAuditLog, LLMUsageLog, RecipeAnalytics, RecipeFeedback, RecipeVersion
+from ..models import AdminAuditLog, LLMUsageLog, RecipeAnalytics, RecipeFeedback, RecipeVersion, _secure_public_url
 from ..nutrition import compute_nutrition, estimated_yield_grams
 from ..services.audit import audit_admin_action
 from ..services.ingredient_canonical import normalize_components_to_grams
+from ..services.recipe_identity import current_head_identity_query, ensure_recipe_identity, generate_admin_ref
 from ..services.llm_settings import available_models, get_llm_settings, resolve_task_model, set_llm_setting
 from ..services.llm_usage import record_llm_usage
 from ..services.recipe_versions import fork_recipe_version
@@ -736,6 +737,7 @@ def commit_recipe_import(
         yield_grams = estimated_yield_grams(components)
         recipe = RecipeVersion(
             recipe_id=f"import-{uuid.uuid4().hex[:8]}",
+            admin_ref=generate_admin_ref(),
             parent_version_id=None,
             lineage="imported",
             name=row.name,
@@ -763,9 +765,11 @@ def commit_recipe_import(
             ),
             research_conversation={"messages": []},
         )
+        ensure_recipe_identity(recipe, db)
         db.add(recipe)
         created.append({
             "recipe_id": recipe.recipe_id,
+            "admin_ref": recipe.admin_ref,
             "name": recipe.name,
             "sheet_name": row.sheet_name,
             "row_number": row.row_number,
@@ -805,12 +809,14 @@ def list_all_recipes(db: Session = Depends(get_db), role: str = Depends(require_
         )
         result.append({
             "recipe_id": r.recipe_id,
+            "public_slug": r.public_slug,
+            "admin_ref": r.admin_ref,
             "version_id": r.version_id,
             "name": r.name,
             "category": r.category,
             "status": r.status or "published",
             "lineage": r.lineage,
-            "hero_image_url": r.hero_image_url,
+            "hero_image_url": _secure_public_url(r.hero_image_url),
             "intro": r.intro,
             "first_published_at": first_published_at.isoformat() if first_published_at else None,
             "updated_at": r.updated_at.isoformat() if r.updated_at else None,
@@ -900,17 +906,13 @@ def create_edit_draft(
     keep both recipes.
     """
     current = (
-        db.query(RecipeVersion)
-        .filter(
-            RecipeVersion.recipe_id == recipe_id,
-            RecipeVersion.is_current_head == True,  # noqa: E712
-            RecipeVersion.deleted_at.is_(None),
-        )
+        current_head_identity_query(db, recipe_id)
         .first()
     )
     if not current:
         raise HTTPException(404, "Recipe not found")
     if (current.status or "published") == "draft":
+        ensure_recipe_identity(current, db)
         audit_admin_action(
             db,
             action="draft_opened",
@@ -939,6 +941,7 @@ def create_edit_draft(
         .first()
     )
     if existing:
+        ensure_recipe_identity(existing, db)
         audit_admin_action(
             db,
             action="edit_draft_opened",
@@ -957,6 +960,7 @@ def create_edit_draft(
     draft = fork_recipe_version(current)
     draft.name = f"{current.name} (draft edit)"
     draft.source = "revision_draft"
+    ensure_recipe_identity(draft, db)
     db.add(draft)
     audit_admin_action(
         db,
@@ -986,6 +990,8 @@ def list_trash(db: Session = Depends(get_db), role: str = Depends(require_admin)
     return [
         {
             "recipe_id": r.recipe_id,
+            "admin_ref": r.admin_ref,
+            "public_slug": r.public_slug,
             "version_id": r.version_id,
             "name": r.name,
             "category": r.category,
@@ -1054,7 +1060,14 @@ def restore_recipe(
     "draft", since delete is gated to drafts-only)."""
     row = (
         db.query(RecipeVersion)
-        .filter(RecipeVersion.recipe_id == recipe_id, RecipeVersion.is_current_head == True)  # noqa: E712
+        .filter(
+            or_(
+                RecipeVersion.recipe_id == recipe_id,
+                RecipeVersion.public_slug == recipe_id,
+                RecipeVersion.admin_ref == recipe_id,
+            ),
+            RecipeVersion.is_current_head == True,  # noqa: E712
+        )
         .first()
     )
     if not row:
@@ -1080,13 +1093,21 @@ def purge_recipe(
     publish-then-unpublish-then-delete gate on a live recipe."""
     current = (
         db.query(RecipeVersion)
-        .filter(RecipeVersion.recipe_id == recipe_id, RecipeVersion.is_current_head == True)  # noqa: E712
+        .filter(
+            or_(
+                RecipeVersion.recipe_id == recipe_id,
+                RecipeVersion.public_slug == recipe_id,
+                RecipeVersion.admin_ref == recipe_id,
+            ),
+            RecipeVersion.is_current_head == True,  # noqa: E712
+        )
         .first()
     )
     if not current:
         raise HTTPException(404, "Recipe not found")
     if current.deleted_at is None:
         raise HTTPException(400, "Only trashed recipes can be permanently purged.")
+    recipe_id = current.recipe_id
     versions = db.query(RecipeVersion).filter(RecipeVersion.recipe_id == recipe_id).all()
     for v in versions:
         db.delete(v)

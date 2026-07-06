@@ -13,8 +13,9 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth import router as auth_router
@@ -68,8 +69,44 @@ def health_check():
 # frontend-next/out — same origin as the API, so the session cookie and
 # relative /api fetches both work with zero extra config.
 FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend-next" / "out"
-if FRONTEND_DIR.exists():
-    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def serve_frontend(full_path: str = ""):
+    """Serve the static-exported Next frontend, with root-level recipe slugs.
+
+    StaticFiles(html=True) can serve exported routes like /recipe/ but it
+    cannot turn /death-by-chocolate-cake into the recipe shell. This handler
+    serves real exported files first, then falls back to recipe/index.html for
+    extensionless unknown paths so pretty recipe URLs work in production.
+    """
+    if not FRONTEND_DIR.exists():
+        raise HTTPException(404, "Frontend build not found")
+
+    requested = (FRONTEND_DIR / full_path).resolve()
+    frontend_root = FRONTEND_DIR.resolve()
+    if not str(requested).startswith(str(frontend_root)):
+        raise HTTPException(404, "Not found")
+
+    if requested.is_dir():
+        requested = requested / "index.html"
+    elif not requested.exists():
+        html_sibling = requested.with_suffix(".html")
+        if html_sibling.exists():
+            requested = html_sibling
+
+    if requested.exists() and requested.is_file():
+        return FileResponse(requested)
+
+    # Missing assets and nested paths should stay missing; one-segment
+    # extensionless paths can be recipe slugs and should render the
+    # client-side recipe page.
+    if Path(full_path).suffix or "/" in full_path.strip("/"):
+        raise HTTPException(404, "Not found")
+    recipe_page = FRONTEND_DIR / "recipe" / "index.html"
+    if recipe_page.exists():
+        return FileResponse(recipe_page)
+    raise HTTPException(404, "Not found")
 
 
 @app.on_event("startup")

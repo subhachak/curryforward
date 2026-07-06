@@ -9,6 +9,7 @@ from ..models import RecipeVersion
 from ..nutrition import compute_nutrition, estimated_yield_grams
 from ..schemas import RecipeUpsertRequest
 from .ingredient_canonical import normalize_components_to_grams
+from .recipe_identity import current_head_identity_query, ensure_recipe_identity, generate_admin_ref
 
 
 RICH_CONTENT_FIELDS = [
@@ -46,8 +47,9 @@ def _copy_rich_fields(source: RecipeVersion, target_kwargs: dict[str, Any]) -> N
 def create_manual_recipe(req: RecipeUpsertRequest, db: Session | None = None) -> RecipeVersion:
     components = normalize_components_to_grams(req.normalized_components())
     yield_grams = estimated_yield_grams(components)
-    return RecipeVersion(
+    version = RecipeVersion(
         recipe_id=f"manual-{uuid.uuid4().hex[:8]}",
+        admin_ref=generate_admin_ref(),
         parent_version_id=None,
         lineage="manual",
         name=req.name,
@@ -65,6 +67,8 @@ def create_manual_recipe(req: RecipeUpsertRequest, db: Session | None = None) ->
         source="manual",
         is_current_head=True,
     )
+    ensure_recipe_identity(version, db)
+    return version
 
 
 def create_chat_edit_version(current: RecipeVersion, result: dict, db: Session | None = None) -> RecipeVersion:
@@ -72,6 +76,8 @@ def create_chat_edit_version(current: RecipeVersion, result: dict, db: Session |
     yield_grams = estimated_yield_grams(components)
     kwargs: dict[str, Any] = {
         "recipe_id": current.recipe_id,
+        "public_slug": current.public_slug,
+        "admin_ref": generate_admin_ref(),
         "parent_version_id": current.version_id,
         "lineage": "edit",
         "name": current.name,
@@ -91,13 +97,16 @@ def create_chat_edit_version(current: RecipeVersion, result: dict, db: Session |
     }
     _copy_rich_fields(current, kwargs)
     current.is_current_head = False
-    return RecipeVersion(**kwargs)
+    version = RecipeVersion(**kwargs)
+    ensure_recipe_identity(version, db)
+    return version
 
 
 def fork_recipe_version(current: RecipeVersion) -> RecipeVersion:
     yield_grams = estimated_yield_grams(current.components or [])
     kwargs: dict[str, Any] = {
         "recipe_id": f"{current.recipe_id}-fork-{uuid.uuid4().hex[:6]}",
+        "admin_ref": generate_admin_ref(),
         "parent_version_id": current.version_id,
         "lineage": "fork",
         "name": f"{current.name} (copy)",
@@ -120,8 +129,4 @@ def fork_recipe_version(current: RecipeVersion) -> RecipeVersion:
 
 
 def current_head_query(db: Session, recipe_id: str):
-    return db.query(RecipeVersion).filter(
-        RecipeVersion.recipe_id == recipe_id,
-        RecipeVersion.is_current_head == True,  # noqa: E712
-        RecipeVersion.deleted_at.is_(None),
-    )
+    return current_head_identity_query(db, recipe_id)

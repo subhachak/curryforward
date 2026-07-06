@@ -64,6 +64,7 @@ class RecipeDetailResponse(BaseModel):
 
     version_id: str
     recipe_id: str
+    public_slug: str | None = None
     parent_version_id: str | None
     lineage: str
     name: str
@@ -120,6 +121,7 @@ class RecipeFeedbackListResponse(BaseModel):
 
 
 class RecipeResearchResponse(RecipeDetailResponse):
+    admin_ref: str | None = None
     notes: str | None
     research_conversation: dict[str, Any]
     research_model: str | None
@@ -131,6 +133,7 @@ class RecipeResearchResponse(RecipeDetailResponse):
 
 class RecipeSummaryResponse(BaseModel):
     recipe_id: str
+    public_slug: str | None = None
     version_id: str
     name: str
     category: str | None

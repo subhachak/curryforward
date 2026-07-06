@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/icons";
 import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
+import { adminRecipeHref, publicRecipeHref } from "@/lib/recipeLinks";
 import type { AdminRecipeSummary } from "@/lib/types";
 
 interface RecipeManagementTableProps {
@@ -71,7 +72,7 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
       const result = await api.createEditDraft(recipe.recipe_id);
       if (result.note) push(result.note, result.created ? "success" : "info");
       onChanged();
-      router.push(`/recipe/research?id=${encodeURIComponent(result.draft.recipe_id)}`);
+      router.push(adminRecipeHref(result.draft));
     } catch (e) {
       push(e instanceof ApiError ? e.message : "Edit failed", "error");
     } finally {
@@ -191,10 +192,7 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
         </div>
         <div className="space-y-2">
           {recipes.map((r) => {
-            const href =
-              r.status === "published"
-                ? `/recipe?id=${encodeURIComponent(r.recipe_id)}`
-                : `/recipe/research?id=${encodeURIComponent(r.recipe_id)}`;
+            const href = r.status === "published" ? publicRecipeHref(r) : adminRecipeHref(r);
             const busy = pendingId === r.recipe_id;
             const menuItems: MenuItem[] = [
               {

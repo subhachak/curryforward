@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { NutritionCard } from "@/components/NutritionCard";
 import { RecipeContent } from "@/components/RecipeContent";
 import { RecipeFeedbackPanel } from "@/components/RecipeFeedbackPanel";
@@ -25,8 +25,10 @@ function RecipeDetailInner() {
   const { isAdmin } = useAuth();
   const { push } = useToast();
   const { setOpen, setTarget } = useAssistant();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const recipeId = searchParams.get("id");
+  const pathSlug = pathname && pathname !== "/recipe" && pathname !== "/recipe/" ? pathname.replace(/^\/+|\/+$/g, "") : null;
+  const recipeLookup = searchParams.get("slug") || searchParams.get("id") || pathSlug;
 
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [history, setHistory] = useState<RecipeDetail[]>([]);
@@ -38,12 +40,12 @@ function RecipeDetailInner() {
     setLoading(true);
     setError(null);
     try {
-      if (recipeId) {
+      if (recipeLookup) {
         // Version history is an admin/power-user detail — skip fetching it
         // for guests so normal browsing doesn't pay for or show it.
         const [r, h] = await Promise.all([
-          api.getRecipe(recipeId),
-          isAdmin ? api.getHistory(recipeId) : Promise.resolve([]),
+          api.getRecipe(recipeLookup),
+          isAdmin ? api.getHistory(recipeLookup) : Promise.resolve([]),
         ]);
         setRecipe(r);
         setHistory(h);
@@ -55,7 +57,7 @@ function RecipeDetailInner() {
     } finally {
       setLoading(false);
     }
-  }, [recipeId, isAdmin]);
+  }, [recipeLookup, isAdmin]);
 
   useEffect(() => {
     // Intentional fetch-on-mount/on-id-change; load() sets loading state
