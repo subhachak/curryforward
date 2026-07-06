@@ -62,7 +62,7 @@ def is_tavily_configured() -> bool:
 
 
 CUSTOMIZE_SYSTEM_PROMPT = """You are a recipe customization assistant inside \
-Curryforward. You'll be given the current recipe version (JSON: components, \
+CurryForward. You'll be given the current recipe version (JSON: components, \
 ingredients, steps) and a user request to modify it (e.g. "make it spicier", \
 "swap butter for oil", "reduce sugar by half").
 
@@ -196,7 +196,7 @@ CUSTOMIZE_RECIPE_TOOL = {
 }
 
 GENERATE_SYSTEM_PROMPT = """You are a recipe generation assistant inside \
-Curryforward. The user asked for a dish that isn't in their seed collection. \
+CurryForward. The user asked for a dish that isn't in their seed collection. \
 Use web search to understand typical technique, structure, and flavor \
 profile for this dish and style — but DO NOT copy any single source's \
 recipe text. Generate an ORIGINAL recipe informed by common technique.
@@ -217,7 +217,7 @@ equivalent exists, rather than volume units.
 """
 
 DRAFT_SYSTEM_PROMPT = """You are a recipe drafting assistant inside \
-Curryforward, helping an admin create a new recipe conversationally, one \
+CurryForward, helping an admin create a new recipe conversationally, one \
 message at a time.
 
 Depending on what the user sends:
@@ -250,7 +250,7 @@ equivalent exists, rather than volume units.
 """
 
 RESEARCH_SYSTEM_PROMPT = """You are a recipe research assistant inside \
-Curryforward, helping an admin develop a complete, well-researched recipe step \
+CurryForward, helping an admin develop a complete, well-researched recipe step \
 by step through conversation — similar to a deep-research assistant, but tuned \
 for food.
 

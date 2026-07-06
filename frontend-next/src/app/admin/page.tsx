@@ -9,7 +9,7 @@ import { RecipeManagementTable } from "@/components/admin/RecipeManagementTable"
 import { TrashPanel } from "@/components/admin/TrashPanel";
 import { Card, CardBody } from "@/components/ui/Card";
 import { IconButton } from "@/components/ui/IconButton";
-import { CheckIcon, LogOutIcon, PlusIcon, SendIcon, XIcon } from "@/components/ui/icons";
+import { CheckIcon, LogOutIcon, PlusIcon, SendIcon, UploadIcon, XIcon } from "@/components/ui/icons";
 import { Input } from "@/components/ui/Input";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { useAuth } from "@/context/AuthContext";
@@ -22,6 +22,8 @@ import type {
   LLMSettingsResponse,
   LLMUsageResponse,
   PendingRecipeFeedback,
+  RecipeImportPreview,
+  RecipeImportRow,
   TrashedRecipeSummary,
 } from "@/lib/types";
 
@@ -30,7 +32,7 @@ type RecipeStatusFilter = "all" | "published" | "draft";
 
 const tabs: { id: WorkspaceTab; label: string }[] = [
   { id: "recipes", label: "All recipes" },
-  { id: "research", label: "Research new recipe" },
+  { id: "research", label: "New Recipe" },
   { id: "feedback", label: "Feedback" },
   { id: "trash", label: "Trash" },
   { id: "analytics", label: "Analytics" },
@@ -56,6 +58,9 @@ export default function AdminPage() {
   const [researchPrompt, setResearchPrompt] = useState("");
   const [researchModel, setResearchModel] = useState<string | null>(null);
   const [startingResearch, setStartingResearch] = useState(false);
+  const [importPreview, setImportPreview] = useState<RecipeImportPreview | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [previewingImport, setPreviewingImport] = useState(false);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("recipes");
   const [recipeSearch, setRecipeSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<RecipeStatusFilter>("all");
@@ -130,6 +135,32 @@ export default function AdminPage() {
     } catch (e) {
       push(e instanceof ApiError ? e.message : "Couldn't start research", "error");
       setStartingResearch(false);
+    }
+  }
+
+  async function handleImportPreview(file: File) {
+    setPreviewingImport(true);
+    try {
+      setImportPreview(await api.previewRecipeImport(file, researchModel ?? undefined));
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Import preview failed", "error");
+    } finally {
+      setPreviewingImport(false);
+    }
+  }
+
+  async function handleImportCommit(rows: RecipeImportRow[]) {
+    setImporting(true);
+    try {
+      const result = await api.commitRecipeImport(rows);
+      push(`Imported ${result.created.length} draft recipe${result.created.length === 1 ? "" : "s"}`, "success");
+      setImportPreview(null);
+      await handleRecipesChanged();
+      setActiveTab("recipes");
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Import failed", "error");
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -241,13 +272,19 @@ export default function AdminPage() {
       )}
 
       {activeTab === "research" && (
-        <ResearchTab
+        <NewRecipeTab
           prompt={researchPrompt}
           model={researchModel}
           starting={startingResearch}
+          preview={importPreview}
+          previewingImport={previewingImport}
+          importing={importing}
           onPromptChange={setResearchPrompt}
           onModelChange={setResearchModel}
           onSubmit={handleStartResearch}
+          onPreview={handleImportPreview}
+          onImport={handleImportCommit}
+          onClear={() => setImportPreview(null)}
         />
       )}
 
@@ -362,7 +399,7 @@ function RecipesTab({
                 </option>
               ))}
             </select>
-            <IconButton label="Research new recipe" icon={<PlusIcon />} size="md" onClick={onStartResearch} />
+            <IconButton label="New recipe" icon={<PlusIcon />} size="md" onClick={onStartResearch} />
           </div>
           <div className="mt-3 text-sm text-muted">
             Showing {recipes.length} of {totalRecipes} recipes.
@@ -374,54 +411,185 @@ function RecipesTab({
   );
 }
 
-function ResearchTab({
+function NewRecipeTab({
   prompt,
   model,
   starting,
+  preview,
+  previewingImport,
+  importing,
   onPromptChange,
   onModelChange,
   onSubmit,
+  onPreview,
+  onImport,
+  onClear,
 }: {
   prompt: string;
   model: string | null;
   starting: boolean;
+  preview: RecipeImportPreview | null;
+  previewingImport: boolean;
+  importing: boolean;
   onPromptChange: (value: string) => void;
   onModelChange: (value: string | null) => void;
   onSubmit: (event: FormEvent) => void;
+  onPreview: (file: File) => void;
+  onImport: (rows: RecipeImportRow[]) => void;
+  onClear: () => void;
 }) {
   return (
-    <Card>
-      <CardBody className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-ink">Research a new recipe</h2>
-          <p className="text-sm text-muted">
-            Start with a dish name, a rough idea, or a pasted recipe draft. The agentic editor opens after the draft is
-            created.
-          </p>
-        </div>
-        <form onSubmit={onSubmit} className="space-y-3">
-          <CopyAssistField
-            fieldLabel="new recipe research prompt"
-            value={prompt}
-            onChange={onPromptChange}
-            placeholder="A dish name, a longer description, or paste a draft recipe to refine..."
-            multiline
-            rows={8}
-          />
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <ModelPicker value={model} onChange={onModelChange} />
-            <IconButton
-              type="submit"
-              label="Start research"
-              icon={<SendIcon />}
-              size="md"
-              loading={starting}
-              disabled={!prompt.trim()}
-            />
+    <div className="space-y-4">
+      <Card>
+        <CardBody className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-ink">Create a new recipe</h2>
+            <p className="text-sm text-muted">
+              Start from a prompt, pasted draft, or Excel import. Everything opens as a draft for admin review.
+            </p>
           </div>
-        </form>
-      </CardBody>
-    </Card>
+          <form onSubmit={onSubmit} className="space-y-3">
+            <CopyAssistField
+              fieldLabel="new recipe research prompt"
+              value={prompt}
+              onChange={onPromptChange}
+              placeholder="A dish name, a longer description, or paste a draft recipe to refine..."
+              multiline
+              rows={8}
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <ModelPicker value={model} onChange={onModelChange} />
+              <IconButton
+                type="submit"
+                label="Start new draft"
+                icon={<SendIcon />}
+                size="md"
+                loading={starting}
+                disabled={!prompt.trim()}
+              />
+            </div>
+          </form>
+        </CardBody>
+      </Card>
+
+      <ImportTab
+        preview={preview}
+        previewing={previewingImport}
+        importing={importing}
+        onPreview={onPreview}
+        onImport={onImport}
+        onClear={onClear}
+      />
+    </div>
+  );
+}
+
+function ImportTab({
+  preview,
+  previewing,
+  importing,
+  onPreview,
+  onImport,
+  onClear,
+}: {
+  preview: RecipeImportPreview | null;
+  previewing: boolean;
+  importing: boolean;
+  onPreview: (file: File) => void;
+  onImport: (rows: RecipeImportRow[]) => void;
+  onClear: () => void;
+}) {
+  const validRows = preview?.rows.filter((row) => row.issues.length === 0) ?? [];
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardBody className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-ink">Import from Excel</h2>
+            <p className="text-sm text-muted">
+              Upload a workbook with one or more tabs. The selected model maps each sheet into recipe drafts.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-muted">
+              <UploadIcon className="h-4 w-4" />
+              Choose workbook
+              <input
+                type="file"
+                accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) onPreview(file);
+                }}
+              />
+            </label>
+            {previewing && <span className="text-sm text-muted">Mapping workbook...</span>}
+            {preview && <IconButton label="Clear import preview" icon={<XIcon />} onClick={onClear} />}
+          </div>
+          <div className="rounded-md border border-border bg-surface-muted p-3 text-xs text-muted">
+            Each tab should have a header row. Works best with columns like name, category, cuisine_tags, servings,
+            ingredients, steps, intro, history, tips, watch_outs, and source_url. Messy column names are okay.
+          </div>
+        </CardBody>
+      </Card>
+
+      {preview && (
+        <Card>
+          <CardBody className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="font-semibold text-ink">Preview</div>
+                <div className="text-sm text-muted">
+                  {preview.valid_count} ready · {preview.issue_count} need cleanup ·{" "}
+                  {preview.file_type.toUpperCase()} ·{" "}
+                  {preview.source === "ai" ? `AI mapped with ${preview.model}` : "fallback parser used"}
+                </div>
+                {preview.ai_error && <div className="mt-1 text-xs text-warning">{preview.ai_error}</div>}
+              </div>
+              <IconButton
+                label="Import valid rows as drafts"
+                icon={<CheckIcon />}
+                loading={importing}
+                disabled={validRows.length === 0}
+                onClick={() => onImport(preview.rows)}
+              />
+            </div>
+            <div className="space-y-2">
+              {preview.rows.slice(0, 30).map((row) => (
+                <div
+                  key={row.row_number}
+                  className={`rounded-md border p-3 ${
+                    row.issues.length ? "border-warning/50 bg-warning-soft/30" : "border-border bg-surface"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-foreground">
+                        {row.sheet_name ? `${row.sheet_name} · ` : ""}Row {row.row_number}: {row.name}
+                      </div>
+                      <div className="mt-1 text-xs text-muted">
+                        {row.category || "No category"} · {row.components[0]?.ingredients.length ?? 0} ingredients ·{" "}
+                        {row.steps.length} steps
+                      </div>
+                    </div>
+                    {row.issues.length > 0 && (
+                      <div className="text-xs font-medium text-warning">{row.issues.join(", ")}</div>
+                    )}
+                  </div>
+                  {row.intro && <p className="mt-2 line-clamp-2 text-sm text-muted">{row.intro}</p>}
+                </div>
+              ))}
+            </div>
+            {preview.rows.length > 30 && (
+              <div className="text-sm text-muted">Showing first 30 rows. Import still includes all valid rows.</div>
+            )}
+          </CardBody>
+        </Card>
+      )}
+    </div>
   );
 }
 

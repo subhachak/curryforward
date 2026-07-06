@@ -93,6 +93,20 @@ function MobileMenu() {
           >
             All recipes
           </Link>
+          <Link
+            href="/#bengali-sweets"
+            className="block rounded-md px-2 py-2 text-sm font-medium text-foreground hover:bg-surface-muted"
+            onClick={() => setOpen(false)}
+          >
+            Bengali Sweets
+          </Link>
+          <Link
+            href="/#hard-to-find"
+            className="block rounded-md px-2 py-2 text-sm font-medium text-foreground hover:bg-surface-muted"
+            onClick={() => setOpen(false)}
+          >
+            Classics
+          </Link>
           {isAdmin && (
             <Link
               href="/admin"
@@ -138,6 +152,12 @@ export function NavBar() {
             Home
           </Link>
           <RecipesMenu />
+          <Link href="/#bengali-sweets" className="text-sm font-medium text-foreground hover:text-brand-hover">
+            Bengali Sweets
+          </Link>
+          <Link href="/#hard-to-find" className="text-sm font-medium text-foreground hover:text-brand-hover">
+            Classics
+          </Link>
           {isAdmin && (
             <Link href="/admin" className="text-sm font-medium text-foreground hover:text-brand-hover">
               Workspace

@@ -27,7 +27,7 @@ from .routers.uploads import router as uploads_router, UPLOADS_DIR
 from .seed_loader import load_seed_data
 from .services.security import RateLimitMiddleware, SecurityHeadersMiddleware
 
-app = FastAPI(title="Curryforward")
+app = FastAPI(title="CurryForward")
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)

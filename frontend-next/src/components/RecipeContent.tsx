@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import type { Ingredient, IngredientUnitOption, RecipeDetail } from "@/lib/types";
 
 /**
- * The recipe body — everything between the page header and the sidebar.
+ * The recipe body - everything between the page header and the sidebar.
  * Shared between the real public recipe page and the research workspace's
  * "Preview" mode, so what an admin sees while researching is exactly what
  * guests will see once published (same component, not just similar markup).
@@ -29,28 +29,6 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
 
   return (
     <div className="space-y-6">
-      {recipe.hero_image_url ? (
-        // Static-export app, no next/image optimization pipeline available.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={recipe.hero_image_url}
-          alt=""
-          className="h-64 w-full rounded-lg border border-border object-cover sm:h-80"
-        />
-      ) : (
-        <div
-          className="flex h-40 w-full items-center justify-center rounded-lg border border-border bg-gradient-to-br from-brand-soft to-accent-soft"
-          aria-hidden
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/mark-cloche-forward.svg" alt="" className="h-20 w-auto opacity-80" />
-        </div>
-      )}
-
-      {recipe.intro && (
-        <p className="text-lg text-muted">{recipe.intro}</p>
-      )}
-
       {(recipe.prep_time_minutes ||
         recipe.cook_time_minutes ||
         recipe.serving_size.amount ||
@@ -70,20 +48,20 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
         </div>
       )}
 
-      <Card>
+      <Card className="border-[#FFD2AE] bg-[#FFF8F1]">
         <CardBody>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="font-semibold">Recipe scale</div>
-              <div className="text-xs text-muted">
+              <div className="font-semibold text-[#2E1B14]">Recipe scale</div>
+              <div className="text-xs text-[#5A4038]">
                 {recipe.base_servings.amount
                   ? `Original yield: ${recipe.base_servings.amount} ${recipe.base_servings.unit}`
                   : "Original yield not specified"}
-                {multiplierLabel ? ` · scaled to ${multiplierLabel}` : ""}
+                {multiplierLabel ? ` - scaled to ${multiplierLabel}` : ""}
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <label htmlFor="recipe-multiplier" className="text-xs font-medium text-muted">
+              <label htmlFor="recipe-multiplier" className="text-xs font-medium text-[#5A4038]">
                 Multiplier
               </label>
               <input
@@ -94,7 +72,7 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
                 step="0.25"
                 value={multiplier}
                 onChange={(e) => setMultiplier(Number(e.target.value) || 1)}
-                className="h-9 w-24 rounded-md border border-border bg-surface px-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40"
+                className="h-9 w-24 rounded-md border border-[#FFD2AE] bg-white px-2 text-sm focus:border-[#FF6B00] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30"
               />
             </div>
           </div>
@@ -102,27 +80,42 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
       </Card>
 
       {recipe.history && (
-        <Card>
+        <Card className="border-[#FFD2AE] bg-white">
           <CardBody>
-            <div className="mb-2 font-semibold">History &amp; facts</div>
-            <p className="whitespace-pre-wrap text-sm text-foreground">{recipe.history}</p>
+            <div className="mb-2 font-semibold text-[#2E1B14]">Overview</div>
+            <p className="whitespace-pre-wrap text-sm leading-6 text-[#5A4038]">{recipe.history}</p>
           </CardBody>
         </Card>
       )}
 
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-2xl font-bold text-[#2E1B14]">Ingredients</h2>
+          <span className="rounded-full bg-[#DFF3E6] px-3 py-1 text-xs font-semibold text-[#2E9B57]">
+            Checklist
+          </span>
+        </div>
       <div className="grid gap-4 sm:grid-cols-2">
         {recipe.components.map((c) => (
-          <Card key={c.component_name}>
+          <Card key={c.component_name} className="border-[#BDE8CB] bg-white">
             <CardBody>
-              <div className="mb-2 flex items-center gap-1.5 font-semibold">
+              <div className="mb-3 flex items-center gap-1.5 font-semibold text-[#145C32]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/brand/icon-ingredients-leaf.svg" alt="" aria-hidden className="h-4 w-4" />
                 {c.component_name}
               </div>
               <ul className="space-y-1 text-sm">
                 {c.ingredients.map((ing, idx) => (
-                  <li key={ing.ingredient_id ?? idx} className="flex items-center justify-between gap-2">
-                    <span>{formatIngredient(ing, selectedUnits[`${c.component_name}-${idx}`] ?? 0, multiplier)} — {ing.name}</span>
+                  <li key={ing.ingredient_id ?? idx} className="flex items-center justify-between gap-2 rounded-md px-1 py-1 hover:bg-[#DFF3E6]/45">
+                    <label className="flex min-w-0 items-center gap-2">
+                      <input type="checkbox" className="h-4 w-4 rounded border-[#BDE8CB] accent-[#2E9B57]" />
+                      <span className="min-w-0">
+                        <span className="font-semibold text-[#2E1B14]">
+                          {formatIngredient(ing, selectedUnits[`${c.component_name}-${idx}`] ?? 0, multiplier)}
+                        </span>{" "}
+                        <span className="text-[#5A4038]">{ing.name}</span>
+                      </span>
+                    </label>
                     {unitChoices(ing).length > 1 && (
                       <select
                         aria-label={`Unit for ${ing.name}`}
@@ -133,7 +126,7 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
                             [`${c.component_name}-${idx}`]: Number(e.target.value),
                           }))
                         }
-                        className="h-8 max-w-28 rounded-md border border-border bg-surface px-2 text-xs"
+                        className="h-8 max-w-28 rounded-md border border-[#BDE8CB] bg-white px-2 text-xs"
                       >
                         {unitChoices(ing).map((option, optionIdx) => (
                           <option key={`${option.unit}-${optionIdx}`} value={optionIdx}>
@@ -149,34 +142,53 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
           </Card>
         ))}
       </div>
+      </section>
 
-      <Card>
-        <CardBody>
-          <div className="mb-2 font-semibold">Steps</div>
-          <ol className="list-inside list-decimal space-y-3 text-sm">
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-2xl font-bold text-[#2E1B14]">Instructions</h2>
+          <button
+            type="button"
+            className="rounded-md bg-[#FF6B00] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#E6462D]"
+          >
+            Start cook mode
+          </button>
+        </div>
+          <ol className="space-y-3 text-sm">
             {recipe.steps.map((s, idx) => (
-              <li key={idx}>
-                {s.instruction}
-                {s.component_ref && <span className="ml-1 text-xs text-muted">({s.component_ref})</span>}
+              <li key={idx} className="rounded-md border border-[#FFD2AE] bg-white p-4">
+                <div className="flex gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FF6B00] text-sm font-bold text-white">
+                    {idx + 1}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-[#2E1B14]">Step {idx + 1}</div>
+                    <p className="mt-1 leading-6 text-[#5A4038]">{s.instruction}</p>
+                    {s.component_ref && (
+                      <span className="mt-2 inline-flex rounded-full bg-[#FFF0C1] px-2 py-0.5 text-xs font-semibold text-[#7A5200]">
+                        {s.component_ref}
+                      </span>
+                    )}
+                  </div>
+                </div>
                 {s.image_url && (
                   // Static-export app, no next/image optimization pipeline available.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={s.image_url}
                     alt=""
-                    className="mt-2 max-h-64 rounded-lg border border-border object-cover"
+                    className="mt-3 max-h-64 rounded-lg border border-[#FFD2AE] object-cover"
                   />
                 )}
               </li>
             ))}
           </ol>
-        </CardBody>
-      </Card>
+      </section>
 
       {suggestedUtensils.length > 0 && (
-        <Card>
+        <Card className="border-[#FFD2AE] bg-white">
           <CardBody>
-            <div className="mb-2 font-semibold">Suggested utensils</div>
+            <div className="mb-2 font-semibold text-[#2E1B14]">Suggested utensils</div>
             <ul className="list-inside list-disc space-y-1 text-sm">
               {suggestedUtensils.map((item, idx) => (
                 <li key={idx}>{item}</li>
@@ -187,14 +199,14 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
       )}
 
       {panConversions.length > 0 && (
-        <Card>
+        <Card className="border-[#FFD2AE] bg-white">
           <CardBody>
-            <div className="mb-2 font-semibold">Baking pan conversion</div>
+            <div className="mb-2 font-semibold text-[#2E1B14]">Baking pan conversion</div>
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <select
                 value={selectedPanIndex}
                 onChange={(e) => setSelectedPanIndex(Number(e.target.value))}
-                className="h-9 rounded-md border border-border bg-surface px-2 text-sm"
+                className="h-9 rounded-md border border-[#FFD2AE] bg-white px-2 text-sm"
               >
                 {panConversions.map((conversion, idx) => (
                   <option key={idx} value={idx}>
@@ -204,9 +216,9 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
                 ))}
               </select>
               {selectedPan && (
-                <span className="text-foreground">
+                <span className="text-[#2E1B14]">
                   Use {formatPanSide(selectedPan.to_count, selectedPan.to_size)}
-                  {selectedPan.note ? ` · ${selectedPan.note}` : ""}
+                  {selectedPan.note ? ` - ${selectedPan.note}` : ""}
                 </span>
               )}
             </div>
@@ -215,9 +227,9 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
       )}
 
       {recipe.tips.length > 0 && (
-        <Card>
+        <Card className="border-[#FFDD85] bg-[#FFF8F1]">
           <CardBody>
-            <div className="mb-2 font-semibold">Tips &amp; tricks</div>
+            <div className="mb-2 font-semibold text-[#7A5200]">Tips &amp; tricks</div>
             <ul className="list-inside list-disc space-y-1 text-sm">
               {recipe.tips.map((tip, idx) => (
                 <li key={idx}>{tip}</li>
@@ -228,9 +240,9 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
       )}
 
       {recipe.watch_outs.length > 0 && (
-        <Card className="border-warning/40 bg-warning-soft/40">
+        <Card className="border-[#F2B7AD] bg-[#FFE0DA]">
           <CardBody>
-            <div className="mb-2 font-semibold">Things to watch out for</div>
+            <div className="mb-2 font-semibold text-[#E6462D]">Things to watch out for</div>
             <ul className="list-inside list-disc space-y-1 text-sm">
               {recipe.watch_outs.map((item, idx) => (
                 <li key={idx}>{item}</li>

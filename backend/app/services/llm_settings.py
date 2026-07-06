@@ -46,6 +46,11 @@ TASK_DEFAULTS = {
         "default_model": "gemini/gemini-2.5-flash-lite",
         "description": "Cheap admin-only rewrites for individual editable text fields.",
     },
+    "recipe_import": {
+        "label": "Recipe CSV import",
+        "default_model": "gemini/gemini-2.5-flash",
+        "description": "Maps messy spreadsheet rows into draft recipe fields for admin review.",
+    },
     "recipe_wide_edit": {
         "label": "Recipe-wide edit",
         "default_model": "gemini/gemini-2.5-flash",

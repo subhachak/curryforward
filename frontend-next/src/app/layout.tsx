@@ -8,8 +8,8 @@ import { NavBar } from "@/components/NavBar";
 import { AuthFooterControl } from "@/components/AuthFooterControl";
 
 export const metadata: Metadata = {
-  title: "Curryforward",
-  description: "A living recipe collection — browse, customize, and generate recipes through chat.",
+  title: "CurryForward",
+  description: "A living recipe collection - browse, customize, and generate recipes through chat.",
 };
 
 export default function RootLayout({
@@ -29,7 +29,7 @@ export default function RootLayout({
                   {children}
                 </main>
                 <footer className="relative flex items-center justify-center gap-2 border-t border-border py-4 text-center text-xs text-muted">
-                  <span>Curryforward — a living recipe collection</span>
+                  <span>CurryForward - recipes with roots, adapted for today.</span>
                   <span className="absolute right-4">
                     <AuthFooterControl />
                   </span>

@@ -15,6 +15,9 @@ import type {
   RecipeDetail,
   RecipeFeedback,
   RecipeFeedbackList,
+  RecipeImportCommitResult,
+  RecipeImportPreview,
+  RecipeImportRow,
   RecipeResearchDetail,
   ResearchJobSummary,
   RecipeSummary,
@@ -152,6 +155,26 @@ export const api = {
 
   // Admin dashboard — unified recipe management + trash.
   listAllRecipesAdmin: () => apiFetch<AdminRecipeSummary[]>("/admin/recipes"),
+  previewRecipeImport: async (file: File, model?: string): Promise<RecipeImportPreview> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (model) formData.append("model", model);
+    const res = await fetch("/api/admin/recipes/import/preview", {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new ApiError(body.detail || "Import preview failed");
+    }
+    return res.json();
+  },
+  commitRecipeImport: (rows: RecipeImportRow[]) =>
+    apiFetch<RecipeImportCommitResult>("/admin/recipes/import/commit", {
+      method: "POST",
+      body: JSON.stringify({ rows }),
+    }),
   createEditDraft: (recipeId: string) =>
     apiFetch<EditDraftResult>(`/admin/recipes/${recipeId}/edit-draft`, { method: "POST" }),
   listTrash: () => apiFetch<TrashedRecipeSummary[]>("/admin/recipes/trash"),

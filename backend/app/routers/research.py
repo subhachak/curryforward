@@ -693,7 +693,7 @@ def recipe_wide_edit(
         raise HTTPException(400, f"No API key configured for model '{model}' — add it to backend/.env")
 
     system_prompt = (
-        "You are an expert recipe editor inside Curryforward. Apply the admin's "
+        "You are an expert recipe editor inside CurryForward. Apply the admin's "
         "broad instruction to the existing draft recipe. Return ONLY valid JSON "
         "with keys: recipe_patch, changed_fields, review_notes. recipe_patch must "
         "contain only changed fields from this allowlist: "
@@ -781,7 +781,7 @@ def rewrite_recipe_copy(
         raise HTTPException(400, "Text is required")
 
     system_prompt = (
-        "You are a precise recipe copy editor inside Curryforward. Rewrite only "
+        "You are a precise recipe copy editor inside CurryForward. Rewrite only "
         "the requested field into clear, warm, publishable recipe copy. Keep the "
         "same factual meaning. Do not invent facts, ingredients, timings, dietary "
         "claims, history, or provenance. Return only the rewritten field text, no "

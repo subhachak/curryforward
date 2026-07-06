@@ -277,6 +277,39 @@ export interface EditDraftResult {
   note: string;
 }
 
+export interface RecipeImportRow {
+  sheet_name: string | null;
+  row_number: number;
+  name: string;
+  category: string | null;
+  cuisine_tags: string[];
+  base_servings_amount: number | null;
+  base_servings_unit: string;
+  intro: string | null;
+  history: string | null;
+  components: RecipeComponent[];
+  steps: RecipeStep[];
+  tips: string[];
+  watch_outs: string[];
+  source_url: string | null;
+  issues: string[];
+}
+
+export interface RecipeImportPreview {
+  rows: RecipeImportRow[];
+  valid_count: number;
+  issue_count: number;
+  source: "ai" | "heuristic";
+  model: string | null;
+  ai_error: string | null;
+  file_type: "xlsx" | "csv";
+}
+
+export interface RecipeImportCommitResult {
+  created: { recipe_id: string; name: string; sheet_name: string | null; row_number: number }[];
+  skipped: { sheet_name: string | null; row_number: number; name: string; issues: string[] }[];
+}
+
 export interface DraftSummary {
   recipe_id: string;
   version_id: string;

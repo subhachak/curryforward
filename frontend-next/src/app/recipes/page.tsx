@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { RecipeCard } from "@/components/RecipeCard";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { useAssistant } from "@/context/AssistantContext";
 import { useRecipes } from "@/context/RecipesContext";
 
 function FilterChip({
@@ -34,6 +36,7 @@ function RecipesInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { recipes, categories, tags, loading } = useRecipes();
+  const { setOpen } = useAssistant();
 
   const query = (searchParams.get("q") || "").trim().toLowerCase();
   const category = searchParams.get("category") || "";
@@ -94,9 +97,16 @@ function RecipesInner() {
       )}
 
       {loading ? (
-        <PageSpinner label="Loading recipes…" />
+        <div className="rounded-md border border-border bg-surface py-14 text-center">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-brand-soft">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/mark-cloche-forward.svg" alt="" className="h-9 w-auto" />
+          </div>
+          <PageSpinner label="Opening the cloche..." />
+          <p className="mt-2 text-sm text-muted">Finding today&apos;s recipes.</p>
+        </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border py-16 text-center text-muted">
+        <div className="rounded-md border border-dashed border-border bg-surface px-4 py-16 text-center text-muted">
           {query || category || tag ? (
             <>
               No recipes match your filters.{" "}
@@ -105,7 +115,19 @@ function RecipesInner() {
               </button>
             </>
           ) : (
-            "No recipes yet."
+            <div className="mx-auto max-w-sm space-y-3">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-soft">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/brand/mark-cloche-forward.svg" alt="" className="h-9 w-auto" />
+              </div>
+              <div>
+                <div className="font-semibold text-ink">No recipes found yet.</div>
+                <p className="mt-1 text-sm text-muted">Start by asking the assistant to create one.</p>
+              </div>
+              <Button size="md" onClick={() => setOpen(true)}>
+                Ask the assistant
+              </Button>
+            </div>
           )}
         </div>
       ) : (
@@ -127,7 +149,7 @@ function RecipesInner() {
 
 export default function RecipesPage() {
   return (
-    <Suspense fallback={<PageSpinner label="Loading recipes…" />}>
+    <Suspense fallback={<PageSpinner label="Opening the cloche..." />}>
       <RecipesInner />
     </Suspense>
   );

@@ -9,8 +9,9 @@ import { RecipeFeedbackPanel } from "@/components/RecipeFeedbackPanel";
 import { VersionHistory } from "@/components/VersionHistory";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
-import { DownloadIcon } from "@/components/ui/icons";
+import { CopyIcon, DownloadIcon, SparklesIcon } from "@/components/ui/icons";
 import { LikeButton } from "@/components/LikeButton";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { useAuth } from "@/context/AuthContext";
@@ -21,7 +22,7 @@ import { lineageLabel } from "@/lib/lineage";
 
 function RecipeDetailInner() {
   const { isAdmin } = useAuth();
-  const { setTarget } = useAssistant();
+  const { setOpen, setTarget } = useAssistant();
   const searchParams = useSearchParams();
   const recipeId = searchParams.get("id");
 
@@ -81,7 +82,7 @@ function RecipeDetailInner() {
     a.click();
   }
 
-  if (loading) return <PageSpinner label="Loading recipe…" />;
+  if (loading) return <RecipeLoadingState />;
 
   if (error || !recipe) {
     return (
@@ -99,58 +100,91 @@ function RecipeDetailInner() {
   const lineage = lineageLabel(recipe.lineage);
   const metadata = recipe.metadata;
   const feedback = recipe.feedback_summary;
+  const totalMinutes = (recipe.prep_time_minutes ?? 0) + (recipe.cook_time_minutes ?? 0);
+  const region = recipe.cuisine_tags[0] ?? recipe.category ?? "Recipe";
 
   return (
-    <div className="space-y-6">
-      <Link href="/recipes" className="text-sm text-muted hover:underline">
+    <div className="space-y-6 text-[#2E1B14]">
+      <Link href="/recipes" className="text-sm font-medium text-[#5A4038] hover:text-[#FF6B00]">
         &larr; Back to recipes
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">{recipe.name}</h1>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">
-            <span>
+      <section className="grid gap-5 overflow-hidden rounded-md border border-[#FFD2AE] bg-[#FFF1E6] p-5 shadow-sm lg:grid-cols-[minmax(0,1fr)_360px] lg:items-stretch">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-[#5A4038]">
+            <Link href="/recipes" className="hover:text-[#FF6B00]">Recipes</Link>
+            <span>/</span>
+            {recipe.category && <span>{recipe.category}</span>}
+            <span>/</span>
+            <span className="font-medium text-[#2E1B14]">{recipe.name}</span>
+          </div>
+          <h1 className="max-w-3xl text-4xl font-bold leading-tight text-[#2E1B14] sm:text-5xl">{recipe.name}</h1>
+          {recipe.intro && <p className="max-w-2xl text-lg text-[#5A4038]">{recipe.intro}</p>}
+          <div className="flex flex-wrap gap-2">
+            {recipe.category && <span className="rounded-full bg-[#F7DDED] px-3 py-1 text-sm font-semibold text-[#5A2145]">{recipe.category}</span>}
+            <span className="rounded-full bg-[#DFF3E6] px-3 py-1 text-sm font-semibold text-[#2E9B57]">
               Serves {recipe.base_servings.amount ?? "?"} {recipe.base_servings.unit}
             </span>
-            {recipe.category && <Badge tone="neutral">{recipe.category}</Badge>}
-            {lineage && <Badge tone="brand">{lineage}</Badge>}
-            {isAdmin && recipe.status === "draft" && <Badge tone="warning">Draft — not published</Badge>}
+            {totalMinutes > 0 && (
+              <span className="rounded-full bg-[#FFF0C1] px-3 py-1 text-sm font-semibold text-[#7A5200]">
+                {totalMinutes} min
+              </span>
+            )}
+            <span className="rounded-full bg-[#FFE0DA] px-3 py-1 text-sm font-semibold text-[#E6462D]">Medium spice</span>
+            {lineage && <span className="rounded-full bg-[#F7DDED] px-3 py-1 text-sm font-semibold text-[#5A2145]">{lineage}</span>}
+            {isAdmin && recipe.status === "draft" && <Badge tone="warning">Draft - not published</Badge>}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            <Button
+              className="bg-[#FF6B00] text-white shadow-[0_8px_18px_rgba(255,107,0,0.22)] hover:bg-[#E6462D]"
+              onClick={() => setOpen(true)}
+            >
+              <SparklesIcon className="h-4 w-4" />
+              Ask assistant
+            </Button>
+            <LikeButton key={recipe.recipe_id} recipeId={recipe.recipe_id} likeCount={recipe.like_count} />
+            <Button variant="secondary" onClick={() => setOpen(true)}>
+              <CopyIcon className="h-4 w-4" />
+              Copy as new version
+            </Button>
+            {(recipe.status === "published" || isAdmin) && (
+              <IconButton label="Download recipe" icon={<DownloadIcon />} onClick={handleDownload} />
+            )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <LikeButton key={recipe.recipe_id} recipeId={recipe.recipe_id} likeCount={recipe.like_count} />
-          {(recipe.status === "published" || isAdmin) && (
-            <IconButton label="Download recipe" icon={<DownloadIcon />} onClick={handleDownload} />
+        <div className="relative flex min-h-72 items-center justify-center overflow-hidden rounded-md border border-[#FFD2AE] bg-[#FFF8F1]">
+          {recipe.hero_image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={recipe.hero_image_url} alt="" className="h-full min-h-72 w-full object-cover" />
+          ) : (
+            <>
+              <div className="absolute left-6 top-8 h-20 w-20 rounded-full border-8 border-[#FFB000]" aria-hidden />
+              <div className="absolute bottom-8 right-8 h-16 w-16 rounded-full border-8 border-[#2E9B57]" aria-hidden />
+              <div className="absolute right-14 top-12 h-12 w-12 rounded-full bg-[#FFE0DA]" aria-hidden />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/mark-cloche-forward.svg" alt="" className="relative z-10 h-36 w-auto" />
+            </>
           )}
         </div>
-      </div>
+      </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+      <ModifyRecipePanel onAsk={() => setOpen(true)} />
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
           <RecipeContent recipe={recipe} />
 
           <RecipeFeedbackPanel recipeId={recipe.recipe_id} />
-
-          {isAdmin && (
-            <Card className="border-dashed">
-              <CardBody className="text-sm text-muted">
-                Want changes? Use the <span className="font-medium text-foreground">search bar</span>{" "}
-                above — it&apos;s already focused on this recipe.
-              </CardBody>
-            </Card>
-          )}
-
-          {isAdmin && <VersionHistory versions={history} />}
         </div>
 
-        <aside className="lg:sticky lg:top-20 lg:self-start">
+        <aside className="lg:sticky lg:top-24 lg:self-start">
           <div className="space-y-4">
             <NutritionCard recipe={recipe} />
-            <Card>
+            <Card className="border-[#E5C5E0] bg-[#FFF8F1]">
               <CardBody>
-                <div className="font-semibold">Recipe details</div>
+                <div className="font-semibold text-[#5A2145]">Version & details</div>
                 <dl className="mt-3 space-y-2 text-sm">
+                  <MetaRow label="Region" value={region} />
                   <MetaRow label="First published" value={formatDate(metadata?.first_published_at)} />
                   <MetaRow label="Last updated" value={formatDate(metadata?.last_updated_at ?? recipe.updated_at)} />
                   <MetaRow label="Versions" value={metadata?.version_count?.toString() ?? "1"} />
@@ -163,8 +197,12 @@ function RecipeDetailInner() {
                     }
                   />
                 </dl>
+                <div className="mt-4 rounded-md bg-[#F7DDED] px-3 py-2 text-xs text-[#5A2145]">
+                  Nutrition and metadata are tied to this recipe version.
+                </div>
               </CardBody>
             </Card>
+            {isAdmin && <VersionHistory versions={history} />}
           </div>
         </aside>
       </div>
@@ -181,6 +219,64 @@ function MetaRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function RecipeLoadingState() {
+  return (
+    <div className="rounded-md border border-[#FFD2AE] bg-[#FFF8F1] px-4 py-14 text-center">
+      <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[#FFE7D1]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/mark-cloche-forward.svg" alt="" className="h-10 w-auto animate-pulse" />
+      </div>
+      <PageSpinner label="Opening the cloche..." />
+      <p className="mt-2 text-sm text-[#5A4038]">Preparing your recipe.</p>
+      <div className="mx-auto mt-6 grid max-w-3xl gap-3 sm:grid-cols-[1fr_280px]">
+        <div className="space-y-3 rounded-md border border-[#FFD2AE] bg-[#FFF1E6] p-4">
+          <div className="h-5 w-2/3 rounded bg-[#FFE7D1]" />
+          <div className="h-4 w-full rounded bg-[#FFE7D1]" />
+          <div className="h-4 w-5/6 rounded bg-[#FFE7D1]" />
+        </div>
+        <div className="rounded-md border border-[#FFD2AE] bg-white p-4">
+          <div className="h-5 w-1/2 rounded bg-[#FFE7D1]" />
+          <div className="mt-4 h-12 rounded bg-[#FFE7D1]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModifyRecipePanel({ onAsk }: { onAsk: () => void }) {
+  const prompts = ["Make it dairy-free", "Make it spicier", "Reduce calories", "Scale to 6 servings", "Make it vegetarian", "Use chicken thighs"];
+  return (
+    <section className="rounded-md border border-[#E5C5E0] bg-[#F7DDED] p-4 sm:p-5">
+      <div className="grid gap-4 lg:grid-cols-[220px_1fr_auto] lg:items-center">
+        <div>
+          <div className="text-lg font-bold text-[#5A2145]">Modify this recipe</div>
+          <p className="mt-1 text-sm text-[#6B3A5A]">Ask CurryForward to adapt this dish.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {prompts.map((prompt, index) => {
+            const colors = [
+              "bg-[#DFF3E6] text-[#2E9B57]",
+              "bg-[#FFE0DA] text-[#E6462D]",
+              "bg-[#FFF0C1] text-[#7A5200]",
+              "bg-[#FFE7D1] text-[#B84600]",
+              "bg-[#DFF3E6] text-[#2E9B57]",
+              "bg-[#FFF8F1] text-[#5A2145]",
+            ];
+            return (
+              <button key={prompt} type="button" onClick={onAsk} className={`rounded-full px-3 py-1.5 text-sm font-semibold ${colors[index]}`}>
+                {prompt}
+              </button>
+            );
+          })}
+        </div>
+        <Button className="bg-[#5A2145] text-white hover:bg-[#E6462D]" onClick={onAsk}>
+          Ask CurryForward
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 function formatDate(value?: string | null) {
   if (!value) return "Not published";
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
@@ -188,7 +284,7 @@ function formatDate(value?: string | null) {
 
 export default function RecipeDetailPage() {
   return (
-    <Suspense fallback={<PageSpinner label="Loading recipe…" />}>
+    <Suspense fallback={<RecipeLoadingState />}>
       <RecipeDetailInner />
     </Suspense>
   );
