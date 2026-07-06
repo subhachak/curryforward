@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import type { Ingredient, IngredientUnitOption, RecipeDetail } from "@/lib/types";
+import { estimatedRecipeYieldGrams, ingredientGrams } from "@/lib/recipeNutrition";
+import { smartUnitChoices } from "@/lib/ingredientUnits";
 
 type WakeLockSentinelLike = {
   released: boolean;
@@ -37,12 +39,12 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
   const panConversions = recipe.pan_conversions || [];
   const [selectedPanIndex, setSelectedPanIndex] = useState(0);
   const selectedPan = panConversions[selectedPanIndex];
+  const estimatedYieldGrams = estimatedRecipeYieldGrams(recipe);
   const multiplierLabel = useMemo(() => {
-    const base = recipe.base_servings.amount;
-    if (!base || multiplier === 1) return null;
-    const scaled = roundAmount(base * multiplier);
-    return `${scaled} ${recipe.base_servings.unit}`;
-  }, [recipe.base_servings.amount, recipe.base_servings.unit, multiplier]);
+    if (!estimatedYieldGrams || multiplier === 1) return null;
+    const scaled = roundAmount(estimatedYieldGrams * multiplier);
+    return `${scaled} g`;
+  }, [estimatedYieldGrams, multiplier]);
 
   const handleWakeLockRelease = useCallback(() => {
     wakeLockRef.current = null;
@@ -134,8 +136,7 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
     <div className="space-y-6">
       {(recipe.prep_time_minutes ||
         recipe.cook_time_minutes ||
-        recipe.serving_size.amount ||
-        recipe.serving_size.unit) && (
+        recipe.serving_size.amount) && (
         <div className="flex flex-wrap gap-2">
           {recipe.prep_time_minutes != null && (
             <Badge tone="neutral">Prep: {recipe.prep_time_minutes} min</Badge>
@@ -143,9 +144,9 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
           {recipe.cook_time_minutes != null && (
             <Badge tone="neutral">Cook: {recipe.cook_time_minutes} min</Badge>
           )}
-          {(recipe.serving_size.amount || recipe.serving_size.unit) && (
+          {recipe.serving_size.amount && (
             <Badge tone="neutral">
-              Serving size: {[recipe.serving_size.amount, recipe.serving_size.unit].filter(Boolean).join(" ")}
+              Serving size: {recipe.serving_size.amount} g
             </Badge>
           )}
         </div>
@@ -157,9 +158,9 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
             <div>
               <div className="font-semibold text-[#2E1B14]">Recipe scale</div>
               <div className="text-xs text-[#5A4038]">
-                {recipe.base_servings.amount
-                  ? `Original yield: ${recipe.base_servings.amount} ${recipe.base_servings.unit}`
-                  : "Original yield not specified"}
+                {estimatedYieldGrams
+                  ? `Approx. original yield: ${estimatedYieldGrams} g`
+                  : "Original yield not calculated"}
                 {multiplierLabel ? ` - scaled to ${multiplierLabel}` : ""}
               </div>
             </div>
@@ -215,7 +216,7 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
                       <span className="min-w-0">
                         <IngredientAmount
                           ingredient={ing}
-                          selectedIndex={selectedUnits[`${c.component_name}-${idx}`] ?? 0}
+                          selectedIndex={selectedUnits[`${c.component_name}-${idx}`] ?? defaultUnitIndex(ing)}
                           multiplier={multiplier}
                         />{" "}
                         <span className="text-[#5A4038]">{ing.name}</span>
@@ -224,7 +225,7 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
                     {unitChoices(ing).length > 1 && (
                       <select
                         aria-label={`Unit for ${ing.name}`}
-                        value={selectedUnits[`${c.component_name}-${idx}`] ?? 0}
+                        value={selectedUnits[`${c.component_name}-${idx}`] ?? defaultUnitIndex(ing)}
                         onChange={(e) =>
                           setSelectedUnits((prev) => ({
                             ...prev,
@@ -406,26 +407,18 @@ function IngredientAmount({
 }
 
 function unitChoices(ingredient: Ingredient): IngredientUnitOption[] {
-  const grams = gramAmount(ingredient);
-  if (grams == null) return [];
-  const choices: IngredientUnitOption[] = [
-    { amount: grams, unit: "g", label: "g" },
-    { amount: grams / 1000, unit: "kg", label: "kg" },
-    { amount: grams / 28.3495, unit: "oz", label: "oz" },
-    { amount: grams / 453.592, unit: "lb", label: "lb" },
-  ];
-  for (const option of ingredient.unit_options || []) {
-    if (option.amount == null || !option.unit || option.unit.toLowerCase() === "g") continue;
-    choices.push(option);
-  }
-  return choices;
+  return smartUnitChoices(ingredient);
+}
+
+function defaultUnitIndex(ingredient: Ingredient): number {
+  const displayUnit = (ingredient.display_unit || "").trim().toLowerCase();
+  if (!displayUnit || displayUnit === "g") return 0;
+  const index = unitChoices(ingredient).findIndex((option) => option.unit.toLowerCase() === displayUnit);
+  return index >= 0 ? index : 0;
 }
 
 function gramAmount(ingredient: Ingredient): number | null {
-  if (ingredient.gram_amount != null) return ingredient.gram_amount;
-  if (ingredient.gram_equivalent != null) return ingredient.gram_equivalent;
-  if ((ingredient.unit || "").toLowerCase() === "g") return ingredient.amount;
-  return null;
+  return ingredientGrams(ingredient);
 }
 
 function roundAmount(value: number): number {

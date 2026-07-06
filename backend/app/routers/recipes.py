@@ -21,7 +21,7 @@ from ..llm_agent import (
 )
 from ..llm_client import is_litellm_configured, is_model_available, litellm_completion
 from ..models import RecipeAnalytics, RecipeFeedback, RecipeVersion
-from ..nutrition import compute_nutrition
+from ..nutrition import compute_nutrition, estimated_yield_grams
 from ..recipe_export import render_markdown
 from ..schemas import (
     RecipeDetailResponse,
@@ -521,6 +521,9 @@ def reset_recipe_ingredients_to_grams(
         raise HTTPException(404, "Recipe not found")
     current.components = normalize_components_to_grams(current.components or [])
     current.nutrition = compute_nutrition(current.components or [], db)
+    current.base_servings_amount = estimated_yield_grams(current.components or [])
+    current.base_servings_unit = "g"
+    current.serving_size_unit = "g"
     audit_admin_action(
         db,
         action="recipe_ingredients_reset_to_grams",
@@ -695,6 +698,7 @@ def generate_recipe(
 
     components = normalize_components_to_grams(result["components"])
     nutrition = compute_nutrition(components, db)
+    yield_grams = estimated_yield_grams(components)
 
     recipe_id = f"gen-{uuid.uuid4().hex[:8]}"
     version = RecipeVersion(
@@ -704,10 +708,10 @@ def generate_recipe(
         name=result["name"],
         category=result.get("category", "main"),
         cuisine_tags=result.get("cuisine_tags", []),
-        base_servings_amount=result["base_servings"]["amount"],
-        base_servings_unit=result["base_servings"]["unit"],
-        serving_size_amount=(result.get("serving_size") or {}).get("amount"),
-        serving_size_unit=(result.get("serving_size") or {}).get("unit"),
+        base_servings_amount=yield_grams,
+        base_servings_unit="g",
+        serving_size_amount=100,
+        serving_size_unit="g",
         components=components,
         steps=result["steps"],
         nutrition=nutrition,

@@ -47,6 +47,8 @@ export interface Nutrition {
   potassium_mg?: number;
   data_completeness?: "complete" | "partial";
   unmatched_ingredients?: string[];
+  nutrition_issues?: { ingredient: string; reason: string; suggestion: string }[];
+  estimated_total_yield_g?: number | null;
   nutrition_sources?: string[];
   cache_expires_days?: number | null;
 }
@@ -322,21 +324,6 @@ export interface DraftSummary {
   status: "draft" | "published";
   updated_at: string | null;
 }
-
-export interface SearchProposal {
-  type: "search_proposal";
-  query: string;
-  tool_use_id: string;
-}
-
-export interface ResearchChatReply {
-  type: "reply";
-  reply: string;
-  recipe: RecipeResearchDetail;
-  notes_suggestion: string | null;
-}
-
-export type ResearchTurnResult = SearchProposal | ResearchChatReply;
 
 export interface RecipeWideEditResult {
   recipe: RecipeResearchDetail;

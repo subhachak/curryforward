@@ -1,15 +1,12 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AutoResearchPanel } from "@/components/research/AutoResearchPanel";
-import { ModelPicker } from "@/components/research/ModelPicker";
-import { ResearchChatPanel, type DisplayMessage } from "@/components/research/ResearchChatPanel";
 import { ResearchDocumentPreview } from "@/components/research/ResearchDocumentPreview";
 import { Card, CardBody } from "@/components/ui/Card";
 import { IconButton } from "@/components/ui/IconButton";
-import { CheckIcon, CopyIcon, EyeIcon, PencilIcon, RefreshIcon, SendIcon, XIcon } from "@/components/ui/icons";
+import { CheckIcon, CopyIcon, RefreshIcon, SendIcon, XIcon } from "@/components/ui/icons";
 import { Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { PageSpinner } from "@/components/ui/Spinner";
@@ -17,8 +14,9 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { useRecipes } from "@/context/RecipesContext";
 import { api, ApiError } from "@/lib/api";
-import { reconstructTranscript } from "@/lib/researchTranscript";
-import type { ResearchPatchPayload, ResearchTurnResult, RecipeResearchDetail } from "@/lib/types";
+import type { ResearchPatchPayload, RecipeResearchDetail } from "@/lib/types";
+
+type WorkspaceMode = "edit" | "review";
 
 function ResearchWorkspaceInner() {
   const { isAdmin, loading: authLoading } = useAuth();
@@ -32,30 +30,15 @@ function ResearchWorkspaceInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [messages, setMessages] = useState<DisplayMessage[]>([]);
-  const [pendingProposal, setPendingProposal] = useState<{ query: string; tool_use_id: string } | null>(null);
-  const [notesSuggestion, setNotesSuggestion] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [deciding, setDeciding] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
-  const [previewMode, setPreviewMode] = useState(false);
   const [confirmingPublish, setConfirmingPublish] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [refreshingNutrition, setRefreshingNutrition] = useState(false);
-  const [mode, setMode] = useState<"guided" | "auto">("auto");
+  const [mode, setMode] = useState<WorkspaceMode>("edit");
   const [wideEditPrompt, setWideEditPrompt] = useState("");
   const [wideEditing, setWideEditing] = useState(false);
   const [reviewHighlights, setReviewHighlights] = useState<string[]>([]);
   const [reviewNotes, setReviewNotes] = useState<string | null>(null);
-
-  const nextId = useRef(0);
-  const kickedOff = useRef(false);
-  const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const promptTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function addMessage(role: DisplayMessage["role"], kind: DisplayMessage["kind"], text: string) {
-    setMessages((prev) => [...prev, { id: nextId.current++, role, kind, text }]);
-  }
 
   const load = useCallback(async () => {
     if (!recipeId) {
@@ -68,18 +51,6 @@ function ResearchWorkspaceInner() {
     try {
       const r = await api.getResearchRecipe(recipeId);
       setRecipe(r);
-      const conversation = (r.research_conversation as {
-        messages?: unknown;
-        pending_tool_use?: { id: string; query: string } | null;
-      }) || {};
-      const transcript = reconstructTranscript(conversation.messages);
-      setMessages(transcript.map((t) => ({ id: nextId.current++, ...t })));
-      if (conversation.pending_tool_use) {
-        setPendingProposal({
-          query: conversation.pending_tool_use.query,
-          tool_use_id: conversation.pending_tool_use.id,
-        });
-      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load this recipe");
     } finally {
@@ -91,63 +62,6 @@ function ResearchWorkspaceInner() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
-
-  const applyTurnResult = useCallback((result: ResearchTurnResult) => {
-    if (result.type === "search_proposal") {
-      setPendingProposal({ query: result.query, tool_use_id: result.tool_use_id });
-      return;
-    }
-    addMessage("assistant", "text", result.reply);
-    setRecipe(result.recipe);
-    setSaveStatus("saved");
-    if (result.notes_suggestion) setNotesSuggestion(result.notes_suggestion);
-  }, []);
-
-  const handleSend = useCallback(
-    async (message: string) => {
-      if (!recipeId) return;
-      addMessage("user", "text", message);
-      setSending(true);
-      try {
-        const result = await api.researchChat(recipeId, { message });
-        applyTurnResult(result);
-      } catch (e) {
-        addMessage("assistant", "text", e instanceof ApiError ? e.message : "Something went wrong.");
-      } finally {
-        setSending(false);
-      }
-    },
-    [recipeId, applyTurnResult]
-  );
-
-  // Kick off the guided-chat conversation automatically the first time the
-  // admin views that tab with a brand-new (no history yet) session, so they
-  // don't have to type the first message themselves. Gated on mode==="guided"
-  // — auto-research is the default landing tab now, and firing off a chat
-  // turn nobody looks at would just be a wasted LLM call.
-  useEffect(() => {
-    if (mode === "guided" && recipe && !kickedOff.current && messages.length === 0 && !pendingProposal) {
-      kickedOff.current = true;
-      handleSend(`Help me research and build a complete recipe for "${recipe.name}".`);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recipe, mode]);
-
-  async function handleDecision(approved: boolean) {
-    if (!recipeId || !pendingProposal) return;
-    setDeciding(true);
-    if (approved) addMessage("assistant", "search", pendingProposal.query);
-    const { tool_use_id, query } = pendingProposal;
-    setPendingProposal(null);
-    try {
-      const result = await api.researchChat(recipeId, { tool_use_id, query, approved });
-      applyTurnResult(result);
-    } catch (e) {
-      addMessage("assistant", "text", e instanceof ApiError ? e.message : "Something went wrong.");
-    } finally {
-      setDeciding(false);
-    }
-  }
 
   async function handleCommit(patch: ResearchPatchPayload) {
     if (!recipeId) return;
@@ -192,23 +106,6 @@ function ResearchWorkspaceInner() {
     }
   }
 
-  function handleModelChange(model: string) {
-    setRecipe((prev) => (prev ? { ...prev, research_model: model } : prev));
-    handleCommit({ model });
-  }
-
-  function handleAutoComplete(updated: RecipeResearchDetail) {
-    setRecipe(updated);
-    setSaveStatus("saved");
-    push("Auto-research complete — review the document on the right", "success");
-  }
-
-  function handleStartingPromptChange(value: string) {
-    setRecipe((prev) => (prev ? { ...prev, starting_prompt: value } : prev));
-    if (promptTimer.current) clearTimeout(promptTimer.current);
-    promptTimer.current = setTimeout(() => handleCommit({ starting_prompt: value }), 800);
-  }
-
   async function handleRefineSection(section: string, instruction: string) {
     if (!recipeId) return;
     try {
@@ -238,20 +135,6 @@ function ResearchWorkspaceInner() {
     } finally {
       setWideEditing(false);
     }
-  }
-
-  function handleNotesChange(value: string) {
-    setRecipe((prev) => (prev ? { ...prev, notes: value } : prev));
-    if (notesTimer.current) clearTimeout(notesTimer.current);
-    notesTimer.current = setTimeout(() => handleCommit({ notes: value }), 800);
-  }
-
-  function handleAcceptNotesSuggestion() {
-    if (!notesSuggestion) return;
-    const combined = recipe?.notes ? `${recipe.notes}\n${notesSuggestion}` : notesSuggestion;
-    setRecipe((prev) => (prev ? { ...prev, notes: combined } : prev));
-    handleCommit({ notes: combined });
-    setNotesSuggestion(null);
   }
 
   async function handlePublish(mode: "keep_both" | "replace_original" = "keep_both") {
@@ -299,7 +182,6 @@ function ResearchWorkspaceInner() {
   const canPublish = Boolean(recipe.name && recipe.components.length && recipe.steps.length);
   const isDraft = recipe.status === "draft";
   const isLinkedEditDraft = isDraft && recipe.source === "revision_draft" && Boolean(recipe.parent_version_id);
-  const canResearchAssist = isDraft && recipe.source === "researched" && !recipe.parent_version_id;
   const hasUnmatchedNutrition = Boolean(recipe.nutrition.unmatched_ingredients?.length);
   const publishChecks = [
     { label: "Name", done: Boolean(recipe.name) },
@@ -310,86 +192,74 @@ function ResearchWorkspaceInner() {
     { label: "Image", done: Boolean(recipe.hero_image_url) },
     { label: "Nutrition reviewed", done: !hasUnmatchedNutrition },
   ];
+  const issues = [
+    !recipe.hero_image_url ? "No hero image" : null,
+    !recipe.intro ? "Intro is missing" : null,
+    recipe.serving_size.amount != null && recipe.serving_size.amount < 10 ? "Serving size looks very low" : null,
+    recipe.nutrition.nutrition_issues?.length ? `${recipe.nutrition.nutrition_issues.length} nutrition item${recipe.nutrition.nutrition_issues.length === 1 ? "" : "s"} need review` : null,
+    hasUnmatchedNutrition ? `${recipe.nutrition.unmatched_ingredients?.length || 0} ingredient${(recipe.nutrition.unmatched_ingredients?.length || 0) === 1 ? "" : "s"} missing from nutrition` : null,
+  ].filter(Boolean) as string[];
+  const modeTabs: { id: WorkspaceMode; label: string }[] = [
+    { id: "edit", label: "Edit" },
+    { id: "review", label: "Review" },
+  ];
+  const showReviewRail = isDraft && mode === "edit";
+  const previewMode = mode === "review";
+  const shellGridClass = showReviewRail ? "grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]" : "space-y-4";
 
   return (
     <div className="space-y-4">
-      <Link href="/admin" className="text-sm text-muted hover:underline">
-        &larr; Back to admin
-      </Link>
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-ink">{recipe.name}</h1>
-          <div className="flex items-center gap-2 text-xs text-muted">
-            <Badge tone={isDraft ? "neutral" : "success"}>{isDraft ? "Draft" : "Published"}</Badge>
-            <span>{isDraft ? saveStatus === "saving" ? "Saving…" : saveStatus === "error" ? "Save failed" : "Saved" : "Read-only"}</span>
+      <div className="sticky top-16 z-20 rounded-lg border border-border bg-background/95 p-4 shadow-sm backdrop-blur">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <Link href="/admin" className="text-sm text-muted hover:underline">
+              &larr; Back to Workspace
+            </Link>
+            <h1 className="mt-2 truncate text-2xl font-bold text-ink">{recipe.name}</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+              <Badge tone={isDraft ? "neutral" : "success"}>{isDraft ? "Draft" : "Published"}</Badge>
+              <span>{isDraft ? saveStatus === "saving" ? "Saving..." : saveStatus === "error" ? "Save failed" : "Saved" : "Read-only"}</span>
+              {recipe.updated_at && <span>Last edited {new Date(recipe.updated_at).toLocaleString()}</span>}
+            </div>
           </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {isDraft ? (
-            <>
-              <ModelPicker value={recipe.research_model} onChange={handleModelChange} />
-              <IconButton
-                label={previewMode ? "Edit draft" : "Preview as guest"}
-                icon={previewMode ? <PencilIcon /> : <EyeIcon />}
-                onClick={() => setPreviewMode((v) => !v)}
-              />
-              <IconButton
-                label="Refresh nutrition facts"
-                icon={<RefreshIcon />}
-                loading={refreshingNutrition}
-                onClick={handleRefreshNutrition}
-              />
-              <IconButton
-                label="Publish"
-                icon={<SendIcon />}
-                disabled={!canPublish}
-                onClick={() => setConfirmingPublish(true)}
-              />
-            </>
-          ) : (
-            <IconButton label="Back to dashboard" icon={<XIcon />} onClick={() => router.push("/admin")} />
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {isDraft ? (
+              <>
+                <div className="flex rounded-md border border-border bg-surface p-1 text-sm">
+                  {modeTabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setMode(tab.id)}
+                      className={`rounded px-3 py-1.5 font-medium ${
+                        mode === tab.id ? "bg-brand text-ink" : "text-muted hover:bg-surface-muted hover:text-foreground"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+                <IconButton
+                  label="Refresh nutrition facts"
+                  icon={<RefreshIcon />}
+                  loading={refreshingNutrition}
+                  onClick={handleRefreshNutrition}
+                />
+                <IconButton
+                  label="Publish"
+                  icon={<SendIcon />}
+                  disabled={!canPublish}
+                  onClick={() => setConfirmingPublish(true)}
+                />
+              </>
+            ) : (
+              <IconButton label="Back to dashboard" icon={<XIcon />} onClick={() => router.push("/admin")} />
+            )}
+          </div>
         </div>
       </div>
 
-      {isDraft ? (
-        <>
-          {canResearchAssist && (
-            <div className="flex gap-2 text-sm">
-              <button
-                type="button"
-                onClick={() => setMode("guided")}
-                className={`rounded-md px-3 py-1.5 font-medium ${
-                  mode === "guided" ? "bg-brand text-ink" : "bg-surface-muted text-muted hover:text-foreground"
-                }`}
-              >
-                Guided chat
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("auto")}
-                className={`rounded-md px-3 py-1.5 font-medium ${
-                  mode === "auto" ? "bg-brand text-ink" : "bg-surface-muted text-muted hover:text-foreground"
-                }`}
-              >
-                Auto-research
-              </button>
-            </div>
-          )}
-
-          <Card>
-            <CardBody className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="font-semibold text-ink">Publish checklist</span>
-              {publishChecks.map((item) => (
-                <Badge key={item.label} tone={item.done ? "success" : "warning"}>
-                  {item.done ? "✓" : "!"} {item.label}
-                </Badge>
-              ))}
-            </CardBody>
-          </Card>
-        </>
-      ) : (
+      {!isDraft && (
         <Card>
           <CardBody className="flex flex-wrap items-center justify-between gap-3 text-sm">
             <div className="text-muted">
@@ -436,76 +306,49 @@ function ResearchWorkspaceInner() {
       )}
 
       {isDraft ? (
-        <div className={canResearchAssist ? "grid gap-4 lg:grid-cols-[360px_1fr]" : "space-y-4"}>
-          {canResearchAssist && (
-            <div className="lg:sticky lg:top-20 lg:h-[calc(100vh-8rem)]">
-              {mode === "guided" ? (
-                <ResearchChatPanel
-                  recipeId={recipe.recipe_id}
-                  messages={messages}
-                  pendingProposal={pendingProposal}
-                  sending={sending}
-                  deciding={deciding}
-                  onSend={handleSend}
-                  onApprove={() => handleDecision(true)}
-                  onDecline={() => handleDecision(false)}
-                  notes={recipe.notes ?? ""}
-                  onNotesChange={handleNotesChange}
-                  notesSuggestion={notesSuggestion}
-                  onAcceptNotesSuggestion={handleAcceptNotesSuggestion}
-                  onDismissNotesSuggestion={() => setNotesSuggestion(null)}
-                />
-              ) : (
-                <AutoResearchPanel
-                  recipe={recipe}
-                  onComplete={handleAutoComplete}
-                  onPromptChange={handleStartingPromptChange}
-                />
-              )}
-            </div>
-          )}
-          <div className="space-y-4">
+        <div className={shellGridClass}>
+          <main className="min-w-0 space-y-4">
             {!previewMode && (
               <Card className={reviewHighlights.length ? "border-brand/50 bg-brand-soft/30" : ""}>
-                  <CardBody className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <div className="font-semibold text-ink">Recipe-wide AI edit</div>
-                        <div className="text-xs text-muted">Apply one broad instruction across the draft, then review highlighted sections.</div>
-                      </div>
-                      {reviewHighlights.length > 0 && (
-                        <IconButton
-                          label="Clear review highlights"
-                          icon={<CheckIcon />}
-                          onClick={() => {
-                            setReviewHighlights([]);
-                            setReviewNotes(null);
-                          }}
-                        />
-                      )}
+                <CardBody className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-ink">Recipe-wide AI edit</div>
+                      <div className="text-xs text-muted">Apply one broad instruction across the draft, then review highlighted sections.</div>
                     </div>
-                    <div className="flex gap-2">
-                      <Textarea
-                        value={wideEditPrompt}
-                        onChange={(e) => setWideEditPrompt(e.target.value)}
-                        rows={3}
-                        placeholder="Make this recipe keto friendly; make it kid friendly; turn it into a weeknight version..."
-                      />
+                    {reviewHighlights.length > 0 && (
                       <IconButton
-                        label="Apply recipe-wide edit"
-                        icon={<SendIcon />}
-                        loading={wideEditing}
-                        disabled={!wideEditPrompt.trim()}
-                        onClick={handleWideEdit}
+                        label="Clear review highlights"
+                        icon={<CheckIcon />}
+                        onClick={() => {
+                          setReviewHighlights([]);
+                          setReviewNotes(null);
+                        }}
                       />
-                    </div>
-                    {(reviewHighlights.length > 0 || reviewNotes) && (
-                      <div className="rounded-md border border-brand/30 bg-surface px-3 py-2 text-xs text-muted">
-                        {reviewHighlights.length > 0 && (
-                          <div>
-                            Review: <span className="font-medium text-foreground">{reviewHighlights.join(", ")}</span>
-                          </div>
-                        )}
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Textarea
+                      value={wideEditPrompt}
+                      onChange={(e) => setWideEditPrompt(e.target.value)}
+                      rows={3}
+                      placeholder="Make this recipe keto friendly; make it kid friendly; turn it into a weeknight version..."
+                    />
+                    <IconButton
+                      label="Apply recipe-wide edit"
+                      icon={<SendIcon />}
+                      loading={wideEditing}
+                      disabled={!wideEditPrompt.trim()}
+                      onClick={handleWideEdit}
+                    />
+                  </div>
+                  {(reviewHighlights.length > 0 || reviewNotes) && (
+                    <div className="rounded-md border border-brand/30 bg-surface px-3 py-2 text-xs text-muted">
+                      {reviewHighlights.length > 0 && (
+                        <div>
+                          Review: <span className="font-medium text-foreground">{reviewHighlights.join(", ")}</span>
+                        </div>
+                      )}
                       {reviewNotes && <div className="mt-1">{reviewNotes}</div>}
                     </div>
                   )}
@@ -526,7 +369,69 @@ function ResearchWorkspaceInner() {
                 setReviewNotes(null);
               }}
             />
-          </div>
+          </main>
+
+          {showReviewRail && (
+            <aside className="space-y-3 xl:sticky xl:top-40 xl:max-h-[calc(100vh-11rem)] xl:overflow-auto">
+              <Card>
+                <CardBody className="space-y-3">
+                  <div>
+                    <div className="font-semibold text-ink">Recipe readiness</div>
+                    <div className="text-xs text-muted">Publish checks, issues, and final actions.</div>
+                  </div>
+                  <div className="space-y-2">
+                    {publishChecks.map((item) => (
+                      <div key={item.label} className="flex items-center justify-between gap-2 rounded-md bg-surface-muted px-3 py-2 text-sm">
+                        <span>{item.label}</span>
+                        <Badge tone={item.done ? "success" : "warning"}>{item.done ? "Ready" : "Needs review"}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardBody className="space-y-3">
+                  <div className="font-semibold text-ink">Issues detected</div>
+                  {issues.length ? (
+                    <ul className="space-y-2 text-sm text-muted">
+                      {issues.map((issue) => (
+                        <li key={issue} className="rounded-md border border-warning/30 bg-warning-soft/40 px-3 py-2">
+                          {issue}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="rounded-md bg-success-soft px-3 py-2 text-sm text-success">No blocking issues detected.</div>
+                  )}
+                  <IconButton
+                    label="Refresh nutrition facts"
+                    icon={<RefreshIcon />}
+                    loading={refreshingNutrition}
+                    onClick={handleRefreshNutrition}
+                  />
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardBody className="space-y-3">
+                  <div className="font-semibold text-ink">Publish</div>
+                  <div className="text-sm text-muted">
+                    {canPublish ? "Ready when your review is complete." : "Name, ingredients, and steps are required before publishing."}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <IconButton label="Preview" icon={<CheckIcon />} onClick={() => setMode("review")} />
+                    <IconButton
+                      label="Publish"
+                      icon={<SendIcon />}
+                      disabled={!canPublish}
+                      onClick={() => setConfirmingPublish(true)}
+                    />
+                  </div>
+                </CardBody>
+              </Card>
+            </aside>
+          )}
         </div>
       ) : (
         <ResearchDocumentPreview

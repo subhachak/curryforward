@@ -48,7 +48,9 @@ def test_admin_can_create_recipe():
     assert body["name"] == "Test Manual Curry"
     assert body["lineage"] == "manual"
     assert body["is_current_head"] is True
-    assert body["serving_size"] == {"amount": 1.0, "unit": "bowl"}
+    assert body["base_servings"] == {"amount": 200.0, "unit": "g"}
+    assert body["serving_size"] == {"amount": 1.0, "unit": "g"}
+    assert body["nutrition"]["estimated_total_yield_g"] == 200.0
     assert body["nutrition"]["calories"] > 0
 
 

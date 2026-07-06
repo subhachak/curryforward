@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from ..models import RecipeVersion
-from ..nutrition import compute_nutrition
+from ..nutrition import compute_nutrition, estimated_yield_grams
 from ..schemas import RecipeUpsertRequest
 from .ingredient_canonical import normalize_components_to_grams
 
@@ -45,6 +45,7 @@ def _copy_rich_fields(source: RecipeVersion, target_kwargs: dict[str, Any]) -> N
 
 def create_manual_recipe(req: RecipeUpsertRequest, db: Session | None = None) -> RecipeVersion:
     components = normalize_components_to_grams(req.normalized_components())
+    yield_grams = estimated_yield_grams(components)
     return RecipeVersion(
         recipe_id=f"manual-{uuid.uuid4().hex[:8]}",
         parent_version_id=None,
@@ -52,10 +53,10 @@ def create_manual_recipe(req: RecipeUpsertRequest, db: Session | None = None) ->
         name=req.name,
         category=req.category,
         cuisine_tags=req.cuisine_tags,
-        base_servings_amount=req.base_servings_amount,
-        base_servings_unit=req.base_servings_unit,
-        serving_size_amount=req.serving_size_amount,
-        serving_size_unit=req.serving_size_unit,
+        base_servings_amount=yield_grams,
+        base_servings_unit="g",
+        serving_size_amount=req.serving_size_amount or 100,
+        serving_size_unit="g",
         components=components,
         steps=req.normalized_steps(),
         nutrition=compute_nutrition(components, db),
@@ -68,6 +69,7 @@ def create_manual_recipe(req: RecipeUpsertRequest, db: Session | None = None) ->
 
 def create_chat_edit_version(current: RecipeVersion, result: dict, db: Session | None = None) -> RecipeVersion:
     components = normalize_components_to_grams(result["components"])
+    yield_grams = estimated_yield_grams(components)
     kwargs: dict[str, Any] = {
         "recipe_id": current.recipe_id,
         "parent_version_id": current.version_id,
@@ -75,10 +77,10 @@ def create_chat_edit_version(current: RecipeVersion, result: dict, db: Session |
         "name": current.name,
         "category": current.category,
         "cuisine_tags": current.cuisine_tags,
-        "base_servings_amount": current.base_servings_amount,
-        "base_servings_unit": current.base_servings_unit,
+        "base_servings_amount": yield_grams,
+        "base_servings_unit": "g",
         "serving_size_amount": current.serving_size_amount,
-        "serving_size_unit": current.serving_size_unit,
+        "serving_size_unit": "g",
         "components": components,
         "steps": steps_preserving_images(current.steps, result["steps"]),
         "nutrition": compute_nutrition(components, db),
@@ -93,6 +95,7 @@ def create_chat_edit_version(current: RecipeVersion, result: dict, db: Session |
 
 
 def fork_recipe_version(current: RecipeVersion) -> RecipeVersion:
+    yield_grams = estimated_yield_grams(current.components or [])
     kwargs: dict[str, Any] = {
         "recipe_id": f"{current.recipe_id}-fork-{uuid.uuid4().hex[:6]}",
         "parent_version_id": current.version_id,
@@ -100,10 +103,10 @@ def fork_recipe_version(current: RecipeVersion) -> RecipeVersion:
         "name": f"{current.name} (copy)",
         "category": current.category,
         "cuisine_tags": current.cuisine_tags,
-        "base_servings_amount": current.base_servings_amount,
-        "base_servings_unit": current.base_servings_unit,
+        "base_servings_amount": yield_grams,
+        "base_servings_unit": "g",
         "serving_size_amount": current.serving_size_amount,
-        "serving_size_unit": current.serving_size_unit,
+        "serving_size_unit": "g",
         "components": current.components,
         "steps": current.steps,
         "nutrition": current.nutrition,

@@ -115,9 +115,9 @@ def test_plan_without_model_key_400s(monkeypatch):
     assert "No API key configured" in r.json()["detail"]
 
 
-def test_run_without_tavily_key_400s(monkeypatch):
+def test_run_without_web_search_key_400s(monkeypatch):
     draft = _start_draft()
-    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: False)
     r = client.post(
         f"/api/recipes/research/{draft['recipe_id']}/auto/run",
         json={"approved_queries": ["some query"]},
@@ -128,7 +128,7 @@ def test_run_without_tavily_key_400s(monkeypatch):
 
 def test_run_without_model_key_400s(monkeypatch):
     draft = _start_draft()
-    monkeypatch.setenv("TAVILY_API_KEY", "fake-key-for-test")
+    monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
     _delenv_all_provider_keys(monkeypatch)
     r = client.post(
         f"/api/recipes/research/{draft['recipe_id']}/auto/run",
@@ -169,9 +169,9 @@ def test_plan_returns_mocked_plan_and_query_batch(monkeypatch):
 
 
 def test_run_applies_merged_patch_from_mocked_crew(monkeypatch):
-    monkeypatch.setenv("TAVILY_API_KEY", "fake-key-for-test")
+    monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
     monkeypatch.setattr(
-        "app.routers.research.run_tavily_search",
+        "app.routers.research.run_web_search",
         lambda query: f"mocked results for {query}",
     )
 
@@ -209,7 +209,7 @@ def test_run_applies_merged_patch_from_mocked_crew(monkeypatch):
 
 
 def test_run_with_no_approved_queries_still_runs_crew(monkeypatch):
-    monkeypatch.setenv("TAVILY_API_KEY", "fake-key-for-test")
+    monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
 
     def fake_run_auto_research_crew(dish_name, current_document, search_results, starting_prompt, model, on_task_done=None):
         assert search_results == []
@@ -230,7 +230,7 @@ def test_run_with_no_approved_queries_still_runs_crew(monkeypatch):
 
 
 def test_run_passes_starting_prompt_through_to_crew(monkeypatch):
-    monkeypatch.setenv("TAVILY_API_KEY", "fake-key-for-test")
+    monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
     seen = {}
 
     def fake_run_auto_research_crew(dish_name, current_document, search_results, starting_prompt, model, on_task_done=None):
@@ -254,7 +254,7 @@ def test_run_passes_starting_prompt_through_to_crew(monkeypatch):
 
 
 def test_run_surfaces_crew_error_via_status_poll(monkeypatch):
-    monkeypatch.setenv("TAVILY_API_KEY", "fake-key-for-test")
+    monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
 
     def failing_crew(dish_name, current_document, search_results, starting_prompt, model, on_task_done=None):
         raise RuntimeError("the crew blew up")
@@ -275,7 +275,7 @@ def test_run_surfaces_crew_error_via_status_poll(monkeypatch):
 
 
 def test_cannot_start_a_second_run_while_one_is_in_progress(monkeypatch):
-    monkeypatch.setenv("TAVILY_API_KEY", "fake-key-for-test")
+    monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
 
     def slow_crew(dish_name, current_document, search_results, starting_prompt, model, on_task_done=None):
         time.sleep(0.3)
@@ -302,7 +302,7 @@ def test_cannot_start_a_second_run_while_one_is_in_progress(monkeypatch):
 
 
 def test_cannot_publish_while_auto_research_is_running(monkeypatch):
-    monkeypatch.setenv("TAVILY_API_KEY", "fake-key-for-test")
+    monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
 
     def slow_crew(dish_name, current_document, search_results, starting_prompt, model, on_task_done=None):
         time.sleep(0.3)
@@ -338,7 +338,7 @@ def test_cancel_unblocks_immediately_and_discards_stale_result(monkeypatch):
     *after* the second job, the harder case — its result must NOT overwrite
     the second job's already-applied one, because its job id no longer
     matches the row's current job id."""
-    monkeypatch.setenv("TAVILY_API_KEY", "fake-key-for-test")
+    monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
 
     def slow_stale_crew(dish_name, current_document, search_results, starting_prompt, model, on_task_done=None):
         time.sleep(0.4)  # finishes after the second (fast) job below

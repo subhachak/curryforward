@@ -12,16 +12,9 @@ import { CopyAssistField } from "@/components/research/CopyAssistField";
 import { useRecipes } from "@/context/RecipesContext";
 import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
-import type { PanConversion, RecipeResearchDetail, ResearchPatchPayload } from "@/lib/types";
-
-// Recognized by backend/app/nutrition.py's UNIT_TO_GRAM — picking one of
-// these lets the nutrition calculation actually match the ingredient,
-// but the field stays a free-text input (with these as datalist suggestions)
-// since plenty of real ingredient units fall outside this set (e.g. "pods",
-// "pinch", "leaf") and forcing a closed dropdown would block entering them.
-const INGREDIENT_UNIT_SUGGESTIONS = ["g", "ml", "cup", "tbsp", "tsp", "oz", "lb", "piece", "drop", "inch"];
-const SERVING_UNIT_SUGGESTIONS = ["servings", "people", "portions"];
-const SERVING_SIZE_UNIT_SUGGESTIONS = ["bowl", "piece", "cup", "g", "ml"];
+import { smartUnitChoices } from "@/lib/ingredientUnits";
+import { estimatedYieldGramsFromComponents } from "@/lib/recipeNutrition";
+import type { Ingredient, PanConversion, RecipeResearchDetail, ResearchPatchPayload } from "@/lib/types";
 
 interface RefineBoxProps {
   section: string;
@@ -34,6 +27,34 @@ function SectionHeader({ title, children }: { title: string; children?: ReactNod
     <div className="flex min-h-8 items-center justify-between gap-2">
       <div className="font-semibold">{title}</div>
       <div className="flex shrink-0 items-center gap-1">{children}</div>
+    </div>
+  );
+}
+
+function normalizeIssueName(name: string) {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function nutritionIssueLabel(reason: string) {
+  if (reason === "missing_grams") return "Needs grams";
+  if (reason === "no_nutrition_profile") return "No profile match";
+  return "Needs review";
+}
+
+function IngredientNutritionIssue({
+  issue,
+}: {
+  issue?: { ingredient: string; reason: string; suggestion: string };
+}) {
+  if (!issue) return null;
+
+  return (
+    <div className="rounded-md border border-warning/30 bg-warning-soft/40 px-3 py-2 text-xs">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-semibold text-warning">{nutritionIssueLabel(issue.reason)}</span>
+        <span className="text-muted">Not included in the current nutrition calculation.</span>
+      </div>
+      <div className="mt-1 text-muted">{issue.suggestion}</div>
     </div>
   );
 }
@@ -122,6 +143,20 @@ function toComponentRows(recipe: RecipeResearchDetail): ComponentRow[] {
     : [emptyComponent()];
 }
 
+function estimateYieldGramsFromRows(rows: ComponentRow[]) {
+  let total = 0;
+  let hasValue = false;
+  for (const component of rows) {
+    for (const ingredient of component.ingredients) {
+      const amount = Number(ingredient.amount);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      total += amount;
+      hasValue = true;
+    }
+  }
+  return hasValue ? Math.round(total * 10) / 10 : null;
+}
+
 function canonicalGramValue(ingredient: RecipeResearchDetail["components"][number]["ingredients"][number]) {
   if (ingredient.gram_amount != null) return ingredient.gram_amount;
   if (ingredient.gram_equivalent != null) return ingredient.gram_equivalent;
@@ -178,6 +213,24 @@ function formatUnitOptions(options: { amount: number | null; unit: string; label
     .map((option) => option.label || [option.amount, option.unit].filter(Boolean).join(" "))
     .filter(Boolean)
     .join("; ");
+}
+
+function displayUnitChoices(row: IngredientRow) {
+  const grams = Number(row.amount);
+  const syntheticIngredient: Ingredient = {
+    name: row.name,
+    amount: Number.isFinite(grams) && grams > 0 ? grams : null,
+    unit: "g",
+    gram_amount: Number.isFinite(grams) && grams > 0 ? grams : null,
+    gram_equivalent: Number.isFinite(grams) && grams > 0 ? grams : null,
+    display_unit: row.displayUnit,
+    unit_options: parseUnitOptions(row.unitOptionsText),
+  };
+  const units = smartUnitChoices(syntheticIngredient).map((option) => option.unit);
+  if (row.displayUnit && !units.some((unit) => unit.toLowerCase() === row.displayUnit.toLowerCase())) {
+    units.push(row.displayUnit);
+  }
+  return units;
 }
 
 function parseLines(text: string) {
@@ -263,14 +316,9 @@ export function ResearchDocumentPreview({
   const [name, setName] = useState(recipe.name);
   const [category, setCategory] = useState(recipe.category ?? "");
   const [cuisineTags, setCuisineTags] = useState(recipe.cuisine_tags.join(", "));
-  const [servingsAmount, setServingsAmount] = useState(
-    recipe.base_servings.amount != null ? String(recipe.base_servings.amount) : ""
-  );
-  const [servingsUnit, setServingsUnit] = useState(recipe.base_servings.unit || "servings");
   const [servingSizeAmount, setServingSizeAmount] = useState(
     recipe.serving_size.amount != null ? String(recipe.serving_size.amount) : ""
   );
-  const [servingSizeUnit, setServingSizeUnit] = useState(recipe.serving_size.unit ?? "");
   const [intro, setIntro] = useState(recipe.intro ?? "");
   const [history, setHistory] = useState(recipe.history ?? "");
   const [prepTime, setPrepTime] = useState(recipe.prep_time_minutes != null ? String(recipe.prep_time_minutes) : "");
@@ -286,6 +334,13 @@ export function ResearchDocumentPreview({
   const [uploadingStep, setUploadingStep] = useState<number | null>(null);
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const heroFileInputRef = useRef<HTMLInputElement | null>(null);
+  const nutritionIssues = recipe.nutrition?.nutrition_issues || [];
+  const nutritionIssueForIngredient = (ingredientName: string) =>
+    nutritionIssues.find((issue) => normalizeIssueName(issue.ingredient) === normalizeIssueName(ingredientName));
+  const estimatedYieldGrams =
+    recipe.nutrition?.estimated_total_yield_g ??
+    estimateYieldGramsFromRows(components) ??
+    estimatedYieldGramsFromComponents(recipe.components);
 
   if (previewMode) {
     return (
@@ -322,7 +377,12 @@ export function ResearchDocumentPreview({
     );
   }
   function commitComponents(rows: ComponentRow[]) {
-    onCommit({ components: buildComponentsPatch(rows) });
+    onCommit({
+      components: buildComponentsPatch(rows),
+      base_servings_amount: estimateYieldGramsFromRows(rows),
+      base_servings_unit: "g",
+      serving_size_unit: "g",
+    });
   }
   function addComponent() {
     setComponents((rows) => {
@@ -496,7 +556,7 @@ export function ResearchDocumentPreview({
               )}
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium">Category</label>
               <Input
@@ -513,58 +573,29 @@ export function ResearchDocumentPreview({
               </datalist>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Serves (amount)</label>
-              <Input
-                type="number"
-                value={servingsAmount}
-                onChange={(e) => setServingsAmount(e.target.value)}
-                onBlur={() =>
-                  onCommit({ base_servings_amount: servingsAmount.trim() ? Number(servingsAmount) : null })
-                }
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Serving unit</label>
-              <Input
-                value={servingsUnit}
-                onChange={(e) => setServingsUnit(e.target.value)}
-                onBlur={() => onCommit({ base_servings_unit: servingsUnit.trim() || "servings" })}
-                list="serving-unit-options"
-              />
-              <datalist id="serving-unit-options">
-                {SERVING_UNIT_SUGGESTIONS.map((u) => (
-                  <option key={u} value={u} />
-                ))}
-              </datalist>
+              <div className="text-sm font-medium">Estimated recipe yield</div>
+              <div className="mt-1 text-sm text-muted">
+                {estimatedYieldGrams ? `Approx. ${estimatedYieldGrams} g from ingredient grams` : "Add ingredient grams to calculate yield"}
+              </div>
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium">Serving size amount</label>
+              <label className="mb-1 block text-sm font-medium">Nutrition serving grams</label>
               <Input
                 type="number"
                 value={servingSizeAmount}
                 onChange={(e) => setServingSizeAmount(e.target.value)}
                 onBlur={() =>
-                  onCommit({ serving_size_amount: servingSizeAmount.trim() ? Number(servingSizeAmount) : null })
+                  onCommit({
+                    serving_size_amount: servingSizeAmount.trim() ? Number(servingSizeAmount) : null,
+                    serving_size_unit: "g",
+                    base_servings_amount: estimateYieldGramsFromRows(components),
+                    base_servings_unit: "g",
+                  })
                 }
-                placeholder="1"
+                placeholder="100"
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Serving size unit</label>
-              <Input
-                value={servingSizeUnit}
-                onChange={(e) => setServingSizeUnit(e.target.value)}
-                onBlur={() => onCommit({ serving_size_unit: servingSizeUnit.trim() || null })}
-                placeholder="bowl, piece, cup, 250 g"
-                list="serving-size-unit-options"
-              />
-              <datalist id="serving-size-unit-options">
-                {SERVING_SIZE_UNIT_SUGGESTIONS.map((u) => (
-                  <option key={u} value={u} />
-                ))}
-              </datalist>
             </div>
           </div>
           <div>
@@ -633,12 +664,22 @@ export function ResearchDocumentPreview({
 
       <Card className={highlightClass(["components"])}>
         <CardBody className="space-y-4">
-          <SectionHeader title="Components & ingredients">{reviewBadge(["components"])}</SectionHeader>
-          <datalist id="ingredient-unit-options">
-            {INGREDIENT_UNIT_SUGGESTIONS.map((u) => (
-              <option key={u} value={u} />
-            ))}
-          </datalist>
+          <SectionHeader title="Components & ingredients">
+            {nutritionIssues.length > 0 && (
+              <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning">
+                {nutritionIssues.length} nutrition review
+              </span>
+            )}
+            {onRefreshNutrition && (
+              <IconButton
+                label="Refresh nutrition facts"
+                icon={<RefreshIcon />}
+                loading={refreshingNutrition}
+                onClick={() => void onRefreshNutrition()}
+              />
+            )}
+            {reviewBadge(["components"])}
+          </SectionHeader>
           {components.map((component, ci) => (
             <div key={ci} className="rounded-lg border border-border p-3 space-y-3">
               <div className="flex items-center gap-2">
@@ -668,13 +709,32 @@ export function ResearchDocumentPreview({
                         />
                       </div>
                       <div className="w-20 shrink-0">
-                        <Input
+                        <select
                           value={ing.displayUnit}
-                          onChange={(e) => updateIngredient(ci, ii, { displayUnit: e.target.value })}
-                          onBlur={() => commitComponents(components)}
-                          placeholder="Display"
-                          list="ingredient-unit-options"
-                        />
+                          onChange={(e) => {
+                            updateIngredient(ci, ii, { displayUnit: e.target.value });
+                            commitComponents(
+                              components.map((componentRow, componentIndex) =>
+                                componentIndex === ci
+                                  ? {
+                                      ...componentRow,
+                                      ingredients: componentRow.ingredients.map((ingredientRow, ingredientIndex) =>
+                                        ingredientIndex === ii ? { ...ingredientRow, displayUnit: e.target.value } : ingredientRow
+                                      ),
+                                    }
+                                  : componentRow
+                              )
+                            );
+                          }}
+                          className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                          aria-label={`Display unit for ${ing.name || "ingredient"}`}
+                        >
+                          {displayUnitChoices(ing).map((unit) => (
+                            <option key={unit} value={unit}>
+                              {unit}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div className="flex-1">
                         <Input
@@ -692,9 +752,10 @@ export function ResearchDocumentPreview({
                       value={ing.unitOptionsText}
                       onChange={(e) => updateIngredient(ci, ii, { unitOptionsText: e.target.value })}
                       onBlur={() => commitComponents(components)}
-                      placeholder="Display conversions, e.g. 1 cup; 240 ml. Grams remain canonical."
+                      placeholder="Optional custom conversions, e.g. 1 cup; 2 cloves. Grams remain canonical."
                       className="text-xs"
                     />
+                    <IngredientNutritionIssue issue={nutritionIssueForIngredient(ing.name)} />
                   </div>
                 ))}
                 <IconButton label="Add ingredient" icon={<PlusIcon />} onClick={() => addIngredient(ci)} />

@@ -8,57 +8,52 @@ from ..models import LLMSetting
 TASK_DEFAULTS = {
     "feedback_moderation": {
         "label": "Feedback moderation",
-        "default_model": "gemini/gemini-2.5-flash-lite",
+        "default_model": "openai/gpt-5-nano",
         "description": "Cheap, fast classification for ratings, reviews, and comments.",
     },
     "dish_name_extraction": {
         "label": "Dish name extraction",
-        "default_model": "gemini/gemini-2.5-flash-lite",
+        "default_model": "openai/gpt-5-nano",
         "description": "Tiny extraction call when starting a research draft.",
-    },
-    "research_chat": {
-        "label": "Guided research chat",
-        "default_model": "gemini/gemini-2.5-flash",
-        "description": "Balanced cost and quality for iterative recipe research.",
     },
     "recipe_context_chat": {
         "label": "Public recipe Q&A",
-        "default_model": "gemini/gemini-2.5-flash-lite",
+        "default_model": "openai/gpt-5-nano",
         "description": "Low-cost, strictly recipe-contextual answers for public guests.",
     },
     "research_plan": {
         "label": "Auto-research planning",
-        "default_model": "gemini/gemini-2.5-flash-lite",
+        "default_model": "openai/gpt-5-nano",
         "description": "Proposes search queries before auto-research runs.",
     },
     "auto_research_crew": {
         "label": "Auto-research crew",
-        "default_model": "gemini/gemini-2.5-flash",
+        "default_model": "openai/gpt-5-mini",
         "description": "Parallel history, ingredients, steps, tips, and merge agents.",
     },
     "section_refine": {
         "label": "Section refinement",
-        "default_model": "gemini/gemini-2.5-flash",
+        "default_model": "openai/gpt-5-mini",
         "description": "Focused rewrites for recipe sections.",
     },
     "copy_rewrite": {
         "label": "Field copy rewrite",
-        "default_model": "gemini/gemini-2.5-flash-lite",
+        "default_model": "openai/gpt-5-nano",
         "description": "Cheap admin-only rewrites for individual editable text fields.",
     },
     "admin_assistant": {
         "label": "Admin edit assistant",
-        "default_model": "gemini/gemini-2.5-flash-lite",
+        "default_model": "openai/gpt-5-nano",
         "description": "Fast admin-only Q&A for edit-page conversions, technique checks, and draft review.",
     },
     "recipe_import": {
         "label": "Recipe CSV import",
-        "default_model": "gemini/gemini-2.5-flash",
+        "default_model": "openai/gpt-5-mini",
         "description": "Maps messy spreadsheet rows into draft recipe fields for admin review.",
     },
     "recipe_wide_edit": {
         "label": "Recipe-wide edit",
-        "default_model": "gemini/gemini-2.5-flash",
+        "default_model": "openai/gpt-5-mini",
         "description": "Applies broad admin instructions across ingredients, steps, copy, equipment, and metadata.",
     },
     "recipe_customize": {
@@ -210,7 +205,7 @@ def resolve_task_model(task: str, db: Session | None = None, explicit_model: str
             model = row.model
     if task in TASK_DEFAULTS:
         model = model or os.environ.get(f"LLM_MODEL_{task.upper()}") or TASK_DEFAULTS[task]["default_model"]
-    model = model or os.environ.get("DEFAULT_MODEL", "gemini/gemini-2.5-flash")
+    model = model or os.environ.get("DEFAULT_MODEL", "openai/gpt-5-mini")
     if is_model_available(model):
         return model
 

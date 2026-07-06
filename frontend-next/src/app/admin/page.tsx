@@ -3,6 +3,7 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AutoResearchPanel } from "@/components/research/AutoResearchPanel";
 import { CopyAssistField } from "@/components/research/CopyAssistField";
 import { RecipeManagementTable } from "@/components/admin/RecipeManagementTable";
 import { TrashPanel } from "@/components/admin/TrashPanel";
@@ -36,6 +37,7 @@ import type {
   PendingRecipeFeedback,
   RecipeImportPreview,
   RecipeImportRow,
+  RecipeResearchDetail,
   TrashedRecipeSummary,
 } from "@/lib/types";
 
@@ -100,7 +102,7 @@ const modelGroups = [
   {
     title: "Recipe creation",
     description: "Draft generation, research planning, and broader recipe edits.",
-    keys: ["recipe_draft", "gap_generation", "research_chat", "research_plan", "auto_research_crew", "recipe_wide_edit"],
+    keys: ["recipe_draft", "gap_generation", "research_plan", "auto_research_crew", "recipe_wide_edit"],
   },
   {
     title: "Admin cleanup",
@@ -132,6 +134,7 @@ export default function AdminPage() {
   const [loadingRecipes, setLoadingRecipes] = useState(true);
   const [researchPrompt, setResearchPrompt] = useState("");
   const [startingResearch, setStartingResearch] = useState(false);
+  const [activeResearchDraft, setActiveResearchDraft] = useState<RecipeResearchDetail | null>(null);
   const [importPreview, setImportPreview] = useState<RecipeImportPreview | null>(null);
   const [importStatus, setImportStatus] = useState<ImportStatus>(null);
   const [importing, setImporting] = useState(false);
@@ -206,11 +209,30 @@ export default function AdminPage() {
     setStartingResearch(true);
     try {
       const draft = await api.startResearch(prompt);
-      router.push(`/recipe/research?id=${encodeURIComponent(draft.recipe_id)}`);
+      setActiveResearchDraft(draft);
+      setResearchPrompt("");
     } catch (e) {
       push(e instanceof ApiError ? e.message : "Couldn't start research", "error");
+    } finally {
       setStartingResearch(false);
     }
+  }
+
+  async function handleResearchDraftPromptChange(value: string) {
+    setActiveResearchDraft((prev) => (prev ? { ...prev, starting_prompt: value } : prev));
+    if (!activeResearchDraft) return;
+    try {
+      const updated = await api.patchResearch(activeResearchDraft.recipe_id, { starting_prompt: value });
+      setActiveResearchDraft(updated);
+    } catch {
+      // Keep typing responsive; explicit planning/run calls will surface errors.
+    }
+  }
+
+  function handleResearchComplete(updated: RecipeResearchDetail) {
+    setActiveResearchDraft(updated);
+    push("Research complete — opening the editor for review", "success");
+    router.push(`/recipe/research?id=${encodeURIComponent(updated.recipe_id)}`);
   }
 
   async function handleImportPreview(file: File) {
@@ -477,6 +499,9 @@ export default function AdminPage() {
           importing={importing}
           onPromptChange={setResearchPrompt}
           onSubmit={handleStartResearch}
+          activeDraft={activeResearchDraft}
+          onResearchDraftPromptChange={handleResearchDraftPromptChange}
+          onResearchComplete={handleResearchComplete}
           onPreview={handleImportPreview}
           onImport={handleImportCommit}
           onClear={() => {
@@ -825,24 +850,30 @@ function RecipesTab({
 function NewRecipeTab({
   prompt,
   starting,
+  activeDraft,
   preview,
   importStatus,
   previewingImport,
   importing,
   onPromptChange,
   onSubmit,
+  onResearchDraftPromptChange,
+  onResearchComplete,
   onPreview,
   onImport,
   onClear,
 }: {
   prompt: string;
   starting: boolean;
+  activeDraft: RecipeResearchDetail | null;
   preview: RecipeImportPreview | null;
   importStatus: ImportStatus;
   previewingImport: boolean;
   importing: boolean;
   onPromptChange: (value: string) => void;
   onSubmit: (event: FormEvent) => void;
+  onResearchDraftPromptChange: (value: string) => void;
+  onResearchComplete: (recipe: RecipeResearchDetail) => void;
   onPreview: (file: File) => void;
   onImport: (rows: RecipeImportRow[]) => void;
   onClear: () => void;
@@ -902,6 +933,26 @@ function NewRecipeTab({
           </form>
         </CardBody>
       </Card>
+
+      {activeDraft && (
+        <Card className="bg-white">
+          <CardBody className="space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold text-ink">Research plan & progress</h2>
+              <p className="text-sm text-muted">
+                Approve the research plan here. When the draft is ready, CurryForward opens the editor automatically.
+              </p>
+            </div>
+            <div className="min-h-[32rem]">
+              <AutoResearchPanel
+                recipe={activeDraft}
+                onComplete={onResearchComplete}
+                onPromptChange={onResearchDraftPromptChange}
+              />
+            </div>
+          </CardBody>
+        </Card>
+      )}
 
       <ImportTab
         preview={preview}

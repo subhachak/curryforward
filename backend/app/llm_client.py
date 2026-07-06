@@ -1,8 +1,7 @@
 """
-Shared LiteLLM plumbing for the provider-swappable flows: the guided research
-chat (start_research_turn/continue_research_turn in llm_agent.py) and
-auto-research (crew_research.py, including the CrewAI agents themselves, which
-accept a plain LiteLLM model string via Agent(llm=...)).
+Shared LiteLLM plumbing for provider-swappable flows such as auto-research
+(crew_research.py, including the CrewAI agents themselves, which accept a
+plain LiteLLM model string via Agent(llm=...)).
 
 NOT used by customize_recipe/draft_recipe_from_conversation/generate_recipe_for_gap
 in llm_agent.py — those keep using Anthropic's server-executed web_search tool
@@ -32,7 +31,7 @@ def resolve_model(model: str | None) -> str:
     """A session's chosen model, or the configured default if unset/blank."""
     from .services.llm_settings import resolve_task_model
 
-    return model or resolve_task_model("research_chat")
+    return model or resolve_task_model("auto_research_crew")
 
 
 def is_model_available(model: str) -> bool:

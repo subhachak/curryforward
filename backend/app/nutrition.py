@@ -63,7 +63,11 @@ NUTRITION_TABLE: dict[str, NutrientProfile] = {
     "confectioner's sugar": NutrientProfile(389, 0, 0, 100, 0, 0, 0, 1, 0, 100, 100, 0, 1, 0.01, 2),
     "unsalted butter": NutrientProfile(717, 0.9, 81, 0.1, 51, 3.3, 215, 11, 0, 0.1, 0, 1.5, 24, 0.02, 24),
     "heavy whipping cream": NutrientProfile(340, 2.1, 36, 2.8, 23, 1, 137, 27, 0, 2.8, 0, 0.5, 65, 0.06, 95),
+    "heavy cream": NutrientProfile(340, 2.1, 36, 2.8, 23, 1, 137, 27, 0, 2.8, 0, 0.5, 65, 0.06, 95),
+    "double cream": NutrientProfile(467, 1.7, 50.5, 2.7, 31.7, 1.5, 140, 44, 0, 2.7, 0, 0.7, 63, 0.05, 80),
     "salt": NutrientProfile(0, 0, 0, 0, 0, 0, 0, 38758, 0, 0, 0, 0, 24, 0.33, 8),
+    "black pepper": NutrientProfile(251, 10.4, 3.3, 64, 1.4, 0, 0, 20, 25.3, 0.6, 0, 0, 443, 9.7, 1329),
+    "worcestershire sauce": NutrientProfile(78, 0, 0, 19.5, 0, 0, 0, 980, 0, 10, 8, 0, 107, 5.3, 800),
     "egg white": NutrientProfile(52, 10.9, 0.2, 0.7, 0, 0, 0, 166, 0, 0.7, 0, 0, 7, 0.08, 163),
     "bread": NutrientProfile(265, 9, 3.2, 49, 0.7, 0, 0, 491, 2.7, 5, 2, 0, 144, 3.6, 115),
     "onion": NutrientProfile(40, 1.1, 0.1, 9.3, 0, 0, 0, 4, 1.7, 4.2, 0, 0, 23, 0.21, 146),
@@ -187,18 +191,66 @@ USDA_NUTRIENT_NAME_MAP = {
     "potassium, k": "potassium_mg",
 }
 
+INGREDIENT_ALIASES = {
+    "double cream": "heavy cream",
+    "double heavy cream": "heavy cream",
+    "heavy double cream": "heavy cream",
+    "heavy whipping cream": "heavy whipping cream",
+    "whipping cream": "heavy whipping cream",
+    "double heavy": "heavy cream",
+    "sea salt": "salt",
+    "kosher salt": "salt",
+    "table salt": "salt",
+    "ground black pepper": "black pepper",
+    "freshly ground black pepper": "black pepper",
+    "black pepper powder": "black pepper",
+    "worcester sauce": "worcestershire sauce",
+    "worcestershire": "worcestershire sauce",
+}
+
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _normalize_cache_key(name: str) -> str:
+def _normalize_ingredient_text(name: str) -> str:
     key = name.strip().lower()
-    key = re.sub(r"\([^)]*\)", " ", key)
+    key = re.sub(r"[()]", " ", key)
     key = re.sub(r"[^a-z0-9\s-]", " ", key)
-    key = re.sub(r"\b(chopped|diced|minced|sliced|grated|fresh|raw|cooked|optional)\b", " ", key)
+    key = re.sub(
+        r"\b(chopped|diced|minced|sliced|grated|fresh|raw|cooked|optional|softened|melted|room|temperature|at|to|about)\b",
+        " ",
+        key,
+    )
     key = re.sub(r"\s+", " ", key).strip()
     return key or name.strip().lower()
+
+
+def _canonical_ingredient_name(name: str) -> str:
+    key = _normalize_ingredient_text(name)
+    if key in INGREDIENT_ALIASES:
+        return INGREDIENT_ALIASES[key]
+    for alias, canonical in INGREDIENT_ALIASES.items():
+        if alias in key:
+            return canonical
+    return key
+
+
+def _ingredient_name_candidates(name: str) -> list[str]:
+    candidates = [
+        _canonical_ingredient_name(name),
+        _normalize_ingredient_text(name),
+        name.strip().lower(),
+    ]
+    unique = []
+    for candidate in candidates:
+        if candidate and candidate not in unique:
+            unique.append(candidate)
+    return unique
+
+
+def _normalize_cache_key(name: str) -> str:
+    return _canonical_ingredient_name(name)
 
 
 def _normalize_unit(unit: str | None) -> str:
@@ -258,6 +310,19 @@ def _ingredient_grams(ingredient: dict) -> float | None:
     return amount * gram_per_unit
 
 
+def estimated_yield_grams(components: list[dict]) -> float | None:
+    total = 0.0
+    has_measured_ingredient = False
+    for component in components:
+        for ingredient in component.get("ingredients", []):
+            grams = _ingredient_grams(ingredient)
+            if grams is None:
+                continue
+            total += grams
+            has_measured_ingredient = True
+    return round(total, 1) if has_measured_ingredient and total > 0 else None
+
+
 def _nutrition_api_key() -> str | None:
     return os.environ.get("USDA_FDC_API_KEY") or os.environ.get("USDA_API_KEY")
 
@@ -270,7 +335,7 @@ def _cache_ttl_days() -> int:
 
 
 def _lookup(name: str) -> NutrientProfile | None:
-    key = name.strip().lower()
+    key = _canonical_ingredient_name(name)
     for known in NUTRITION_TABLE:
         if known in key:
             return NUTRITION_TABLE[known]
@@ -336,7 +401,7 @@ def _fetch_usda_profile(name: str) -> tuple[NutrientProfile, dict] | None:
     if not api_key:
         return None
 
-    query = _normalize_cache_key(name)
+    query = _canonical_ingredient_name(name)
     params = urllib.parse.urlencode({"api_key": api_key})
     body = json.dumps({
         "query": query,
@@ -382,7 +447,18 @@ def _refresh_cache_profile(db: Session | None, name: str) -> NutrientProfile | N
     profile, source = fetched
     now = _utcnow()
     key = _normalize_cache_key(name)
-    row = db.get(IngredientNutritionCache, key)
+    with db.no_autoflush:
+        row = db.get(IngredientNutritionCache, key)
+        if row is None:
+            row = next(
+                (
+                    pending
+                    for pending in db.new
+                    if isinstance(pending, IngredientNutritionCache)
+                    and pending.cache_key == key
+                ),
+                None,
+            )
     if row is None:
         row = IngredientNutritionCache(cache_key=key, ingredient_name=name)
         db.add(row)
@@ -398,18 +474,22 @@ def _refresh_cache_profile(db: Session | None, name: str) -> NutrientProfile | N
 
 
 def _resolve_profile(name: str, db: Session | None) -> tuple[NutrientProfile | None, str]:
-    profile = _cache_profile(db, name)
-    if profile:
-        return profile, "cache"
-    profile = _refresh_cache_profile(db, name)
-    if profile:
-        return profile, "usda_fdc"
-    profile = _cache_profile(db, name, allow_expired=True)
-    if profile:
-        return profile, "stale_cache"
-    profile = _lookup(name)
-    if profile:
-        return profile, "heuristic"
+    for candidate in _ingredient_name_candidates(name):
+        profile = _cache_profile(db, candidate)
+        if profile:
+            return profile, "cache"
+    for candidate in _ingredient_name_candidates(name):
+        profile = _refresh_cache_profile(db, candidate)
+        if profile:
+            return profile, "usda_fdc"
+    for candidate in _ingredient_name_candidates(name):
+        profile = _cache_profile(db, candidate, allow_expired=True)
+        if profile:
+            return profile, "stale_cache"
+    for candidate in _ingredient_name_candidates(name):
+        profile = _lookup(candidate)
+        if profile:
+            return profile, "heuristic"
     return None, "unmatched"
 
 
@@ -420,16 +500,32 @@ def compute_nutrition(components: list[dict], db: Session | None = None) -> dict
     so the UI can show 'partial data' honestly instead of a false-precision number.
     """
     totals = {field: 0.0 for field in NutrientProfile._fields}
+    estimated_total_yield_g = 0.0
     unmatched: list[str] = []
+    issues: list[dict] = []
     sources: set[str] = set()
 
     for component in components:
         for ing in component.get("ingredients", []):
             macros, source = _resolve_profile(ing["name"], db)
             grams = _ingredient_grams(ing)
+            if grams is not None:
+                estimated_total_yield_g += grams
 
             if macros is None or grams is None:
                 unmatched.append(ing["name"])
+                if grams is None:
+                    issues.append({
+                        "ingredient": ing["name"],
+                        "reason": "missing_grams",
+                        "suggestion": "Add a canonical gram quantity for this ingredient, then refresh nutrition.",
+                    })
+                elif macros is None:
+                    issues.append({
+                        "ingredient": ing["name"],
+                        "reason": "no_nutrition_profile",
+                        "suggestion": "Refresh nutrition with USDA configured, simplify the ingredient name, or add a local nutrition fallback.",
+                    })
                 continue
             if source != "heuristic":
                 sources.add(source)
@@ -443,6 +539,8 @@ def compute_nutrition(components: list[dict], db: Session | None = None) -> dict
     return {
         **{field: round(value, 2) for field, value in totals.items()},
         "unmatched_ingredients": unmatched,
+        "nutrition_issues": issues,
+        "estimated_total_yield_g": round(estimated_total_yield_g, 1) if estimated_total_yield_g > 0 else None,
         "data_completeness": "partial" if unmatched else "complete",
         "nutrition_sources": sorted(sources),
         "cache_expires_days": _cache_ttl_days() if db is not None and _nutrition_api_key() else None,

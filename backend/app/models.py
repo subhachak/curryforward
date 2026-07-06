@@ -58,7 +58,7 @@ class RecipeVersion(Base):
 
     # Admin-only scratch fields — never sent to guests, excluded from to_dict().
     notes = Column(Text, nullable=True)
-    research_conversation = Column(JSON, nullable=True)  # {"messages": [...], "pending_tool_use": {...}|None}
+    research_conversation = Column(JSON, nullable=True)  # legacy transcript field, inert in current flow
     research_model = Column(String, nullable=True)  # LiteLLM model string for this session, e.g. "anthropic/claude-sonnet-5"
     starting_prompt = Column(Text, nullable=True)  # the admin's freeform kickoff text — a name, a description, or a full pasted draft
 
@@ -119,11 +119,11 @@ class RecipeVersion(Base):
         }
 
     def to_research_dict(self) -> dict:
-        """Admin-only shape for the research workspace — adds notes + conversation state."""
+        """Admin-only shape for the research workspace — adds notes and draft metadata."""
         return {
             **self.to_dict(),
             "notes": self.notes,
-            "research_conversation": self.research_conversation or {"messages": [], "pending_tool_use": None},
+            "research_conversation": self.research_conversation or {"messages": []},
             "research_model": self.research_model,
             "starting_prompt": self.starting_prompt,
             "auto_research_status": self.auto_research_status,

@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from app.db import SessionLocal, init_db
 from app.models import IngredientNutritionCache
+from app import nutrition
 from app.nutrition import compute_nutrition
 
 
@@ -92,3 +93,104 @@ def test_compute_nutrition_handles_imported_units_and_gram_options():
     assert result["fat_g"] > 500
     assert result["carbs_g"] > 400
     assert result["unmatched_ingredients"] == []
+
+
+def test_compute_nutrition_matches_common_pantry_aliases_without_usda_key():
+    os.environ.pop("USDA_FDC_API_KEY", None)
+    os.environ.pop("USDA_API_KEY", None)
+
+    result = compute_nutrition(
+        [
+            {
+                "component_name": "main",
+                "ingredients": [
+                    {"name": "Salt", "amount": 5, "unit": "g"},
+                    {"name": "Black pepper", "amount": 2, "unit": "g"},
+                    {"name": "Double (heavy) cream", "amount": 120, "unit": "g"},
+                    {"name": "Worcestershire sauce", "amount": 20, "unit": "g"},
+                ],
+            }
+        ]
+    )
+
+    assert result["unmatched_ingredients"] == []
+    assert result["nutrition_issues"] == []
+    assert result["sodium_mg"] > 1900
+    assert result["fat_g"] > 40
+
+
+def test_compute_nutrition_reports_missing_grams_separately_from_profile_match():
+    os.environ.pop("USDA_FDC_API_KEY", None)
+    os.environ.pop("USDA_API_KEY", None)
+
+    result = compute_nutrition(
+        [
+            {
+                "component_name": "main",
+                "ingredients": [
+                    {"name": "Black pepper", "amount": None, "unit": "g"},
+                ],
+            }
+        ]
+    )
+
+    assert result["unmatched_ingredients"] == ["Black pepper"]
+    assert result["nutrition_issues"] == [
+        {
+            "ingredient": "Black pepper",
+            "reason": "missing_grams",
+            "suggestion": "Add a canonical gram quantity for this ingredient, then refresh nutrition.",
+        }
+    ]
+
+
+def test_compute_nutrition_reuses_pending_cache_row_for_duplicate_keys(monkeypatch):
+    os.environ["USDA_FDC_API_KEY"] = "test-key"
+    init_db()
+    db = SessionLocal()
+    calls: list[str] = []
+
+    def fake_fetch(name: str):
+        calls.append(name)
+        profile = nutrition.NutrientProfile(
+            calories=100,
+            protein_g=1,
+            fat_g=2,
+            carbs_g=3,
+            saturated_fat_g=0,
+            trans_fat_g=0,
+            cholesterol_mg=0,
+            sodium_mg=0,
+            fiber_g=0,
+            sugars_g=0,
+            added_sugars_g=0,
+            vitamin_d_mcg=0,
+            calcium_mg=0,
+            iron_mg=0,
+            potassium_mg=0,
+        )
+        return profile, {"fdc_id": "same", "description": name, "nutrients": profile._asdict()}
+
+    monkeypatch.setattr(nutrition, "_fetch_usda_profile", fake_fetch)
+    try:
+        result = compute_nutrition(
+            [
+                {
+                    "component_name": "main",
+                    "ingredients": [
+                        {"name": "Double cream", "amount": 100, "unit": "g"},
+                        {"name": "Heavy cream", "amount": 100, "unit": "g"},
+                    ],
+                }
+            ],
+            db,
+        )
+        db.commit()
+
+        assert result["calories"] == 200
+        assert result["nutrition_sources"] == ["usda_fdc"]
+        assert db.query(IngredientNutritionCache).filter_by(cache_key="heavy cream").count() == 1
+        assert len(calls) == 2
+    finally:
+        db.close()
+        os.environ.pop("USDA_FDC_API_KEY", None)

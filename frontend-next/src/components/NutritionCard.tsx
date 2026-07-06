@@ -1,5 +1,5 @@
-import { Badge } from "@/components/ui/Badge";
 import type { RecipeDetail } from "@/lib/types";
+import { estimatedRecipeYieldGrams, nutritionServingGrams } from "@/lib/recipeNutrition";
 
 // FDA reference daily values for a 2000-calorie diet, used only to show an
 // approximate "% Daily Value" column like a real nutrition label - these are
@@ -24,23 +24,8 @@ function percentDV(value: number, key: keyof typeof DAILY_VALUES) {
   return Math.round((value / DAILY_VALUES[key]) * 100);
 }
 
-function singularize(unit: string): string {
-  return unit.endsWith("s") && unit.length > 1 ? unit.slice(0, -1) : unit;
-}
-
-function servingSizeLabel(recipe: RecipeDetail): string {
-  const { serving_size, base_servings } = recipe;
-  if (serving_size.amount && serving_size.unit) {
-    return `${serving_size.amount} ${serving_size.unit}`;
-  }
-  if (serving_size.unit) {
-    return serving_size.unit;
-  }
-  return `1 ${singularize(base_servings.unit || "serving")}`;
-}
-
 export function NutritionCard({ recipe }: { recipe: RecipeDetail }) {
-  const { nutrition, base_servings, components } = recipe;
+  const { nutrition, components } = recipe;
 
   if (!nutrition || Object.keys(nutrition).length === 0) {
     return (
@@ -67,17 +52,14 @@ export function NutritionCard({ recipe }: { recipe: RecipeDetail }) {
         <p className="mt-1">
           Add measurable ingredient amounts or refresh after the USDA nutrition key is configured.
         </p>
-        {nutrition.unmatched_ingredients?.length ? (
-          <p className="mt-2 text-xs">
-            Unmatched: {nutrition.unmatched_ingredients.join(", ")}
-          </p>
-        ) : null}
       </div>
     );
   }
 
-  const servings = base_servings.amount && base_servings.amount > 0 ? base_servings.amount : 1;
-  const perServing = (total?: number) => Math.round(((total ?? 0) / servings) * 10) / 10;
+  const totalYieldGrams = estimatedRecipeYieldGrams(recipe);
+  const servingGrams = nutritionServingGrams(recipe);
+  const servingFactor = totalYieldGrams && totalYieldGrams > 0 ? servingGrams / totalYieldGrams : 1;
+  const perServing = (total?: number) => Math.round(((total ?? 0) * servingFactor) * 10) / 10;
 
   const calories = perServing(nutrition.calories);
   const protein = perServing(nutrition.protein_g);
@@ -94,8 +76,6 @@ export function NutritionCard({ recipe }: { recipe: RecipeDetail }) {
   const calcium = perServing(nutrition.calcium_mg);
   const iron = perServing(nutrition.iron_mg);
   const potassium = perServing(nutrition.potassium_mg);
-  const incomplete = nutrition.data_completeness === "partial";
-
   const ingredientList = components
     .flatMap((c) => c.ingredients.map((i) => i.name))
     .filter(Boolean)
@@ -106,10 +86,10 @@ export function NutritionCard({ recipe }: { recipe: RecipeDetail }) {
       <div className="mb-2 h-2 rounded-full bg-[#FF6B00]" />
       <h3 className="text-3xl font-black leading-none text-[#2E1B14]">Nutrition Facts</h3>
       <div className="mt-1 text-sm text-[#5A4038]">
-        {base_servings.amount ? `${base_servings.amount} ${base_servings.unit} per recipe` : "1 recipe"}
+        {totalYieldGrams ? `Approx. ${totalYieldGrams} g per recipe` : "Recipe yield not calculated"}
       </div>
       <div className="border-b-8 border-[#2E1B14] pb-1 text-base font-bold text-[#2E1B14]">
-        Serving size {servingSizeLabel(recipe)}
+        Serving size {servingGrams} g
       </div>
 
       <div className="border-b-4 border-[#2E1B14] pt-1 text-xs text-[#5A4038]">Amount Per Serving</div>
@@ -178,17 +158,9 @@ export function NutritionCard({ recipe }: { recipe: RecipeDetail }) {
       <p className="mt-2 text-[11px] leading-snug text-[#5A4038]">
         *The % Daily Value (DV) tells you how much a nutrient in a serving of food contributes to a
         daily diet. 2,000 calories a day is used for general nutrition advice. Estimated from
-        ingredient data - not lab-verified.
+        ingredient data - not lab-verified. This is an approximation and is not medical,
+        dietary, or allergy guidance.
       </p>
-
-      {incomplete && (
-        <div className="mt-2 flex items-center gap-2">
-          <Badge tone="warning">Partial data</Badge>
-          <span className="text-[11px] text-[#5A4038]">
-            Unmatched: {nutrition.unmatched_ingredients?.join(", ")}
-          </span>
-        </div>
-      )}
 
       {ingredientList && (
         <div className="mt-3 border-t border-[#2E1B14]/20 pt-2 text-[11px] leading-snug text-[#5A4038]">

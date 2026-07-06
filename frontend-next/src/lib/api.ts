@@ -25,7 +25,6 @@ import type {
   RecipeWideEditResult,
   RecipeUpsertRequest,
   ResearchPatchPayload,
-  ResearchTurnResult,
   Role,
   TrashedRecipeSummary,
 } from "./types";
@@ -101,14 +100,6 @@ export const api = {
     apiFetch<RecipeResearchDetail>(`/recipes/research/${recipeId}`),
   listResearchJobs: (recipeId: string) =>
     apiFetch<ResearchJobSummary[]>(`/recipes/research/${recipeId}/jobs`),
-  researchChat: (
-    recipeId: string,
-    body: { message?: string; tool_use_id?: string; query?: string; approved?: boolean }
-  ) =>
-    apiFetch<ResearchTurnResult>(`/recipes/research/${recipeId}/chat`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
   patchResearch: (recipeId: string, patch: ResearchPatchPayload) =>
     apiFetch<RecipeResearchDetail>(`/recipes/research/${recipeId}`, {
       method: "PATCH",

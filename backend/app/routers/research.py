@@ -1,14 +1,13 @@
 """
-The agentic recipe research workflow — a step-by-step recipe editing and
-development workspace. Every endpoint here is
-admin-only.
+The agentic recipe research workflow — admin-only draft creation, auto-research,
+direct field edits, recipe-wide AI edits, review, and publishing.
 
 A research session is a recipe_id whose current-head version has
-status="draft" — mutated in place turn by turn (chat replies, direct field
-patches) rather than creating a new immutable version each time, so autosave
-doesn't explode the version history. Brand-new drafts publish in place.
-Dashboard edits of published recipes create linked draft copies; publishing
-those copies can either replace the original recipe or keep both.
+status="draft" — mutated in place by direct field patches and AI edit actions
+rather than creating a new immutable version each time, so autosave doesn't
+explode the version history. Brand-new drafts publish in place. Dashboard edits
+of published recipes create linked draft copies; publishing those copies can
+either replace the original recipe or keep both.
 """
 from __future__ import annotations
 
@@ -26,12 +25,7 @@ from sqlalchemy.orm import Session
 from ..auth import require_admin
 from ..crew_research import extract_dish_name, propose_search_batch, refine_section, run_auto_research_crew
 from ..db import SessionLocal, get_db
-from ..llm_agent import (
-    continue_research_turn,
-    is_tavily_configured,
-    run_tavily_search,
-    start_research_turn,
-)
+from ..llm_agent import is_web_search_configured, run_web_search
 from ..llm_client import is_litellm_configured, is_model_available, litellm_completion
 from ..models import Base, IngredientNutritionCache, RecipeVersion, ResearchJob
 from ..schemas import ComponentPayload, IngredientPayload, RecipeResearchResponse, StepPayload
@@ -40,7 +34,7 @@ from ..services.audit import audit_admin_action
 from ..services.ingredient_canonical import normalize_components_to_grams
 from ..services.llm_usage import record_llm_usage
 from ..nutrition import _lookup as lookup_builtin_nutrition
-from ..nutrition import _normalize_cache_key, compute_nutrition
+from ..nutrition import _normalize_cache_key, compute_nutrition, estimated_yield_grams
 
 router = APIRouter(prefix="/api/recipes/research")
 logger = logging.getLogger(__name__)
@@ -57,13 +51,6 @@ PATCHABLE_FIELDS = [
 class StartResearchRequest(BaseModel):
     prompt: str
     model: str | None = None
-
-
-class ResearchChatRequest(BaseModel):
-    message: str | None = None
-    tool_use_id: str | None = None
-    query: str | None = None
-    approved: bool | None = None
 
 
 class ResearchPatchRequest(BaseModel):
@@ -165,9 +152,14 @@ def _apply_patch(row: RecipeVersion, patch: dict, db: Session | None = None, all
             continue
         if key == "components" and value is not None:
             value = normalize_components_to_grams(value)
+        if key in {"base_servings_unit", "serving_size_unit"}:
+            value = "g"
         setattr(row, key, value)
     if "components" in patch and (patch["components"] is not None or allow_null):
         row.nutrition = compute_nutrition(row.components or [], db)
+        row.base_servings_amount = estimated_yield_grams(row.components or [])
+        row.base_servings_unit = "g"
+        row.serving_size_unit = "g"
 
 
 def _extract_json_object(text: str) -> dict:
@@ -294,7 +286,7 @@ def start_research(
     or a full pasted draft recipe — stored verbatim as `starting_prompt` and
     also used to derive the short `name` needed for the DB row and page
     headers. Deriving a good name needs a working model, so this gates on
-    is_model_available() the same way /chat and /auto do (unlike before,
+    is_model_available() the same way the auto-research endpoints do (unlike before,
     when creating a draft had no AI dependency at all)."""
     model = req.model or resolve_task_model("dish_name_extraction", db)
     if not is_model_available(model):
@@ -320,7 +312,7 @@ def start_research(
         status="draft",
         source="researched",
         is_current_head=True,
-        research_conversation={"messages": [], "pending_tool_use": None},
+        research_conversation={"messages": []},
         research_model=req.model,
         starting_prompt=req.prompt,
     )
@@ -440,6 +432,9 @@ def refresh_research_nutrition(
     """
     row = _get_draft(db, recipe_id)
     row.nutrition = compute_nutrition(row.components or [], db)
+    row.base_servings_amount = estimated_yield_grams(row.components or [])
+    row.base_servings_unit = "g"
+    row.serving_size_unit = "g"
     audit_admin_action(
         db,
         action="research_nutrition_refreshed",
@@ -453,93 +448,6 @@ def refresh_research_nutrition(
     )
     db.commit()
     return row.to_research_dict()
-
-
-@router.post("/{recipe_id}/chat")
-def research_chat(
-    recipe_id: str,
-    req: ResearchChatRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-    role: str = Depends(require_admin),
-):
-    """
-    One turn of the research conversation. Two shapes of request:
-    - A fresh message: {"message": "..."}.
-    - A decision on a previously proposed search: {"tool_use_id", "query",
-      "approved"}. On approval, actually calls Tavily; on decline, tells the
-      model so without running a search.
-    Either way, the conversation and any recipe content produced are
-    persisted immediately (autosave) before responding.
-    """
-    row = _get_draft(db, recipe_id)
-    model = resolve_task_model("research_chat", db, row.research_model)
-    if not is_model_available(model):
-        raise HTTPException(400, f"No API key configured for model '{model}' — add it to backend/.env")
-
-    conversation = row.research_conversation or {"messages": [], "pending_tool_use": None}
-    messages = list(conversation.get("messages") or [])
-
-    try:
-        if req.tool_use_id is not None:
-            if req.approved:
-                if not is_tavily_configured():
-                    raise HTTPException(400, "TAVILY_API_KEY not set — add it to backend/.env")
-                result_text = run_tavily_search(req.query or "")
-                envelope = continue_research_turn(messages, req.tool_use_id, result_text, model)
-            else:
-                decline_text = (
-                    "The user declined this search. Do not repeat the same or a "
-                    "very similar query — proceed with what you already know, or "
-                    "ask a clarifying question instead."
-                )
-                envelope = continue_research_turn(messages, req.tool_use_id, decline_text, model)
-            # continue_research_turn() injects a tool result message that must
-            # be persisted — otherwise the next turn replays a tool call with
-            # no matching result and the provider rejects the request.
-            messages = envelope["messages"]
-        else:
-            if not req.message:
-                raise HTTPException(400, "message is required")
-            messages = messages + [{"role": "user", "content": req.message}]
-            envelope = start_research_turn(messages, model)
-    except HTTPException:
-        raise
-    except Exception as e:
-        record_llm_usage(task="research_chat", model=model, role=role, status="error", error=str(e))
-        raise HTTPException(500, f"Research chat failed: {e}")
-    record_llm_usage(task="research_chat", model=model, role=role)
-
-    messages = messages + [envelope["assistant_message"]]
-
-    if envelope["tool_use"]:
-        row.research_conversation = {"messages": messages, "pending_tool_use": envelope["tool_use"]}
-        db.commit()
-        return {
-            "type": "search_proposal",
-            "query": envelope["tool_use"]["query"],
-            "tool_use_id": envelope["tool_use"]["id"],
-        }
-
-    row.research_conversation = {"messages": messages, "pending_tool_use": None}
-    patch = envelope.get("recipe_patch")
-    if patch:
-        _apply_patch(row, patch, db)
-    audit_admin_action(
-        db,
-        action="research_chat_turn",
-        target_type="recipe",
-        target_id=recipe_id,
-        request=request,
-        details={"had_patch": bool(patch), "tool_use": bool(envelope.get("tool_use"))},
-    )
-    db.commit()
-    return {
-        "type": "reply",
-        "reply": envelope.get("reply") or "",
-        "recipe": row.to_research_dict(),
-        "notes_suggestion": envelope.get("notes_suggestion"),
-    }
 
 
 @router.post("/{recipe_id}/auto/plan")
@@ -584,18 +492,19 @@ def auto_research_run(
     row = _get_draft(db, recipe_id)
     if row.auto_research_status == "running":
         raise HTTPException(409, "Auto-research is already running for this recipe")
-    if not is_tavily_configured():
-        raise HTTPException(400, "TAVILY_API_KEY not set — add it to backend/.env")
+    if not is_web_search_configured():
+        raise HTTPException(400, "OPENAI_API_KEY not set — add it to backend/.env for native web search")
     model = resolve_task_model("auto_research_crew", db, row.research_model)
     if not is_model_available(model):
         raise HTTPException(400, f"No API key configured for model '{model}' — add it to backend/.env")
 
     job_id = uuid.uuid4().hex
+    approved_queries = list(req.approved_queries)[:4]
     job = ResearchJob(
         job_id=job_id,
         recipe_id=recipe_id,
         model=model,
-        approved_queries=list(req.approved_queries),
+        approved_queries=approved_queries,
         status="running",
         progress=[],
     )
@@ -610,14 +519,14 @@ def auto_research_run(
         target_type="recipe",
         target_id=recipe_id,
         request=request,
-        details={"job_id": job_id, "model": model, "query_count": len(req.approved_queries)},
+        details={"job_id": job_id, "model": model, "query_count": len(approved_queries)},
     )
     db.commit()
     logger.info("auto_research_started", extra={"recipe_id": recipe_id, "job_id": job_id, "model": model})
 
     thread = threading.Thread(
         target=_run_auto_research_job,
-        args=(recipe_id, list(req.approved_queries), model, row.starting_prompt, job_id),
+        args=(recipe_id, approved_queries, model, row.starting_prompt, job_id),
         daemon=True,
     )
     thread.start()
@@ -673,7 +582,7 @@ def _run_auto_research_job(
         try:
             search_results = []
             for q in approved_queries:
-                result_text = run_tavily_search(q)
+                result_text = run_web_search(q)
                 search_results.append({"query": q, "result": result_text})
             job = db.query(ResearchJob).filter(ResearchJob.job_id == job_id).first()
             if job:
@@ -778,7 +687,7 @@ def refine_recipe_section(
 ):
     """One-shot AI refinement of a single section (history/ingredients/steps/
     tips) — a single LLM call, not a crew, so this stays synchronous like
-    /chat."""
+    auto-research endpoint."""
     row = _get_draft(db, recipe_id)
     model = resolve_task_model("section_refine", db, row.research_model)
     if not is_model_available(model):
@@ -925,13 +834,13 @@ def ask_admin_assistant(
     web_query = None
     if _assistant_should_search_web(question, local_context):
         web_query = _build_assistant_web_query(row, question)
-        if is_tavily_configured():
+        if is_web_search_configured():
             try:
-                web_context = run_tavily_search(web_query)
+                web_context = run_web_search(web_query)
             except Exception as e:
                 web_context = f"Web search was attempted but failed: {e}"
         else:
-            web_context = "Web search is unavailable because TAVILY_API_KEY is not configured."
+            web_context = "Web search is unavailable because OPENAI_API_KEY is not configured."
 
     system_prompt = (
         "You are CurryForward's admin editing assistant. Answer concise, practical "

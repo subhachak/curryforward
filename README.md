@@ -53,10 +53,10 @@ Backend configuration lives in `backend/.env`:
 | `APP_ENV=production` | recommended in production | Enables secure cookies and HSTS when Railway's production env flag is absent |
 | `RATE_LIMIT_*` | optional | Tunes login, feedback, upload, and LLM request limits |
 | `ANTHROPIC_API_KEY` | for Anthropic chat/generation | Enables the default recipe chat/generate paths |
-| `OPENAI_API_KEY` / `GROQ_API_KEY` | optional | Enables those models in the research model picker through LiteLLM |
-| `GEMINI_API_KEY` | optional | Enables Gemini models for low-cost moderation/research defaults through LiteLLM |
+| `OPENAI_API_KEY` | recommended | Enables the GPT defaults for moderation, research, import, rewrite, and assistant tasks through LiteLLM |
+| `GEMINI_API_KEY` / `GROQ_API_KEY` | optional | Enables those models as alternate choices in Workspace → Models through LiteLLM |
 | `DEFAULT_MODEL` | optional | Legacy fallback LiteLLM model string; task-specific defaults are managed in Workspace → Models |
-| `TAVILY_API_KEY` | for web research | Enables guided-search approval and auto-research |
+| `OPENAI_WEB_SEARCH_MODEL` | optional | Overrides the OpenAI model used for native web search, defaults to `gpt-5-mini` |
 | `CORS_ORIGINS` | optional | Comma-separated allowed frontend origins for cookie auth |
 | `DATABASE_URL` | optional | SQLite database URL; use `sqlite:////data/curryforward.db` with a persistent Railway Volume |
 | `UPLOADS_DIR` | optional | Uploaded-image directory; use `/data/uploads` with a persistent Railway Volume |
@@ -97,18 +97,20 @@ Also set the app secrets in Railway variables:
 ADMIN_TOKEN=...
 SESSION_SECRET=...
 ANTHROPIC_API_KEY=...
-TAVILY_API_KEY=...
-DEFAULT_MODEL=anthropic/claude-sonnet-5
+OPENAI_API_KEY=...
+OPENAI_WEB_SEARCH_MODEL=gpt-5-mini
+DEFAULT_MODEL=openai/gpt-5-mini
 ```
 
-Optional model-provider variables such as `OPENAI_API_KEY` and `GROQ_API_KEY`
-can be added later. Add `GEMINI_API_KEY` to use the default low-cost Gemini
-model assignments. The Railway health check uses `/api/health`.
+Optional model-provider variables such as `GEMINI_API_KEY` and `GROQ_API_KEY`
+can be added later for alternate model choices. The Railway health check uses
+`/api/health`.
 
 LLM task defaults can be changed from **Workspace → Models**. The app starts
-with cheap Gemini defaults for moderation/name extraction, balanced Gemini
-defaults for research/refinement, and Anthropic defaults for the recipe
-generation paths that still depend on Anthropic's server-side web search.
+with GPT-5 nano defaults for cheap classification/extraction/rewrite calls,
+GPT-5 mini defaults for research/import/refinement, and Anthropic defaults for
+the recipe generation paths that still depend on Anthropic's server-side web
+search.
 
 ## Checks and migrations
 

@@ -9,20 +9,13 @@ LLM agent — powers four things:
 3. Conversational recipe drafting: an admin pastes a natural-language draft
    (or just a dish idea) and can iteratively refine it before saving —
    never persists on its own, unlike #2.
-4. Agentic recipe research: a real multi-turn tool-use loop (unlike #2/#3,
-   which declare Anthropic's server-executed web_search tool and never see
-   the queries). Here a custom `tavily_search` tool is client-side — the
-   model proposes a query and stops; the caller must get human approval
-   before actually searching and continuing the turn. See
-   start_research_turn / continue_research_turn.
+4. Native web search for admin auto-research/admin-assistant lookups, always
+   invoked by backend code after an explicit admin action.
 
-#1-3 call the Anthropic API directly and require ANTHROPIC_API_KEY. #4 is
-routed through LiteLLM (see llm_client.py) so the admin can pick any
-configured provider/model per research session — it requires whichever
-provider key that session's chosen model needs, resolved by the caller in
-routers/research.py, not hardcoded here. If a flow's required key isn't set,
-the app still runs — these endpoints return a clear error instead of
-crashing. Web research additionally requires TAVILY_API_KEY.
+#1-3 call the Anthropic API directly and require ANTHROPIC_API_KEY. If a
+flow's required key isn't set, the app still runs — these endpoints return a
+clear error instead of crashing. Web research uses the configured native
+provider search tool.
 """
 from __future__ import annotations
 
@@ -40,9 +33,9 @@ except ImportError:
     anthropic = None
 
 try:
-    from tavily import TavilyClient
+    from openai import OpenAI
 except ImportError:
-    TavilyClient = None
+    OpenAI = None
 
 MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
 CUSTOMIZE_TIMEOUT_SECONDS = float(os.environ.get("CUSTOMIZE_TIMEOUT_SECONDS", "20"))
@@ -57,8 +50,8 @@ def _client():
     return anthropic.Anthropic(api_key=api_key)
 
 
-def is_tavily_configured() -> bool:
-    return bool(os.environ.get("TAVILY_API_KEY")) and TavilyClient is not None
+def is_web_search_configured() -> bool:
+    return bool(os.environ.get("OPENAI_API_KEY")) and OpenAI is not None
 
 
 CUSTOMIZE_SYSTEM_PROMPT = """You are a recipe customization assistant inside \
@@ -249,84 +242,6 @@ Prefer expressing ingredient amounts in grams ("g") where a reasonable gram \
 equivalent exists, rather than volume units.
 """
 
-RESEARCH_SYSTEM_PROMPT = """You are a recipe research assistant inside \
-CurryForward, helping an admin develop a complete, well-researched recipe step \
-by step through conversation — similar to a deep-research assistant, but tuned \
-for food.
-
-You are building up a recipe document with these sections over the course of \
-the conversation. Fill them in incrementally as you and the admin make \
-progress — you do not need all of them in one turn:
-- name: the dish's name
-- category: e.g. main, dessert, side, drink
-- cuisine_tags: list of short cuisine/style tags
-- base_servings: {"amount": number, "unit": str} — how many servings this yields
-- serving_size: {"amount": number|null, "unit": str|null} — the quantity represented by one nutrition-label serving, e.g. 1 bowl, 1 piece, 250 g
-- intro: a short, appetizing 2-4 sentence description of the dish
-- history: one narrative covering where the dish comes from, its traditions, \
-historical significance, and cultural relevance — grounded in what you actually \
-find via search, not invented
-- prep_time_minutes / cook_time_minutes: integers
-- components: [{"component_name": str, "ingredients": [{"name": str, "amount": \
-number|null, "unit": str}]}] — PREFER GRAMS ("g") for ingredient amounts whenever \
-a reasonable weight equivalent exists; only use volume/count units (cup, tsp, \
-piece, clove, pinch) when weighing genuinely doesn't apply
-- steps: [{"step_number": int, "component_ref": str|null, "instruction": str}]
-- tips: list of short, practical tips-and-tricks strings
-- watch_outs: list of short "things to watch out for" / common-mistake strings
-
-## Web search protocol — approval required
-
-You have a `tavily_search` tool. Never assume you know something you'd need to \
-search for — propose ONE focused search at a time by calling the tool, then \
-stop and wait. The admin approves or declines each search before you see any \
-results; you will never receive results you didn't get explicit approval for. \
-Do not propose a second search in the same turn. If a search is declined, do \
-not immediately re-propose the same or a near-identical query — acknowledge it \
-and either proceed with what you already know or ask the admin a clarifying \
-question instead.
-
-## Responding
-
-When you are not proposing a search, respond with ONLY a valid JSON object (no \
-commentary outside it) in this exact shape:
-{
-  "reply": "a short, conversational message for the admin — what you found, \
-what you're proposing, or a clarifying question",
-  "recipe_patch": {<only the top-level fields you're adding or changing this \
-turn, using the section schema above>} or null if you have nothing new yet,
-  "notes_suggestion": "a short research note worth remembering" or null — use \
-sparingly, only for genuinely useful findings the admin might want to keep \
-(e.g. a source, an uncertain fact, a decision point). This is a SUGGESTION the \
-admin can accept or dismiss — never assume it's saved.
-}
-
-Keep "reply" conversational and concise — you're chatting with the admin, not \
-writing the recipe document itself; the actual content goes in recipe_patch.
-"""
-
-TAVILY_SEARCH_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "tavily_search",
-        "description": (
-            "Search the web for factual information to help research this recipe — "
-            "its origin, history, cultural significance, common technique, or anything "
-            "else useful for writing an accurate, well-informed recipe. Propose ONE "
-            "focused query at a time. The user must approve each search before it runs; "
-            "you will not see results until they do."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "A focused web search query."}
-            },
-            "required": ["query"],
-        },
-    },
-}
-
-
 def is_configured() -> bool:
     return _client() is not None
 
@@ -502,121 +417,31 @@ def _extract_json(text: str) -> dict:
     return json.loads(text[start:end])
 
 
-def run_tavily_search(query: str) -> str:
-    """Runs a real Tavily search and formats results into a compact string
-    suitable for a tool_result block. Only ever called after human approval —
-    see routers/research.py."""
-    if not is_tavily_configured():
+def run_web_search(query: str) -> str:
+    """Runs native provider web search and formats results into compact context.
+
+    Only ever called after human approval — see routers/research.py. OpenAI is
+    the default backend because the app's task defaults are GPT models and the
+    Responses API exposes a first-party web_search tool with citations.
+    """
+    if not is_web_search_configured():
         raise RuntimeError(
-            "TAVILY_API_KEY not set. Add it to backend/.env to enable web search."
+            "OPENAI_API_KEY not set. Add it to backend/.env to enable native web search."
         )
-    client = TavilyClient(api_key=os.environ.get("TAVILY_API_KEY"))
-    response = client.search(query, max_results=5)
-    results = response.get("results", [])
-    if not results:
-        return "No results found for this search."
-
-    lines = []
-    for r in results:
-        title = (r.get("title") or "").strip()
-        url = (r.get("url") or "").strip()
-        content = (r.get("content") or "").strip()
-        if len(content) > 400:
-            content = content[:400].rsplit(" ", 1)[0] + "…"
-        lines.append(f"- {title} ({url}): {content}")
-    text = "\n".join(lines)
-    if len(text) > 3000:
-        text = text[:3000] + "\n… (truncated)"
-    return text
-
-
-def start_research_turn(messages: list[dict], model: str) -> dict:
-    """
-    One turn of the agentic research loop — routed through LiteLLM so `model`
-    can be any provider/model string the admin picked (see llm_client.py),
-    not just Anthropic. Returns a normalized envelope:
-      {"assistant_message": <dict to append to the stored message list>,
-       "tool_use": {"id": str, "query": str} | None,
-       "reply": str | None, "recipe_patch": dict | None,
-       "notes_suggestion": str | None}
-    `tool_use` is set when the model wants to search — the caller must get
-    human approval (see routers/research.py) before calling
-    continue_research_turn(). Otherwise `reply`/`recipe_patch`/
-    `notes_suggestion` are set from the model's final JSON-envelope response.
-
-    LiteLLM normalizes every provider to OpenAI's wire format: the system
-    prompt is a {"role":"system",...} message (not a separate kwarg), tool
-    calls come back as response.choices[0].message.tool_calls (not Anthropic
-    content blocks), and finish_reason ("tool_calls"/"stop"/"length")
-    replaces stop_reason. The system prompt is prepended fresh on every call
-    rather than persisted in `messages` — keeps the stored conversation
-    smaller and a future prompt tweak applies retroactively to old sessions.
-    """
-    from .llm_client import litellm_completion
-
-    response = litellm_completion(
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    model = os.environ.get("OPENAI_WEB_SEARCH_MODEL", "gpt-5-mini")
+    response = client.responses.create(
         model=model,
-        max_tokens=4000,
-        messages=[{"role": "system", "content": RESEARCH_SYSTEM_PROMPT}] + messages,
-        tools=[TAVILY_SEARCH_TOOL],
-        tool_choice="auto",
-        parallel_tool_calls=False,
+        tools=[{"type": "web_search"}],
+        tool_choice="required",
+        include=["web_search_call.action.sources"],
+        input=(
+            "Search the web for this CurryForward recipe research query. "
+            "Return a concise source-grounded summary with useful facts, "
+            "and include source names/URLs when available.\n\n"
+            f"Query: {query}"
+        ),
     )
+    text = (getattr(response, "output_text", "") or "").strip()
+    return text or "No useful web search results were returned for this query."
 
-    choice = response.choices[0]
-    msg = choice.message
-    assistant_message = {
-        "role": "assistant",
-        "content": msg.content,
-        "tool_calls": [tc.model_dump() for tc in msg.tool_calls] if msg.tool_calls else None,
-    }
-
-    if choice.finish_reason == "length":
-        raise RuntimeError(
-            "The research assistant's response was cut off — try a shorter message."
-        )
-
-    if choice.finish_reason == "tool_calls" and msg.tool_calls:
-        tool_call = msg.tool_calls[0]
-        args = json.loads(tool_call.function.arguments)
-        return {
-            "assistant_message": assistant_message,
-            "tool_use": {"id": tool_call.id, "query": args.get("query", "")},
-            "reply": None,
-            "recipe_patch": None,
-            "notes_suggestion": None,
-        }
-
-    envelope = _extract_json(msg.content or "")
-    return {
-        "assistant_message": assistant_message,
-        "tool_use": None,
-        "reply": envelope.get("reply", ""),
-        "recipe_patch": envelope.get("recipe_patch"),
-        "notes_suggestion": envelope.get("notes_suggestion"),
-    }
-
-
-def continue_research_turn(
-    messages: list[dict],
-    tool_use_id: str,
-    tool_result_content: str,
-    model: str,
-    is_error: bool = False,
-) -> dict:
-    """Appends a tool result for a previously-proposed search (either real
-    Tavily results or a "declined by user" notice) and continues the turn.
-    Returns the same envelope shape as start_research_turn(), plus a
-    "messages" key holding the list (including the injected tool result)
-    the caller must persist as the new base — otherwise the next turn's
-    tool call would be missing its result on replay, which providers reject.
-
-    `is_error` is accepted for symmetry with the old Anthropic-native
-    signature but isn't distinguished on the wire here — LiteLLM's OpenAI-
-    style tool message has no separate is_error flag; a declined search is
-    communicated via the content text itself (see routers/research.py)."""
-    messages = list(messages)
-    messages.append({"role": "tool", "tool_call_id": tool_use_id, "content": tool_result_content})
-    envelope = start_research_turn(messages, model)
-    envelope["messages"] = messages
-    return envelope

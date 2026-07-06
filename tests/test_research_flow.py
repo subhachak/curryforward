@@ -54,10 +54,10 @@ def test_guest_cannot_patch_research_recipe():
     assert r.status_code == 403
 
 
-def test_guest_cannot_chat():
+def test_research_chat_route_is_gone_for_guests_too():
     draft = _start_draft()
     r = client.post(f"/api/recipes/research/{draft['recipe_id']}/chat", json={"message": "hi"})
-    assert r.status_code == 403
+    assert r.status_code in {404, 405}
 
 
 def test_guest_cannot_use_admin_assistant():
@@ -75,43 +75,17 @@ def test_guest_cannot_publish_or_unpublish():
     assert client.post(f"/api/recipes/research/{draft['recipe_id']}/unpublish").status_code == 403
 
 
-# --- missing API keys, deterministic ---------------------------------------
+# --- removed research chat endpoint ----------------------------------------
 
 
-def test_chat_without_anthropic_key_400s(monkeypatch):
-    # research_chat's task default is Gemini, not DEFAULT_MODEL — delete every
-    # provider key this task could resolve to (not just Anthropic) so "no
-    # model available" holds regardless of which optional provider keys
-    # happen to be configured in the local .env (e.g. Gemini/OpenAI added for
-    # manual QA testing). Draft creation happens BEFORE the keys are removed
-    # — it still needs a working model itself (to extract the name).
+def test_research_chat_endpoint_is_removed():
     draft = _start_draft()
-    for key in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY", "GROQ_API_KEY"):
-        monkeypatch.delenv(key, raising=False)
     r = client.post(
         f"/api/recipes/research/{draft['recipe_id']}/chat",
         json={"message": "let's research this dish"},
         headers=ADMIN_HEADERS,
     )
-    assert r.status_code == 400
-    assert "No API key configured" in r.json()["detail"]
-
-
-def test_approving_search_without_tavily_key_400s(monkeypatch):
-    # Even with no Anthropic key, the router should reject an approved search
-    # before ever trying to call the model, since it checks Tavily first only
-    # on the approval branch — but Anthropic is checked first, so give it a
-    # bogus configured-looking state isn't needed: just confirm behavior when
-    # BOTH are unset — Anthropic's check fires first (matches endpoint order).
-    draft = _start_draft()
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
-    r = client.post(
-        f"/api/recipes/research/{draft['recipe_id']}/chat",
-        json={"tool_use_id": "toolu_fake", "query": "history of this dish", "approved": True},
-        headers=ADMIN_HEADERS,
-    )
-    assert r.status_code == 400
+    assert r.status_code in {404, 405}
 
 
 # --- draft lifecycle ---------------------------------------------------------
@@ -154,7 +128,7 @@ def test_patch_mutates_draft_in_place():
     assert body["version_id"] == draft["version_id"]  # same row, no new version
     assert body["intro"] == "A cozy weeknight dish."
     assert body["prep_time_minutes"] == 10
-    assert body["serving_size"] == {"amount": 1.0, "unit": "bowl"}
+    assert body["serving_size"] == {"amount": 1.0, "unit": "g"}
 
 
 def test_patch_recomputes_nutrition_when_components_change():
@@ -193,7 +167,7 @@ def test_refresh_nutrition_recomputes_current_draft():
 def test_admin_assistant_answers_without_mutating_draft(monkeypatch):
     monkeypatch.setattr("app.routers.research.is_litellm_configured", lambda: True)
     monkeypatch.setattr("app.routers.research.is_model_available", lambda model: True)
-    monkeypatch.setattr("app.routers.research.is_tavily_configured", lambda: False)
+    monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: False)
     monkeypatch.setattr(
         "app.routers.research.litellm_completion",
         lambda **kwargs: _fake_response("About 192 g for 2 cups of almond flour, depending on grind."),
@@ -223,9 +197,9 @@ def test_admin_assistant_can_attach_web_context(monkeypatch):
 
     monkeypatch.setattr("app.routers.research.is_litellm_configured", lambda: True)
     monkeypatch.setattr("app.routers.research.is_model_available", lambda model: True)
-    monkeypatch.setattr("app.routers.research.is_tavily_configured", lambda: True)
+    monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
     monkeypatch.setattr(
-        "app.routers.research.run_tavily_search",
+        "app.routers.research.run_web_search",
         lambda query: "Search result: almond flour cup weights vary by brand; common references list about 96 g per cup.",
     )
     monkeypatch.setattr("app.routers.research.litellm_completion", fake_completion)

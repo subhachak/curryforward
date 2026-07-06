@@ -1,5 +1,5 @@
 """
-Auto-research mode: a fast, parallel alternative to the guided research chat.
+Auto-research mode: a fast, parallel research workflow for new recipe drafts.
 
 One lightweight LiteLLM call proposes a short plan and a batch of candidate
 search queries (approved/edited by the admin up front — see
@@ -9,9 +9,9 @@ Context, Ingredients & Nutrition, Steps & Technique, Tips & Troubleshooting)
 plus one synchronous Orchestrator agent turn the admin-approved search
 results into a merged recipe patch (see POST /{recipe_id}/auto/run).
 
-Unlike the guided chat, no agent here has live tool access — every search
-result is pre-fetched by the router (via the existing run_tavily_search())
-before the crew ever starts. This guarantees no off-plan searches can happen
+No agent here has live tool access — every search result is pre-fetched by the
+router (via native provider web search) before the crew ever starts. This
+guarantees no off-plan searches can happen
 mid-run and avoids needing a custom CrewAI tool.
 
 The four specialists run with no dependency on each other's exact output —
@@ -89,10 +89,10 @@ have provided a starting prompt that includes a full draft recipe to refine \
 rather than invent from scratch — if so, plan searches that fill gaps in or \
 verify that draft, not searches that ignore it.
 
-Propose up to 6 focused search queries spread across these categories: \
+Propose up to 4 focused search queries spread across these categories: \
 history/cultural context, ingredients/nutrition, steps/technique, \
 tips/troubleshooting. Prefer fewer, well-targeted queries over many \
-redundant ones — 4-6 total is typical, not always exactly 6.
+redundant ones — 3 total is typical, 4 only when the recipe truly needs it.
 
 Also write a short (2-3 sentence) plan describing what you're about to do,\
  for the admin to review before anything runs.
@@ -131,7 +131,7 @@ def propose_search_batch(dish_name: str, starting_prompt: str | None, model: str
     text = response.choices[0].message.content or ""
     start, end = text.find("{"), text.rfind("}") + 1
     envelope = json.loads(text[start:end])
-    return {"plan": envelope.get("plan", ""), "queries": envelope.get("queries", [])}
+    return {"plan": envelope.get("plan", ""), "queries": (envelope.get("queries", []) or [])[:4]}
 
 
 # --- crew: 4 specialists + 1 orchestrator -----------------------------------
@@ -248,7 +248,7 @@ def run_auto_research_crew(
     on_task_done: Optional[Callable[[str], None]] = None,
 ) -> dict:
     """Returns a recipe_patch dict — same shape _apply_patch() expects from
-    the guided-chat flow, so the router can reuse _apply_patch() unchanged.
+    the research router's _apply_patch() helper can apply unchanged.
 
     `on_task_done(section_key)` is called once per completed task (including
     the four concurrent specialists, each from its own thread) — see the

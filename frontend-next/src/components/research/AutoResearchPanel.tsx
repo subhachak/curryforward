@@ -20,7 +20,8 @@ interface AutoResearchPanelProps {
 
 type Phase = "idle" | "planning" | "reviewing" | "running";
 
-const POLL_INTERVAL_MS = 2500;
+const INITIAL_POLL_INTERVAL_MS = 5000;
+const MAX_POLL_INTERVAL_MS = 15000;
 
 const SECTION_LABELS: Record<string, string> = {
   history: "History & intro",
@@ -40,7 +41,9 @@ export function AutoResearchPanel({ recipe, onComplete, onPromptChange }: AutoRe
   const [progress, setProgress] = useState<string[]>(recipe.auto_research_progress || []);
   const [jobs, setJobs] = useState<ResearchJobSummary[]>([]);
   const [cancelling, setCancelling] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollDelayRef = useRef(INITIAL_POLL_INTERVAL_MS);
+  const pollingActiveRef = useRef(false);
 
   // A background job may already be in flight — e.g. the admin started a run,
   // navigated away or the connection dropped (the crew can take a minute or
@@ -58,37 +61,54 @@ export function AutoResearchPanel({ recipe, onComplete, onPromptChange }: AutoRe
 
   function stopPolling() {
     if (pollRef.current) {
-      clearInterval(pollRef.current);
+      clearTimeout(pollRef.current);
       pollRef.current = null;
     }
+    pollingActiveRef.current = false;
   }
 
   function startPolling() {
     stopPolling();
-    pollRef.current = setInterval(async () => {
-      let updated: RecipeResearchDetail;
-      try {
-        updated = await api.getResearchRecipe(recipeId);
-      } catch {
-        return; // transient fetch error — try again next tick
-      }
-      setProgress(updated.auto_research_progress || []);
-      if (updated.auto_research_status === "running") return;
+    pollingActiveRef.current = true;
+    pollDelayRef.current = INITIAL_POLL_INTERVAL_MS;
+    scheduleNextPoll(0);
+  }
 
-      stopPolling();
-      if (updated.auto_research_status === "error") {
-        setError(updated.auto_research_error || "Auto-research failed");
-        setPhase("reviewing");
-        return;
-      }
-      setPlan(null);
-      setQueries([]);
-      setApproved(new Set());
-      setProgress([]);
-      setPhase("idle");
-      api.listResearchJobs(recipeId).then(setJobs).catch(() => undefined);
-      onComplete(updated);
-    }, POLL_INTERVAL_MS);
+  function scheduleNextPoll(delay = pollDelayRef.current) {
+    if (!pollingActiveRef.current) return;
+    pollRef.current = setTimeout(pollOnce, delay);
+    pollDelayRef.current = Math.min(MAX_POLL_INTERVAL_MS, Math.round(pollDelayRef.current * 1.5));
+  }
+
+  async function pollOnce() {
+    pollRef.current = null;
+    if (!pollingActiveRef.current) return;
+    let updated: RecipeResearchDetail;
+    try {
+      updated = await api.getResearchRecipe(recipeId);
+    } catch {
+      scheduleNextPoll();
+      return; // transient fetch error — try again next tick
+    }
+    setProgress(updated.auto_research_progress || []);
+    if (updated.auto_research_status === "running") {
+      scheduleNextPoll();
+      return;
+    }
+
+    stopPolling();
+    if (updated.auto_research_status === "error") {
+      setError(updated.auto_research_error || "Auto-research failed");
+      setPhase("reviewing");
+      return;
+    }
+    setPlan(null);
+    setQueries([]);
+    setApproved(new Set());
+    setProgress([]);
+    setPhase("idle");
+    api.listResearchJobs(recipeId).then(setJobs).catch(() => undefined);
+    onComplete(updated);
   }
 
   async function handlePlan() {
