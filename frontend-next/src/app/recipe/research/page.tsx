@@ -268,6 +268,7 @@ function ResearchWorkspaceInner() {
   const canPublish = Boolean(recipe.name && recipe.components.length && recipe.steps.length);
   const isDraft = recipe.status === "draft";
   const isLinkedEditDraft = isDraft && recipe.source === "revision_draft" && Boolean(recipe.parent_version_id);
+  const canResearchAssist = isDraft && recipe.source === "researched" && !recipe.parent_version_id;
   const hasUnmatchedNutrition = Boolean(recipe.nutrition.unmatched_ingredients?.length);
   const publishChecks = [
     { label: "Name", done: Boolean(recipe.name) },
@@ -317,26 +318,28 @@ function ResearchWorkspaceInner() {
 
       {isDraft ? (
         <>
-          <div className="flex gap-2 text-sm">
-            <button
-              type="button"
-              onClick={() => setMode("guided")}
-              className={`rounded-md px-3 py-1.5 font-medium ${
-                mode === "guided" ? "bg-brand text-ink" : "bg-surface-muted text-muted hover:text-foreground"
-              }`}
-            >
-              Guided chat
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("auto")}
-              className={`rounded-md px-3 py-1.5 font-medium ${
-                mode === "auto" ? "bg-brand text-ink" : "bg-surface-muted text-muted hover:text-foreground"
-              }`}
-            >
-              Auto-research
-            </button>
-          </div>
+          {canResearchAssist && (
+            <div className="flex gap-2 text-sm">
+              <button
+                type="button"
+                onClick={() => setMode("guided")}
+                className={`rounded-md px-3 py-1.5 font-medium ${
+                  mode === "guided" ? "bg-brand text-ink" : "bg-surface-muted text-muted hover:text-foreground"
+                }`}
+              >
+                Guided chat
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("auto")}
+                className={`rounded-md px-3 py-1.5 font-medium ${
+                  mode === "auto" ? "bg-brand text-ink" : "bg-surface-muted text-muted hover:text-foreground"
+                }`}
+              >
+                Auto-research
+              </button>
+            </div>
+          )}
 
           <Card>
             <CardBody className="flex flex-wrap items-center gap-2 text-xs">
@@ -396,33 +399,34 @@ function ResearchWorkspaceInner() {
       )}
 
       {isDraft ? (
-        <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-          <div className="lg:sticky lg:top-20 lg:h-[calc(100vh-8rem)]">
-            {mode === "guided" ? (
-              <ResearchChatPanel
-                recipeId={recipe.recipe_id}
-                messages={messages}
-                pendingProposal={pendingProposal}
-                sending={sending}
-                deciding={deciding}
-                onSend={handleSend}
-                onApprove={() => handleDecision(true)}
-                onDecline={() => handleDecision(false)}
-                notes={recipe.notes ?? ""}
-                onNotesChange={handleNotesChange}
-                notesSuggestion={notesSuggestion}
-                onAcceptNotesSuggestion={handleAcceptNotesSuggestion}
-                onDismissNotesSuggestion={() => setNotesSuggestion(null)}
-              />
-            ) : (
-              <AutoResearchPanel
-                recipe={recipe}
-                onComplete={handleAutoComplete}
-                onPromptChange={handleStartingPromptChange}
-              />
-            )}
-          </div>
-
+        <div className={canResearchAssist ? "grid gap-4 lg:grid-cols-[360px_1fr]" : "space-y-4"}>
+          {canResearchAssist && (
+            <div className="lg:sticky lg:top-20 lg:h-[calc(100vh-8rem)]">
+              {mode === "guided" ? (
+                <ResearchChatPanel
+                  recipeId={recipe.recipe_id}
+                  messages={messages}
+                  pendingProposal={pendingProposal}
+                  sending={sending}
+                  deciding={deciding}
+                  onSend={handleSend}
+                  onApprove={() => handleDecision(true)}
+                  onDecline={() => handleDecision(false)}
+                  notes={recipe.notes ?? ""}
+                  onNotesChange={handleNotesChange}
+                  notesSuggestion={notesSuggestion}
+                  onAcceptNotesSuggestion={handleAcceptNotesSuggestion}
+                  onDismissNotesSuggestion={() => setNotesSuggestion(null)}
+                />
+              ) : (
+                <AutoResearchPanel
+                  recipe={recipe}
+                  onComplete={handleAutoComplete}
+                  onPromptChange={handleStartingPromptChange}
+                />
+              )}
+            </div>
+          )}
           <div className="space-y-4">
             {!previewMode && (
               <Card className={reviewHighlights.length ? "border-brand/50 bg-brand-soft/30" : ""}>
