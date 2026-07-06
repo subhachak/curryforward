@@ -33,6 +33,10 @@ from ..services.recipe_versions import fork_recipe_version
 
 router = APIRouter(prefix="/api/admin")
 
+MAX_AI_IMPORT_ROWS = 25
+MAX_AI_IMPORT_CELL_CHARS = 1200
+AI_IMPORT_TIMEOUT_SECONDS = 20
+
 
 class FeedbackDecision(BaseModel):
     approved: bool
@@ -127,6 +131,80 @@ def _first_value(row: dict[str, str], *names: str) -> str:
     return ""
 
 
+def _normalize_header(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+
+
+IMPORT_HEADER_ALIASES = {
+    "name",
+    "title",
+    "recipe",
+    "recipe_name",
+    "category",
+    "course",
+    "cuisine_tags",
+    "tags",
+    "cuisine",
+    "servings",
+    "yield",
+    "base_servings",
+    "ingredients",
+    "ingredient_list",
+    "steps",
+    "instructions",
+    "method",
+    "directions",
+    "intro",
+    "description",
+    "summary",
+    "history",
+    "notes",
+    "tips",
+    "tips_and_tricks",
+    "watch_outs",
+    "watchouts",
+    "warnings",
+    "source_url",
+    "url",
+    "source",
+}
+
+SECTION_ALIASES = {
+    "name": "name",
+    "title": "name",
+    "recipe": "name",
+    "recipe_name": "name",
+    "category": "category",
+    "course": "category",
+    "yelds": "servings",
+    "yields": "servings",
+    "serves": "servings",
+    "servings": "servings",
+    "yield": "servings",
+    "base_servings": "servings",
+    "ingredients": "ingredients",
+    "ingredient_list": "ingredients",
+    "steps": "steps",
+    "instruction": "steps",
+    "instructions": "steps",
+    "method": "steps",
+    "directions": "steps",
+    "intro": "intro",
+    "description": "intro",
+    "summary": "intro",
+    "history": "history",
+    "notes": "history",
+    "tips": "tips",
+    "tips_and_tricks": "tips",
+    "watch_outs": "watch_outs",
+    "watchouts": "watch_outs",
+    "warnings": "watch_outs",
+    "source_url": "source_url",
+    "url": "source_url",
+    "source": "source_url",
+}
+
+
 def _parse_list(value: str, *, split_commas: bool = False) -> list[str]:
     if not value:
         return []
@@ -142,6 +220,21 @@ def _parse_servings(value: str) -> tuple[float | None, str]:
     if not match:
         return None, value.strip() or "servings"
     return float(match.group(1)), (match.group(2).strip() or "servings")
+
+
+def _parse_optional_float(value: str) -> float | None:
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def _is_index_cell(value: str) -> bool:
+    number = _parse_optional_float(value)
+    return number is not None and number > 0 and number.is_integer()
 
 
 def _parse_ingredient_line(line: str) -> dict:
@@ -224,6 +317,215 @@ def _normalize_import_row(row: dict[str, str], row_number: int, sheet_name: str 
     return normalized
 
 
+def _looks_like_table_header(values: tuple | list) -> bool:
+    normalized_headers = {_normalize_header(_cell_to_text(value)) for value in values if _cell_to_text(value)}
+    return len(normalized_headers & IMPORT_HEADER_ALIASES) >= 2
+
+
+def _read_structured_recipe_sheet(sheet) -> tuple[dict[str, str] | None, RecipeImportRow | None]:
+    components: list[dict] = []
+    current_component = {"component_name": "main", "ingredients": []}
+    steps: list[dict] = []
+    servings = ""
+    in_ingredients = False
+    in_steps = False
+    saw_structured_row = False
+    raw_cells = []
+
+    def flush_component():
+        nonlocal current_component
+        if current_component["ingredients"]:
+            components.append(current_component)
+        current_component = {"component_name": "main", "ingredients": []}
+
+    for row_number, values in enumerate(sheet.iter_rows(values_only=True), start=1):
+        cells = [_cell_to_text(value) for value in values]
+        non_empty = [cell for cell in cells if cell]
+        if not non_empty:
+            continue
+        raw_cells.append(" | ".join(non_empty))
+        normalized = [_normalize_header(cell) for cell in cells]
+
+        if any(label in {"yelds", "yields", "serves", "servings"} for label in normalized):
+            label_index = next(
+                idx for idx, label in enumerate(normalized) if label in {"yelds", "yields", "serves", "servings"}
+            )
+            tail = [cell for cell in cells[label_index + 1 :] if cell]
+            numeric_cells = [cell for cell in tail if _parse_optional_float(cell) is not None]
+            unit = next((cell for cell in tail if _parse_optional_float(cell) is None), "servings")
+            amount = numeric_cells[-1] if numeric_cells else ""
+            servings = f"{amount} {unit}".strip()
+            saw_structured_row = True
+            continue
+
+        if any(label in {"steps", "instruction", "instructions", "method", "directions"} for label in normalized):
+            flush_component()
+            in_ingredients = False
+            in_steps = True
+            saw_structured_row = True
+            continue
+
+        if any(label in {"ingredients", "ingredient_list"} for label in normalized):
+            in_ingredients = True
+            in_steps = False
+            saw_structured_row = True
+            continue
+
+        if in_steps:
+            if len(non_empty) == 1 and not re.search(r"[.!?]$", non_empty[0]):
+                continue
+            instruction = cells[1] if len(cells) > 1 and cells[1] else non_empty[-1]
+            if instruction and _normalize_header(instruction) not in SECTION_ALIASES:
+                steps.append({"instruction": instruction})
+                saw_structured_row = True
+            continue
+
+        if cells and _is_index_cell(cells[0]) and len(cells) > 1 and cells[1]:
+            if len(non_empty) <= 2 and (len(cells[1]) > 80 or re.search(r"[.!?]$", cells[1])):
+                flush_component()
+                in_ingredients = False
+                in_steps = True
+                steps.append({"instruction": cells[1]})
+                saw_structured_row = True
+                continue
+            amount_text = cells[3] if len(cells) > 3 and cells[3] else (cells[2] if len(cells) > 2 else "")
+            unit = cells[4] if len(cells) > 4 else ""
+            ingredient = {
+                "name": cells[1],
+                "amount": _parse_optional_float(amount_text),
+                "unit": unit,
+            }
+            unit_options = []
+            if len(cells) > 2 and cells[2] and cells[2] != amount_text:
+                unit_options.append({"amount": _parse_optional_float(cells[2]), "unit": unit})
+            if len(cells) > 7 and cells[6] and cells[7]:
+                unit_options.append({"amount": _parse_optional_float(cells[6]), "unit": cells[7]})
+            if unit_options:
+                ingredient["unit_options"] = unit_options
+            current_component["ingredients"].append(ingredient)
+            saw_structured_row = True
+            continue
+
+        if in_ingredients:
+            text = " ".join(non_empty).strip()
+            parsed = _parse_ingredient_line(text)
+            if parsed["amount"] is None and (not parsed["unit"] or not re.search(r"\d", text)):
+                flush_component()
+                current_component = {"component_name": text, "ingredients": []}
+            else:
+                current_component["ingredients"].append(parsed)
+            saw_structured_row = True
+            continue
+
+        if len(non_empty) == 1 and not _parse_optional_float(non_empty[0]) and not re.search(r"\d", non_empty[0]):
+            label = non_empty[0].strip()
+            normalized_label = _normalize_header(label)
+            if normalized_label not in SECTION_ALIASES and not label.lower().startswith("http"):
+                flush_component()
+                current_component = {"component_name": label, "ingredients": []}
+
+    flush_component()
+    if not saw_structured_row or (not components and not steps):
+        return None, None
+
+    row = {
+        "name": sheet.title,
+        "servings": servings,
+        "ingredients": "",
+        "steps": "",
+    }
+    raw = {"_sheet_name": sheet.title, "_layout": "structured_recipe", "_raw_text": "\n".join(raw_cells), **row}
+    normalized = RecipeImportRow(
+        sheet_name=sheet.title,
+        row_number=1,
+        name=sheet.title,
+        category=None,
+        cuisine_tags=[],
+        base_servings_amount=_parse_servings(servings)[0],
+        base_servings_unit=_parse_servings(servings)[1],
+        components=components,
+        steps=steps,
+        tips=[],
+        watch_outs=[],
+        source_url=None,
+    )
+    normalized.issues = _import_issues(normalized)
+    return raw, normalized
+
+
+def _append_block_value(blocks: dict[str, list[str]], key: str, value: str):
+    value = value.strip()
+    if value:
+        blocks.setdefault(key, []).append(value)
+
+
+def _read_sheet_as_recipe(sheet) -> tuple[dict[str, str] | None, RecipeImportRow | None]:
+    structured_raw, structured_row = _read_structured_recipe_sheet(sheet)
+    if structured_raw and structured_row:
+        return structured_raw, structured_row
+
+    raw_cells = []
+    scalar_values: dict[str, str] = {}
+    blocks: dict[str, list[str]] = {}
+    current_section: str | None = None
+    first_title: str | None = None
+    first_row_number = 1
+
+    for row_number, values in enumerate(sheet.iter_rows(values_only=True), start=1):
+        cells = [_cell_to_text(value) for value in values]
+        non_empty = [cell for cell in cells if cell]
+        if not non_empty:
+            continue
+        if first_title is None:
+            first_row_number = row_number
+            first_title = non_empty[0]
+        raw_cells.append(" | ".join(non_empty))
+
+        first = non_empty[0]
+        inline_label = re.match(r"^([^:]{1,60}):\s*(.+)$", first)
+        if inline_label:
+            label = _normalize_header(inline_label.group(1))
+            canonical = SECTION_ALIASES.get(label)
+            if canonical:
+                _append_block_value(blocks, canonical, inline_label.group(2))
+                current_section = canonical if canonical in {"ingredients", "steps", "tips", "watch_outs"} else None
+                continue
+
+        label = _normalize_header(first)
+        canonical = SECTION_ALIASES.get(label)
+        rest = " ".join(non_empty[1:]).strip()
+        if canonical and rest:
+            scalar_values[canonical] = rest if canonical not in blocks else scalar_values.get(canonical, rest)
+            _append_block_value(blocks, canonical, rest)
+            current_section = canonical if canonical in {"ingredients", "steps", "tips", "watch_outs"} else None
+            continue
+        if canonical and len(non_empty) == 1:
+            current_section = canonical
+            continue
+        if current_section:
+            _append_block_value(blocks, current_section, " ".join(non_empty))
+
+    if not raw_cells:
+        return None, None
+    if not blocks.get("ingredients") and not blocks.get("steps"):
+        return None, None
+
+    row = {
+        "name": scalar_values.get("name") or sheet.title,
+        "category": scalar_values.get("category", ""),
+        "servings": scalar_values.get("servings", ""),
+        "ingredients": "\n".join(blocks.get("ingredients", [])),
+        "steps": "\n".join(blocks.get("steps", [])),
+        "intro": scalar_values.get("intro") or "\n".join(blocks.get("intro", [])),
+        "history": scalar_values.get("history") or "\n".join(blocks.get("history", [])),
+        "tips": "\n".join(blocks.get("tips", [])),
+        "watch_outs": "\n".join(blocks.get("watch_outs", [])),
+        "source_url": scalar_values.get("source_url", ""),
+    }
+    raw = {"_sheet_name": sheet.title, "_layout": "sheet_recipe", "_raw_text": "\n".join(raw_cells), **row}
+    return raw, _normalize_import_row(row, first_row_number, sheet.title)
+
+
 def _read_csv_upload(raw: bytes) -> tuple[list[dict[str, str]], list[RecipeImportRow]]:
     text = raw.decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(text))
@@ -243,10 +545,14 @@ def _read_xlsx_upload(raw: bytes) -> tuple[list[dict[str, str]], list[RecipeImpo
     for sheet in workbook.worksheets:
         rows = list(sheet.iter_rows(values_only=True))
         header_index = next(
-            (idx for idx, values in enumerate(rows) if any(_cell_to_text(value) for value in values)),
+            (idx for idx, values in enumerate(rows) if _looks_like_table_header(values)),
             None,
         )
         if header_index is None:
+            raw, row = _read_sheet_as_recipe(sheet)
+            if raw and row:
+                raw_rows.append(raw)
+                normalized_rows.append(row)
             continue
         headers = [_cell_to_text(value) or f"column_{idx + 1}" for idx, value in enumerate(rows[header_index])]
         for offset, values in enumerate(rows[header_index + 1 :], start=header_index + 2):
@@ -325,7 +631,7 @@ def _ai_map_import_rows(
         {
             "sheet_name": fallback.sheet_name,
             "row_number": fallback.row_number,
-            "cells": raw,
+            "cells": {key: value[:MAX_AI_IMPORT_CELL_CHARS] for key, value in raw.items()},
         }
         for fallback, raw in zip(fallback_rows, raw_rows)
     ]
@@ -354,6 +660,7 @@ def _ai_map_import_rows(
             },
         ],
         temperature=0.1,
+        timeout=AI_IMPORT_TIMEOUT_SECONDS,
     )
     payload = _extract_json_payload(response.choices[0].message.content or "{}")
     mapped = payload.get("rows") or []
@@ -383,7 +690,12 @@ async def preview_recipe_import(
     source = "heuristic"
     ai_error = None
     resolved_model = resolve_task_model("recipe_import", db, model)
-    if is_litellm_configured() and is_model_available(resolved_model):
+    if len(rows) > MAX_AI_IMPORT_ROWS:
+        ai_error = (
+            f"AI mapping skipped for {len(rows)} rows to keep preview responsive. "
+            f"Upload {MAX_AI_IMPORT_ROWS} rows or fewer at a time for AI-assisted mapping."
+        )
+    elif is_litellm_configured() and is_model_available(resolved_model):
         try:
             rows, _response = _ai_map_import_rows(raw_rows, rows, resolved_model, role)
             source = "ai"

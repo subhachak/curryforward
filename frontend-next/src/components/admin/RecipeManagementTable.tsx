@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/IconButton";
@@ -31,11 +32,21 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
   const { push } = useToast();
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const selectedRecipes = useMemo(
+    () => recipes.filter((recipe) => selectedIds.has(recipe.recipe_id)),
+    [recipes, selectedIds]
+  );
+  const allSelected = recipes.length > 0 && selectedRecipes.length === recipes.length;
+  const selectedDrafts = selectedRecipes.filter((recipe) => recipe.status !== "published");
+  const selectedPublished = selectedRecipes.filter((recipe) => recipe.status === "published");
 
   if (recipes.length === 0) {
     return (
-      <Card>
+      <Card className="bg-white">
         <CardBody className="text-sm text-muted">No recipes yet.</CardBody>
       </Card>
     );
@@ -82,6 +93,54 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
     }
   }
 
+  async function bulkDuplicate() {
+    setBulkBusy(true);
+    try {
+      for (const recipe of selectedRecipes) {
+        await api.forkRecipe(recipe.recipe_id);
+      }
+      push(`Duplicated ${selectedRecipes.length} recipe${selectedRecipes.length === 1 ? "" : "s"} as drafts`, "success");
+      setSelectedIds(new Set());
+      onChanged();
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Bulk duplicate failed", "error");
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function bulkUnpublish() {
+    setBulkBusy(true);
+    try {
+      for (const recipe of selectedPublished) {
+        await api.unpublishResearch(recipe.recipe_id);
+      }
+      push(`Unpublished ${selectedPublished.length} recipe${selectedPublished.length === 1 ? "" : "s"}`, "success");
+      setSelectedIds(new Set());
+      onChanged();
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Bulk unpublish failed", "error");
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function bulkMoveToTrash() {
+    setBulkBusy(true);
+    try {
+      for (const recipe of selectedDrafts) {
+        await api.deleteRecipe(recipe.recipe_id);
+      }
+      push(`Moved ${selectedDrafts.length} draft${selectedDrafts.length === 1 ? "" : "s"} to Trash`, "success");
+      setSelectedIds(new Set());
+      onChanged();
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Bulk move to Trash failed", "error");
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   async function unpublish(recipe: AdminRecipeSummary) {
     setPendingId(recipe.recipe_id);
     try {
@@ -96,11 +155,39 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
   }
 
   return (
-    <Card>
+    <Card className="bg-white">
       <CardBody>
         <div className="mb-1 font-semibold">Recipes ({recipes.length})</div>
         <div className="mb-3 text-xs text-muted">
           Published recipes are live. Edits create a draft copy; duplicates are always drafts. Unpublish a recipe before moving it to Trash.
+        </div>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-surface p-2">
+          <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={(e) => setSelectedIds(e.target.checked ? new Set(recipes.map((recipe) => recipe.recipe_id)) : new Set())}
+              className="h-4 w-4 rounded border-border accent-accent"
+            />
+            Select all
+          </label>
+          {selectedRecipes.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted">{selectedRecipes.length} selected</span>
+              <Button size="sm" variant="secondary" loading={bulkBusy} onClick={bulkDuplicate}>
+                <CopyIcon className="h-3.5 w-3.5" />
+                Duplicate
+              </Button>
+              <Button size="sm" variant="secondary" loading={bulkBusy} disabled={selectedPublished.length === 0} onClick={bulkUnpublish}>
+                <EyeOffIcon className="h-3.5 w-3.5" />
+                Unpublish
+              </Button>
+              <Button size="sm" variant="danger" loading={bulkBusy} disabled={selectedDrafts.length === 0} onClick={bulkMoveToTrash}>
+                <TrashIcon className="h-3.5 w-3.5" />
+                Move to Trash
+              </Button>
+            </div>
+          )}
         </div>
         <div className="space-y-2">
           {recipes.map((r) => {
@@ -129,9 +216,23 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
               },
             ];
             return (
-              <div key={r.recipe_id} className="rounded-md border border-border bg-surface p-3">
+              <div key={r.recipe_id} className="rounded-md border border-border bg-white p-3 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex min-w-0 flex-1 gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(r.recipe_id)}
+                      onChange={(e) => {
+                        setSelectedIds((current) => {
+                          const next = new Set(current);
+                          if (e.target.checked) next.add(r.recipe_id);
+                          else next.delete(r.recipe_id);
+                          return next;
+                        });
+                      }}
+                      className="mt-6 h-4 w-4 shrink-0 rounded border-border accent-accent"
+                      aria-label={`Select ${r.name}`}
+                    />
                     {r.hero_image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -150,10 +251,12 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
                     )}
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Link href={href} className="font-medium hover:underline">
+                        <Link href={href} className="text-base font-semibold text-ink hover:underline">
                           {r.name}
                         </Link>
-                        <Badge tone={r.status === "published" ? "success" : "warning"}>{r.status}</Badge>
+                        <Badge tone={r.status === "published" ? "success" : "warning"} className="uppercase">
+                          {r.status}
+                        </Badge>
                         {r.category && <Badge tone="neutral">{r.category}</Badge>}
                       </div>
                       {r.intro && <p className="mt-1 line-clamp-2 text-sm text-muted">{r.intro}</p>}
@@ -179,6 +282,10 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
                     {busy && (
                       <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent text-muted" />
                     )}
+                    <Button size="sm" variant="secondary" onClick={() => editRecipe(r)} loading={busy}>
+                      <PencilIcon className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
                     <Link
                       href={href}
                       className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface text-foreground transition-colors hover:bg-surface-muted"
