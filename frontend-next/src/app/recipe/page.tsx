@@ -19,7 +19,6 @@ import { useAssistant } from "@/context/AssistantContext";
 import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
 import type { RecipeDetail } from "@/lib/types";
-import { lineageLabel } from "@/lib/lineage";
 
 function RecipeDetailInner() {
   const { isAdmin } = useAuth();
@@ -127,7 +126,6 @@ function RecipeDetailInner() {
     );
   }
 
-  const lineage = lineageLabel(recipe.lineage);
   const metadata = recipe.metadata;
   const feedback = recipe.feedback_summary;
   const totalMinutes = (recipe.prep_time_minutes ?? 0) + (recipe.cook_time_minutes ?? 0);
@@ -157,11 +155,9 @@ function RecipeDetailInner() {
             </span>
             {totalMinutes > 0 && (
               <span className="rounded-full bg-[#FFF0C1] px-3 py-1 text-sm font-semibold text-[#7A5200]">
-                {totalMinutes} min
+                {formatDuration(totalMinutes)}
               </span>
             )}
-            <span className="rounded-full bg-[#FFE0DA] px-3 py-1 text-sm font-semibold text-[#E6462D]">Medium spice</span>
-            {lineage && <span className="rounded-full bg-[#F7DDED] px-3 py-1 text-sm font-semibold text-[#5A2145]">{lineage}</span>}
             {isAdmin && recipe.status === "draft" && <Badge tone="warning">Draft - not published</Badge>}
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-2">
@@ -318,6 +314,14 @@ function ModifyRecipePanel({ onAsk }: { onAsk: () => void }) {
 function formatDate(value?: string | null) {
   if (!value) return "Not published";
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+}
+
+function formatDuration(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (!hours) return `${mins} min`;
+  if (!mins) return `${hours} hr`;
+  return `${hours} hr ${mins} min`;
 }
 
 export default function RecipeDetailPage() {

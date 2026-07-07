@@ -378,7 +378,15 @@ export function ResearchDocumentPreview({
   if (previewMode) {
     return (
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-        <RecipeContent recipe={recipe} />
+        <div className="space-y-6">
+          <Card className="border-[#FFD2AE] bg-[#FFF8F1]">
+            <CardBody>
+              <h1 className="text-3xl font-bold leading-tight text-[#2E1B14]">{recipe.name}</h1>
+              {recipe.intro && <p className="mt-3 max-w-2xl text-lg text-[#5A4038]">{recipe.intro}</p>}
+            </CardBody>
+          </Card>
+          <RecipeContent recipe={recipe} />
+        </div>
         <aside className="lg:sticky lg:top-20 lg:self-start">
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">

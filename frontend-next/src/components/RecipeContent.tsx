@@ -141,10 +141,10 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
         recipe.serving_size.amount) && (
         <div className="flex flex-wrap gap-2">
           {recipe.prep_time_minutes != null && (
-            <Badge tone="neutral">Prep: {recipe.prep_time_minutes} min</Badge>
+            <Badge tone="neutral">Prep: {formatDuration(recipe.prep_time_minutes)}</Badge>
           )}
           {recipe.cook_time_minutes != null && (
-            <Badge tone="neutral">Cook: {recipe.cook_time_minutes} min</Badge>
+            <Badge tone="neutral">Cook: {formatDuration(recipe.cook_time_minutes)}</Badge>
           )}
           {recipe.serving_size.amount && (
             <Badge tone="neutral">
@@ -153,37 +153,6 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
           )}
         </div>
       )}
-
-      <Card className="border-[#FFD2AE] bg-[#FFF8F1]">
-        <CardBody>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="font-semibold text-[#2E1B14]">Recipe scale</div>
-              <div className="text-xs text-[#5A4038]">
-                {estimatedYieldGrams
-                  ? `Approx. original yield: ${estimatedYieldGrams} g`
-                  : "Original yield not calculated"}
-                {multiplierLabel ? ` - scaled to ${multiplierLabel}` : ""}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <label htmlFor="recipe-multiplier" className="text-xs font-medium text-[#5A4038]">
-                Multiplier
-              </label>
-              <input
-                id="recipe-multiplier"
-                type="number"
-                min="0.25"
-                max="8"
-                step="0.25"
-                value={multiplier}
-                onChange={(e) => setMultiplier(Number(e.target.value) || 1)}
-                className="h-9 w-24 rounded-md border border-[#FFD2AE] bg-white px-2 text-sm focus:border-[#FF6B00] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30"
-              />
-            </div>
-          </div>
-        </CardBody>
-      </Card>
 
       {recipe.history && (
         <Card className="border-[#FFD2AE] bg-white">
@@ -195,63 +164,81 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
       )}
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-2xl font-bold text-[#2E1B14]">Ingredients</h2>
-          <span className="rounded-full bg-[#DFF3E6] px-3 py-1 text-xs font-semibold text-[#2E9B57]">
-            Checklist
-          </span>
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-[#FFD2AE] bg-[#FFF8F1] px-3 py-2">
+            <div className="text-xs text-[#5A4038]">
+              <span className="font-semibold text-[#2E1B14]">Scale</span>
+              {estimatedYieldGrams ? ` · ${estimatedYieldGrams} g yield` : " · yield unknown"}
+              {multiplierLabel ? ` · ${multiplierLabel}` : ""}
+            </div>
+            <label htmlFor="recipe-multiplier" className="sr-only">
+              Multiplier
+            </label>
+            <input
+              id="recipe-multiplier"
+              type="number"
+              min="0.25"
+              max="8"
+              step="0.25"
+              value={multiplier}
+              onChange={(e) => setMultiplier(Number(e.target.value) || 1)}
+              className="h-8 w-20 rounded-md border border-[#FFD2AE] bg-white px-2 text-sm focus:border-[#FF6B00] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30"
+              aria-label="Recipe multiplier"
+            />
+          </div>
         </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {recipe.components.map((c, componentIdx) => (
-          <Card key={`${c.component_name || "ingredients"}-${componentIdx}`} className="border-[#BDE8CB] bg-white">
-            <CardBody>
-              {!singleDefaultIngredientSection && (
-                <div className="mb-3 flex items-center gap-1.5 font-semibold text-[#145C32]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/brand/icon-ingredients-leaf.svg" alt="" aria-hidden className="h-4 w-4" />
-                  {c.component_name}
-                </div>
-              )}
-              <ul className="space-y-1 text-sm">
-                {c.ingredients.map((ing, idx) => (
-                  <li key={ing.ingredient_id ?? idx} className="flex items-center justify-between gap-2 rounded-md px-1 py-1 hover:bg-[#DFF3E6]/45">
-                    <label className="flex min-w-0 items-center gap-2">
-                      <input type="checkbox" className="h-4 w-4 rounded border-[#BDE8CB] accent-[#2E9B57]" />
-                      <span className="min-w-0">
-                        <IngredientAmount
-                          ingredient={ing}
-                          selectedIndex={selectedUnits[`${componentIdx}-${idx}`] ?? defaultUnitIndex(ing)}
-                          multiplier={multiplier}
-                        />{" "}
-                        <span className="text-[#5A4038]">{ing.name}</span>
-                      </span>
-                    </label>
-                    {unitChoices(ing).length > 1 && (
-                      <select
-                        aria-label={`Unit for ${ing.name}`}
-                        value={selectedUnits[`${componentIdx}-${idx}`] ?? defaultUnitIndex(ing)}
-                        onChange={(e) =>
-                          setSelectedUnits((prev) => ({
-                            ...prev,
-                            [`${componentIdx}-${idx}`]: Number(e.target.value),
-                          }))
-                        }
-                        className="h-8 max-w-28 rounded-md border border-[#BDE8CB] bg-white px-2 text-xs"
-                      >
-                        {unitChoices(ing).map((option, optionIdx) => (
-                          <option key={`${option.unit}-${optionIdx}`} value={optionIdx}>
-                            {option.label || option.unit || "base"}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </CardBody>
-          </Card>
-        ))}
-      </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {recipe.components.map((c, componentIdx) => (
+            <Card key={`${c.component_name || "ingredients"}-${componentIdx}`} className="border-[#BDE8CB] bg-white">
+              <CardBody>
+                {!singleDefaultIngredientSection && (
+                  <div className="mb-3 flex items-center gap-1.5 font-semibold text-[#145C32]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/brand/icon-ingredients-leaf.svg" alt="" aria-hidden className="h-4 w-4" />
+                    {c.component_name}
+                  </div>
+                )}
+                <ul className="space-y-1 text-sm">
+                  {c.ingredients.map((ing, idx) => (
+                    <li key={ing.ingredient_id ?? idx} className="flex items-center justify-between gap-2 rounded-md px-1 py-1 hover:bg-[#DFF3E6]/45">
+                      <label className="flex min-w-0 items-center gap-2">
+                        <input type="checkbox" className="h-4 w-4 rounded border-[#BDE8CB] accent-[#2E9B57]" />
+                        <span className="min-w-0">
+                          <IngredientAmount
+                            ingredient={ing}
+                            selectedIndex={selectedUnits[`${componentIdx}-${idx}`] ?? defaultUnitIndex(ing)}
+                            multiplier={multiplier}
+                          />{" "}
+                          <span className="text-[#5A4038]">{ing.name}</span>
+                        </span>
+                      </label>
+                      {unitChoices(ing).length > 1 && (
+                        <select
+                          aria-label={`Unit for ${ing.name}`}
+                          value={selectedUnits[`${componentIdx}-${idx}`] ?? defaultUnitIndex(ing)}
+                          onChange={(e) =>
+                            setSelectedUnits((prev) => ({
+                              ...prev,
+                              [`${componentIdx}-${idx}`]: Number(e.target.value),
+                            }))
+                          }
+                          className="h-8 max-w-28 rounded-md border border-[#BDE8CB] bg-white px-2 text-xs"
+                        >
+                          {unitChoices(ing).map((option, optionIdx) => (
+                            <option key={`${option.unit}-${optionIdx}`} value={optionIdx}>
+                              {option.label || option.unit || "base"}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </CardBody>
+            </Card>
+          ))}
+        </div>
       </section>
 
       <section className="space-y-3">
@@ -280,35 +267,35 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
             )}
           </div>
         </div>
-          <ol className="space-y-3 text-sm">
-            {recipe.steps.map((s, idx) => (
-              <li key={idx} className="rounded-md border border-[#FFD2AE] bg-white p-4">
-                <div className="flex gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FF6B00] text-sm font-bold text-white">
-                    {idx + 1}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-semibold text-[#2E1B14]">Step {idx + 1}</div>
-                    <p className="mt-1 leading-6 text-[#5A4038]">{s.instruction}</p>
-                    {s.component_ref && (
-                      <span className="mt-2 inline-flex rounded-full bg-[#FFF0C1] px-2 py-0.5 text-xs font-semibold text-[#7A5200]">
-                        {s.component_ref}
-                      </span>
-                    )}
-                  </div>
+        <ol className="space-y-3 text-sm">
+          {recipe.steps.map((s, idx) => (
+            <li key={idx} className="rounded-md border border-[#FFD2AE] bg-white p-4">
+              <div className="flex gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FF6B00] text-sm font-bold text-white">
+                  {idx + 1}
                 </div>
-                {s.image_url && (
-                  // Static-export app, no next/image optimization pipeline available.
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={s.image_url}
-                    alt=""
-                    className="mt-3 max-h-64 rounded-lg border border-[#FFD2AE] object-cover"
-                  />
-                )}
-              </li>
-            ))}
-          </ol>
+                <div className="min-w-0">
+                  <div className="font-semibold text-[#2E1B14]">Step {idx + 1}</div>
+                  <p className="mt-1 leading-6 text-[#5A4038]">{s.instruction}</p>
+                  {s.component_ref && (
+                    <span className="mt-2 inline-flex rounded-full bg-[#FFF0C1] px-2 py-0.5 text-xs font-semibold text-[#7A5200]">
+                      {s.component_ref}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {s.image_url && (
+                // Static-export app, no next/image optimization pipeline available.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={s.image_url}
+                  alt=""
+                  className="mt-3 max-h-64 rounded-lg border border-[#FFD2AE] object-cover"
+                />
+              )}
+            </li>
+          ))}
+        </ol>
       </section>
 
       {suggestedUtensils.length > 0 && (
@@ -427,6 +414,14 @@ function gramAmount(ingredient: Ingredient): number | null {
 
 function roundAmount(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function formatDuration(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (!hours) return `${mins} min`;
+  if (!mins) return `${hours} hr`;
+  return `${hours} hr ${mins} min`;
 }
 
 function formatPanSide(count: number | null, size: string): string {
