@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..auth import get_role, require_admin
+from ..auth import admin_display_name, get_role, require_admin
 from ..db import get_db
 from ..llm_agent import (
     LLMInvalidResponseError,
@@ -239,7 +239,8 @@ def _scan_feedback_with_ai(
         return {"approved": False, "reason": f"AI scanner unavailable: no API key configured for {model}."}
 
     prompt = (
-        "You moderate public recipe comments. Return only JSON with keys "
+        "You moderate all public recipe feedback: ratings, reviews, comments, "
+        "and threaded replies. Return only JSON with keys "
         "`approved` (boolean) and `reason` (short string). Approve normal "
         "recipe feedback, disagreement, and mild criticism. Flag harassment, "
         "hate, sexual content, threats, spam, private data, malware links, or "
@@ -378,12 +379,24 @@ def list_recipe_feedback(recipe_id: str, db: Session = Depends(get_db), role: st
         .all()
     )
     ratings = [r.rating for r in rows if r.rating is not None]
+    children_by_parent: dict[str, list[dict]] = {}
+    top_level: list[dict] = []
+    for row in sorted(rows, key=lambda r: r.created_at or datetime.min):
+        item = row.to_dict()
+        item["replies"] = []
+        if row.parent_feedback_id:
+            children_by_parent.setdefault(row.parent_feedback_id, []).append(item)
+        else:
+            top_level.append(item)
+    top_level.sort(key=lambda item: item.get("created_at") or "", reverse=True)
+    for item in top_level:
+        item["replies"] = children_by_parent.get(item["feedback_id"], [])
     return {
         "average_rating": round(sum(ratings) / len(ratings), 1) if ratings else None,
         "rating_count": len(ratings),
         "review_count": len([r for r in rows if r.rating is not None]),
         "comment_count": len(rows),
-        "items": [r.to_dict() for r in rows],
+        "items": top_level,
     }
 
 
@@ -401,10 +414,25 @@ def create_recipe_feedback(
     comment = req.comment.strip()
     if not comment:
         raise HTTPException(400, "Comment is required")
+    parent_feedback_id = req.parent_feedback_id.strip() if req.parent_feedback_id else None
+    if parent_feedback_id:
+        parent = (
+            db.query(RecipeFeedback)
+            .filter(
+                RecipeFeedback.feedback_id == parent_feedback_id,
+                RecipeFeedback.recipe_id == canonical_recipe_id,
+                RecipeFeedback.status == "approved",
+                RecipeFeedback.parent_feedback_id.is_(None),
+            )
+            .first()
+        )
+        if not parent:
+            raise HTTPException(404, "Parent feedback not found")
     row = RecipeFeedback(
         recipe_id=canonical_recipe_id,
+        parent_feedback_id=parent_feedback_id,
         author_name=(req.author_name or "").strip()[:80] or None,
-        rating=req.rating,
+        rating=None if parent_feedback_id else req.rating,
         comment=comment,
     )
     scan = _scan_feedback_with_ai(version, row.author_name, row.rating, row.comment, db)
@@ -735,4 +763,4 @@ def generate_recipe(
 
 @router.get("/me")
 def whoami(role: str = Depends(get_role)):
-    return {"role": role}
+    return {"role": role, "display_name": admin_display_name() if role == "admin" else None}

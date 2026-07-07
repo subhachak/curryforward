@@ -49,6 +49,7 @@ Backend configuration lives in `backend/.env`:
 | Variable | Required | Purpose |
 |---|---:|---|
 | `ADMIN_TOKEN` | yes | Shared admin password for `/login` and `X-Admin-Token` API access |
+| `ADMIN_DISPLAY_NAME` | optional | Display name used to prefill admin-authored review/comment replies |
 | `SESSION_SECRET` | recommended | Signing key for the httpOnly admin session cookie; falls back to `ADMIN_TOKEN` |
 | `APP_ENV=production` | recommended in production | Enables secure cookies and HSTS when Railway's production env flag is absent |
 | `RATE_LIMIT_*` | optional | Tunes login, feedback, upload, and LLM request limits |

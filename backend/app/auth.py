@@ -47,6 +47,10 @@ def _create_session_cookie_value() -> str:
     return _serializer().dumps({"role": "admin"})
 
 
+def admin_display_name() -> str | None:
+    return os.environ.get("ADMIN_DISPLAY_NAME", "").strip() or None
+
+
 def _session_is_valid_admin(cookie_value: str | None) -> bool:
     if not cookie_value:
         return False
@@ -93,10 +97,10 @@ def login(req: LoginRequest, response: Response):
         samesite="lax",
         max_age=SESSION_MAX_AGE_SECONDS,
     )
-    return {"role": "admin"}
+    return {"role": "admin", "display_name": admin_display_name()}
 
 
 @router.post("/logout")
 def logout(response: Response):
     response.delete_cookie(SESSION_COOKIE_NAME, secure=is_production(), samesite="lax")
-    return {"role": "guest"}
+    return {"role": "guest", "display_name": None}

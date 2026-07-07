@@ -98,11 +98,13 @@ class RecipeFeedbackCreateRequest(BaseModel):
     author_name: str | None = Field(default=None, max_length=80)
     rating: int | None = Field(default=None, ge=1, le=5)
     comment: str = Field(min_length=1, max_length=2000)
+    parent_feedback_id: str | None = None
 
 
 class RecipeFeedbackResponse(BaseModel):
     feedback_id: str
     recipe_id: str
+    parent_feedback_id: str | None = None
     author_name: str | None
     rating: int | None
     comment: str
@@ -110,6 +112,7 @@ class RecipeFeedbackResponse(BaseModel):
     moderation_reason: str | None
     created_at: str | None
     updated_at: str | None
+    replies: list["RecipeFeedbackResponse"] = Field(default_factory=list)
 
 
 class RecipeFeedbackListResponse(BaseModel):

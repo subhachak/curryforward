@@ -160,6 +160,7 @@ export interface PanConversion {
 export interface RecipeFeedback {
   feedback_id: string;
   recipe_id: string;
+  parent_feedback_id: string | null;
   author_name: string | null;
   rating: number | null;
   comment: string;
@@ -167,6 +168,7 @@ export interface RecipeFeedback {
   moderation_reason: string | null;
   created_at: string | null;
   updated_at: string | null;
+  replies?: RecipeFeedback[];
 }
 
 export interface PendingRecipeFeedback extends RecipeFeedback {

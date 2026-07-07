@@ -246,6 +246,26 @@ def test_published_recipe_accepts_feedback_and_exposes_metadata(monkeypatch):
     assert feedback["average_rating"] == 5
     assert feedback["rating_count"] == 1
     assert feedback["items"][0]["comment"] == "Loved this."
+    parent_id = feedback["items"][0]["feedback_id"]
+
+    reply = client.post(
+        f"/api/recipes/{created['recipe_id']}/feedback",
+        json={
+            "author_name": "Another tester",
+            "rating": 1,
+            "comment": "Same here.",
+            "parent_feedback_id": parent_id,
+        },
+    )
+    assert reply.status_code == 200
+    assert reply.json()["rating"] is None
+    assert reply.json()["parent_feedback_id"] == parent_id
+
+    feedback = client.get(f"/api/recipes/{created['recipe_id']}/feedback").json()
+    assert feedback["average_rating"] == 5
+    assert feedback["rating_count"] == 1
+    assert feedback["comment_count"] == 2
+    assert feedback["items"][0]["replies"][0]["comment"] == "Same here."
 
 
 def test_flagged_feedback_waits_for_admin_approval(monkeypatch):
@@ -285,3 +305,41 @@ def test_flagged_feedback_waits_for_admin_approval(monkeypatch):
 
     public_feedback = client.get(f"/api/recipes/{created['recipe_id']}/feedback").json()
     assert public_feedback["items"][0]["comment"] == "Needs review."
+
+
+def test_flagged_feedback_reply_waits_for_admin_approval(monkeypatch):
+    scan_results = iter([
+        {"approved": True, "reason": "parent approved"},
+        {"approved": False, "reason": "reply flagged in test"},
+    ])
+    monkeypatch.setattr(
+        "app.routers.recipes._scan_feedback_with_ai",
+        lambda recipe, author_name, rating, comment, db=None: next(scan_results),
+    )
+    created = client.post("/api/recipes", json=NEW_RECIPE, headers=ADMIN_HEADERS).json()
+    client.patch(
+        f"/api/recipes/research/{created['recipe_id']}",
+        json={"components": NEW_RECIPE["components"], "steps": NEW_RECIPE["steps"]},
+        headers=ADMIN_HEADERS,
+    )
+    client.post(f"/api/recipes/research/{created['recipe_id']}/publish", headers=ADMIN_HEADERS)
+
+    parent = client.post(
+        f"/api/recipes/{created['recipe_id']}/feedback",
+        json={"author_name": "Tester", "rating": 5, "comment": "Loved this."},
+    ).json()
+
+    reply = client.post(
+        f"/api/recipes/{created['recipe_id']}/feedback",
+        json={"author_name": "Tester 2", "comment": "Reply needs review.", "parent_feedback_id": parent["feedback_id"]},
+    )
+    assert reply.status_code == 200
+    assert reply.json()["status"] == "pending_review"
+
+    public_feedback = client.get(f"/api/recipes/{created['recipe_id']}/feedback").json()
+    assert public_feedback["items"][0]["replies"] == []
+
+    pending = client.get("/api/admin/feedback/pending", headers=ADMIN_HEADERS).json()
+    pending_item = next(item for item in pending if item["parent_feedback_id"] == parent["feedback_id"])
+    assert pending_item["comment"] == "Reply needs review."
+    assert pending_item["moderation_reason"] == "reply flagged in test"

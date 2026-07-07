@@ -200,10 +200,6 @@ function ResearchWorkspaceInner() {
     recipe.nutrition.nutrition_issues?.length ? `${recipe.nutrition.nutrition_issues.length} nutrition item${recipe.nutrition.nutrition_issues.length === 1 ? "" : "s"} need review` : null,
     hasUnmatchedNutrition ? `${recipe.nutrition.unmatched_ingredients?.length || 0} ingredient${(recipe.nutrition.unmatched_ingredients?.length || 0) === 1 ? "" : "s"} missing from nutrition` : null,
   ].filter(Boolean) as string[];
-  const modeTabs: { id: WorkspaceMode; label: string }[] = [
-    { id: "edit", label: "Edit" },
-    { id: "review", label: "Review" },
-  ];
   const showReviewRail = isDraft && mode === "edit";
   const previewMode = mode === "review";
   const shellGridClass = showReviewRail ? "grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]" : "space-y-4";
@@ -226,19 +222,37 @@ function ResearchWorkspaceInner() {
           <div className="flex flex-wrap items-center gap-2">
             {isDraft ? (
               <>
-                <div className="flex rounded-md border border-border bg-surface p-1 text-sm">
-                  {modeTabs.map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setMode(tab.id)}
-                      className={`rounded px-3 py-1.5 font-medium ${
-                        mode === tab.id ? "bg-brand text-ink" : "text-muted hover:bg-surface-muted hover:text-foreground"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
+                <div
+                  className="relative grid h-11 w-44 grid-cols-2 rounded-full border border-border bg-surface p-1 text-sm shadow-inner"
+                  role="switch"
+                  aria-checked={previewMode}
+                  aria-label="Toggle recipe editor mode"
+                >
+                  <span
+                    className={`absolute bottom-1 left-1 top-1 w-[calc(50%-0.25rem)] rounded-full bg-brand shadow-sm transition-transform duration-200 ${
+                      previewMode ? "translate-x-full" : "translate-x-0"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMode("edit")}
+                    className={`relative z-10 rounded-full px-3 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-brand/40 ${
+                      !previewMode ? "text-ink" : "text-muted hover:text-foreground"
+                    }`}
+                    aria-pressed={!previewMode}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode("review")}
+                    className={`relative z-10 rounded-full px-3 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-brand/40 ${
+                      previewMode ? "text-ink" : "text-muted hover:text-foreground"
+                    }`}
+                    aria-pressed={previewMode}
+                  >
+                    Review
+                  </button>
                 </div>
                 <IconButton
                   label="Refresh nutrition facts"

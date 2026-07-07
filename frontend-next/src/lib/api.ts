@@ -49,18 +49,18 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 }
 
 export const api = {
-  me: () => apiFetch<{ role: Role }>("/me"),
+  me: () => apiFetch<{ role: Role; display_name?: string | null }>("/me"),
   login: (password: string) =>
-    apiFetch<{ role: Role }>("/auth/login", {
+    apiFetch<{ role: Role; display_name?: string | null }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ password }),
     }),
-  logout: () => apiFetch<{ role: Role }>("/auth/logout", { method: "POST" }),
+  logout: () => apiFetch<{ role: Role; display_name?: string | null }>("/auth/logout", { method: "POST" }),
 
   listRecipes: () => apiFetch<RecipeSummary[]>("/recipes"),
   getRecipe: (recipeId: string) => apiFetch<RecipeDetail>(`/recipes/${recipeId}`),
   listRecipeFeedback: (recipeId: string) => apiFetch<RecipeFeedbackList>(`/recipes/${recipeId}/feedback`),
-  createRecipeFeedback: (recipeId: string, body: { author_name?: string; rating?: number | null; comment: string }) =>
+  createRecipeFeedback: (recipeId: string, body: { author_name?: string; rating?: number | null; comment: string; parent_feedback_id?: string | null }) =>
     apiFetch<RecipeFeedback>(`/recipes/${recipeId}/feedback`, {
       method: "POST",
       body: JSON.stringify(body),

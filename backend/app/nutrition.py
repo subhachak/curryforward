@@ -29,6 +29,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from typing import NamedTuple
 
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from .models import IngredientNutritionCache
@@ -447,29 +448,32 @@ def _refresh_cache_profile(db: Session | None, name: str) -> NutrientProfile | N
     profile, source = fetched
     now = _utcnow()
     key = _normalize_cache_key(name)
-    with db.no_autoflush:
+    values = {
+        "cache_key": key,
+        "ingredient_name": name,
+        "source": "usda_fdc",
+        "source_food_id": str(source.get("fdc_id") or ""),
+        "source_food_name": source.get("description"),
+        "nutrients": profile._asdict(),
+        "raw_result": source,
+        "fetched_at": now,
+        "expires_at": now + timedelta(days=_cache_ttl_days()),
+    }
+    if db.bind and db.bind.dialect.name == "sqlite":
+        stmt = sqlite_insert(IngredientNutritionCache).values(**values)
+        db.execute(
+            stmt.on_conflict_do_update(
+                index_elements=[IngredientNutritionCache.cache_key],
+                set_={k: v for k, v in values.items() if k != "cache_key"},
+            )
+        )
+    else:
         row = db.get(IngredientNutritionCache, key)
         if row is None:
-            row = next(
-                (
-                    pending
-                    for pending in db.new
-                    if isinstance(pending, IngredientNutritionCache)
-                    and pending.cache_key == key
-                ),
-                None,
-            )
-    if row is None:
-        row = IngredientNutritionCache(cache_key=key, ingredient_name=name)
-        db.add(row)
-    row.ingredient_name = name
-    row.source = "usda_fdc"
-    row.source_food_id = str(source.get("fdc_id") or "")
-    row.source_food_name = source.get("description")
-    row.nutrients = profile._asdict()
-    row.raw_result = source
-    row.fetched_at = now
-    row.expires_at = now + timedelta(days=_cache_ttl_days())
+            row = IngredientNutritionCache(cache_key=key)
+            db.add(row)
+        for field, value in values.items():
+            setattr(row, field, value)
     return profile
 
 

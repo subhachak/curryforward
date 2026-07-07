@@ -53,6 +53,7 @@ _RECIPE_VERSION_COLUMN_ADDITIONS = [
 
 _RECIPE_FEEDBACK_COLUMN_ADDITIONS = [
     ("moderation_reason", "TEXT"),
+    ("parent_feedback_id", "TEXT"),
 ]
 
 _RECIPE_ANALYTICS_COLUMN_ADDITIONS = [

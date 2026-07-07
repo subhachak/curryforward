@@ -4,18 +4,24 @@ import { FormEvent, useEffect, useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
+import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
-import type { RecipeFeedbackList } from "@/lib/types";
+import type { RecipeFeedback, RecipeFeedbackList } from "@/lib/types";
 
 export function RecipeFeedbackPanel({ recipeId }: { recipeId: string }) {
   const { push } = useToast();
+  const { isAdmin, displayName } = useAuth();
   const [feedback, setFeedback] = useState<RecipeFeedbackList | null>(null);
   const [authorName, setAuthorName] = useState("");
   const [rating, setRating] = useState<number | null>(null);
   const [comment, setComment] = useState("");
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyAuthorName, setReplyAuthorName] = useState("");
+  const [replyComment, setReplyComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [submittingReply, setSubmittingReply] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +41,12 @@ export function RecipeFeedbackPanel({ recipeId }: { recipeId: string }) {
     };
   }, [recipeId, push]);
 
+  useEffect(() => {
+    if (!isAdmin || !displayName) return;
+    setAuthorName((current) => current || displayName);
+    setReplyAuthorName((current) => current || displayName);
+  }, [isAdmin, displayName]);
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     const text = comment.trim();
@@ -48,7 +60,7 @@ export function RecipeFeedbackPanel({ recipeId }: { recipeId: string }) {
       });
       const refreshed = await api.listRecipeFeedback(recipeId);
       setFeedback(refreshed);
-      setAuthorName("");
+      setAuthorName(isAdmin && displayName ? displayName : "");
       setRating(null);
       setComment("");
       push(
@@ -61,6 +73,35 @@ export function RecipeFeedbackPanel({ recipeId }: { recipeId: string }) {
       push(err instanceof ApiError ? err.message : "Could not submit feedback", "error");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function submitReply(e: FormEvent, parentFeedbackId: string) {
+    e.preventDefault();
+    const text = replyComment.trim();
+    if (!text) return;
+    setSubmittingReply(true);
+    try {
+      const created = await api.createRecipeFeedback(recipeId, {
+        author_name: replyAuthorName.trim() || undefined,
+        comment: text,
+        parent_feedback_id: parentFeedbackId,
+      });
+      const refreshed = await api.listRecipeFeedback(recipeId);
+      setFeedback(refreshed);
+      setReplyingTo(null);
+      setReplyAuthorName(isAdmin && displayName ? displayName : "");
+      setReplyComment("");
+      push(
+        created.status === "approved"
+          ? "Thanks, your reply was added"
+          : "Thanks, your reply is queued for review",
+        created.status === "approved" ? "success" : "info"
+      );
+    } catch (err) {
+      push(err instanceof ApiError ? err.message : "Could not submit reply", "error");
+    } finally {
+      setSubmittingReply(false);
     }
   }
 
@@ -127,14 +168,26 @@ export function RecipeFeedbackPanel({ recipeId }: { recipeId: string }) {
         <div className="space-y-3">
           {feedback?.items.length ? (
             feedback.items.map((item) => (
-              <div key={item.feedback_id} className="border-b border-border pb-3 last:border-0 last:pb-0">
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="font-medium text-foreground">{item.author_name || "Anonymous"}</span>
-                  {item.rating && <span className="text-brand-hover">{renderStars(item.rating)}</span>}
-                  {item.created_at && <span className="text-xs text-muted">{formatDate(item.created_at)}</span>}
-                </div>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{item.comment}</p>
-              </div>
+              <FeedbackThread
+                key={item.feedback_id}
+                item={item}
+                replyingTo={replyingTo}
+                replyAuthorName={replyAuthorName}
+                replyComment={replyComment}
+                submittingReply={submittingReply}
+                onReplyStart={(feedbackId) => {
+                  setReplyingTo(feedbackId);
+                  setReplyAuthorName((current) => current || (isAdmin ? displayName || "" : ""));
+                  setReplyComment("");
+                }}
+                onReplyCancel={() => {
+                  setReplyingTo(null);
+                  setReplyComment("");
+                }}
+                onReplyAuthorChange={setReplyAuthorName}
+                onReplyCommentChange={setReplyComment}
+                onReplySubmit={submitReply}
+              />
             ))
           ) : (
             !loading && <div className="text-sm text-muted">Be the first to add a note on this recipe.</div>
@@ -142,6 +195,88 @@ export function RecipeFeedbackPanel({ recipeId }: { recipeId: string }) {
         </div>
       </CardBody>
     </Card>
+  );
+}
+
+function FeedbackThread({
+  item,
+  replyingTo,
+  replyAuthorName,
+  replyComment,
+  submittingReply,
+  onReplyStart,
+  onReplyCancel,
+  onReplyAuthorChange,
+  onReplyCommentChange,
+  onReplySubmit,
+}: {
+  item: RecipeFeedback;
+  replyingTo: string | null;
+  replyAuthorName: string;
+  replyComment: string;
+  submittingReply: boolean;
+  onReplyStart: (feedbackId: string) => void;
+  onReplyCancel: () => void;
+  onReplyAuthorChange: (value: string) => void;
+  onReplyCommentChange: (value: string) => void;
+  onReplySubmit: (event: FormEvent, parentFeedbackId: string) => void;
+}) {
+  return (
+    <div className="border-b border-border pb-4 last:border-0 last:pb-0">
+      <FeedbackComment item={item} />
+      <div className="mt-2">
+        <Button type="button" size="sm" variant="ghost" onClick={() => onReplyStart(item.feedback_id)}>
+          Reply
+        </Button>
+      </div>
+
+      {item.replies?.length ? (
+        <div className="mt-3 space-y-3 border-l-2 border-border pl-4">
+          {item.replies.map((reply) => (
+            <FeedbackComment key={reply.feedback_id} item={reply} compact />
+          ))}
+        </div>
+      ) : null}
+
+      {replyingTo === item.feedback_id && (
+        <form onSubmit={(event) => onReplySubmit(event, item.feedback_id)} className="mt-3 space-y-2 rounded-md border border-border bg-surface-muted p-3">
+          <Input
+            value={replyAuthorName}
+            onChange={(e) => onReplyAuthorChange(e.target.value)}
+            placeholder="Your name (optional)"
+            maxLength={80}
+          />
+          <Textarea
+            value={replyComment}
+            onChange={(e) => onReplyCommentChange(e.target.value)}
+            placeholder="Write a reply..."
+            rows={3}
+            maxLength={2000}
+          />
+          <div className="flex justify-end gap-2">
+            <Button type="button" size="sm" variant="ghost" onClick={onReplyCancel}>
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" loading={submittingReply} disabled={!replyComment.trim()}>
+              Submit reply
+            </Button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+function FeedbackComment({ item, compact = false }: { item: RecipeFeedback; compact?: boolean }) {
+  return (
+    <div className={compact ? "rounded-md bg-surface px-3 py-2" : ""}>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium text-foreground">{item.author_name || "Anonymous"}</span>
+        {item.rating && <span className="text-brand-hover">{renderStars(item.rating)}</span>}
+        {item.created_at && <span className="text-xs text-muted">{formatDate(item.created_at)}</span>}
+      </div>
+      <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{item.comment}</p>
+    </div>
   );
 }
 

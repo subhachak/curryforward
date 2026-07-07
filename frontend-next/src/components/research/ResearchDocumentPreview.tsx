@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { DragEvent, ReactNode } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { IconButton } from "@/components/ui/IconButton";
@@ -28,6 +28,30 @@ function SectionHeader({ title, children }: { title: string; children?: ReactNod
       <div className="font-semibold">{title}</div>
       <div className="flex shrink-0 items-center gap-1">{children}</div>
     </div>
+  );
+}
+
+function DragHandle({
+  label,
+  onDragStart,
+  onDragEnd,
+}: {
+  label: string;
+  onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
+  onDragEnd: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      draggable
+      aria-label={label}
+      title={label}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      className="inline-flex h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded-md border border-border bg-surface text-sm font-bold leading-none text-muted transition-colors hover:bg-surface-muted hover:text-foreground active:cursor-grabbing"
+    >
+      <span aria-hidden="true">⋮⋮</span>
+    </button>
   );
 }
 
@@ -116,6 +140,11 @@ interface StepRow {
   component_ref: string;
   image_url: string | null;
 }
+type DragState =
+  | { type: "component"; from: number }
+  | { type: "ingredient"; componentIndex: number; from: number }
+  | { type: "step"; from: number }
+  | null;
 
 function emptyIngredient(): IngredientRow {
   return { name: "", amount: "", displayUnit: "g", unitOptionsText: "" };
@@ -125,6 +154,16 @@ function emptyComponent(): ComponentRow {
 }
 function emptyStep(): StepRow {
   return { instruction: "", component_ref: "", image_url: null };
+}
+
+function reorderRows<T>(rows: T[], fromIndex: number, toIndex: number) {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= rows.length || toIndex >= rows.length) {
+    return rows;
+  }
+  const next = [...rows];
+  const [moved] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, moved);
+  return next;
 }
 
 function toComponentRows(recipe: RecipeResearchDetail): ComponentRow[] {
@@ -329,6 +368,7 @@ export function ResearchDocumentPreview({
   const [panConversionsText, setPanConversionsText] = useState(formatPanConversions(recipe.pan_conversions || []));
   const [components, setComponents] = useState<ComponentRow[]>(() => toComponentRows(recipe));
   const [steps, setSteps] = useState<StepRow[]>(() => toStepRows(recipe));
+  const [dragging, setDragging] = useState<DragState>(null);
   const [heroImageUrl, setHeroImageUrl] = useState(recipe.hero_image_url);
   const [uploadingHero, setUploadingHero] = useState(false);
   const [uploadingStep, setUploadingStep] = useState<number | null>(null);
@@ -366,6 +406,50 @@ export function ResearchDocumentPreview({
     );
   }
 
+  function startDrag(event: DragEvent<HTMLButtonElement>, state: NonNullable<DragState>) {
+    setDragging(state);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", `${state.type}:${"from" in state ? state.from : ""}`);
+  }
+  function allowDrop(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }
+  function dropComponent(event: DragEvent<HTMLElement>, toIndex: number) {
+    event.preventDefault();
+    if (!dragging || dragging.type !== "component") return;
+    setComponents((rows) => {
+      const next = reorderRows(rows, dragging.from, toIndex);
+      commitComponents(next);
+      return next;
+    });
+    setDragging(null);
+  }
+  function dropIngredient(event: DragEvent<HTMLElement>, componentIndex: number, toIndex: number) {
+    event.preventDefault();
+    if (!dragging || dragging.type !== "ingredient" || dragging.componentIndex !== componentIndex) return;
+    setComponents((rows) => {
+      const next = rows.map((component, idx) =>
+        idx === componentIndex
+          ? { ...component, ingredients: reorderRows(component.ingredients, dragging.from, toIndex) }
+          : component
+      );
+      commitComponents(next);
+      return next;
+    });
+    setDragging(null);
+  }
+  function dropStep(event: DragEvent<HTMLElement>, toIndex: number) {
+    event.preventDefault();
+    if (!dragging || dragging.type !== "step") return;
+    setSteps((rows) => {
+      const next = reorderRows(rows, dragging.from, toIndex);
+      commitSteps(next);
+      return next;
+    });
+    setDragging(null);
+  }
+
   function updateComponent(idx: number, patch: Partial<ComponentRow>) {
     setComponents((rows) => rows.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
   }
@@ -398,6 +482,13 @@ export function ResearchDocumentPreview({
       return next;
     });
   }
+  function moveComponent(idx: number, direction: -1 | 1) {
+    setComponents((rows) => {
+      const next = reorderRows(rows, idx, idx + direction);
+      commitComponents(next);
+      return next;
+    });
+  }
   function addIngredient(ci: number) {
     setComponents((rows) => {
       const next = rows.map((c, i) => (i === ci ? { ...c, ingredients: [...c.ingredients, emptyIngredient()] } : c));
@@ -409,6 +500,17 @@ export function ResearchDocumentPreview({
     setComponents((rows) => {
       const next = rows.map((c, i) =>
         i === ci ? { ...c, ingredients: c.ingredients.filter((_, j) => j !== ii) } : c
+      );
+      commitComponents(next);
+      return next;
+    });
+  }
+  function moveIngredient(ci: number, ii: number, direction: -1 | 1) {
+    setComponents((rows) => {
+      const next = rows.map((component, componentIndex) =>
+        componentIndex === ci
+          ? { ...component, ingredients: reorderRows(component.ingredients, ii, ii + direction) }
+          : component
       );
       commitComponents(next);
       return next;
@@ -438,6 +540,13 @@ export function ResearchDocumentPreview({
   function removeStep(idx: number) {
     setSteps((rows) => {
       const next = rows.filter((_, i) => i !== idx);
+      commitSteps(next);
+      return next;
+    });
+  }
+  function moveStep(idx: number, direction: -1 | 1) {
+    setSteps((rows) => {
+      const next = reorderRows(rows, idx, idx + direction);
       commitSteps(next);
       return next;
     });
@@ -681,8 +790,38 @@ export function ResearchDocumentPreview({
             {reviewBadge(["components"])}
           </SectionHeader>
           {components.map((component, ci) => (
-            <div key={ci} className="rounded-lg border border-border p-3 space-y-3">
+            <div
+              key={ci}
+              onDragOver={allowDrop}
+              onDrop={(event) => dropComponent(event, ci)}
+              className={`space-y-3 rounded-lg border p-3 transition-colors ${
+                dragging?.type === "component" && dragging.from !== ci
+                  ? "border-brand/50 bg-brand-soft/20"
+                  : "border-border"
+              }`}
+            >
               <div className="flex items-center gap-2">
+                <DragHandle
+                  label="Drag component to reorder"
+                  onDragStart={(event) => startDrag(event, { type: "component", from: ci })}
+                  onDragEnd={() => setDragging(null)}
+                />
+                <div className="flex shrink-0 items-center gap-1">
+                  <IconButton
+                    label="Move component up"
+                    icon={<UploadIcon />}
+                    variant="ghost"
+                    disabled={ci === 0}
+                    onClick={() => moveComponent(ci, -1)}
+                  />
+                  <IconButton
+                    label="Move component down"
+                    icon={<UploadIcon className="rotate-180" />}
+                    variant="ghost"
+                    disabled={ci === components.length - 1}
+                    onClick={() => moveComponent(ci, 1)}
+                  />
+                </div>
                 <div className="flex-1">
                   <Input
                     value={component.component_name}
@@ -697,8 +836,38 @@ export function ResearchDocumentPreview({
               </div>
               <div className="space-y-2">
                 {component.ingredients.map((ing, ii) => (
-                  <div key={ii} className="space-y-2 rounded-md bg-surface-muted p-2">
+                  <div
+                    key={ii}
+                    onDragOver={allowDrop}
+                    onDrop={(event) => dropIngredient(event, ci, ii)}
+                    className={`space-y-2 rounded-md p-2 transition-colors ${
+                      dragging?.type === "ingredient" && dragging.componentIndex === ci && dragging.from !== ii
+                        ? "bg-brand-soft/40 ring-1 ring-brand/50"
+                        : "bg-surface-muted"
+                    }`}
+                  >
                     <div className="flex gap-2">
+                      <DragHandle
+                        label="Drag ingredient to reorder"
+                        onDragStart={(event) => startDrag(event, { type: "ingredient", componentIndex: ci, from: ii })}
+                        onDragEnd={() => setDragging(null)}
+                      />
+                      <div className="flex shrink-0 items-center gap-1">
+                        <IconButton
+                          label="Move ingredient up"
+                          icon={<UploadIcon />}
+                          variant="ghost"
+                          disabled={ii === 0}
+                          onClick={() => moveIngredient(ci, ii, -1)}
+                        />
+                        <IconButton
+                          label="Move ingredient down"
+                          icon={<UploadIcon className="rotate-180" />}
+                          variant="ghost"
+                          disabled={ii === component.ingredients.length - 1}
+                          onClick={() => moveIngredient(ci, ii, 1)}
+                        />
+                      </div>
                       <div className="w-24 shrink-0">
                         <Input
                           value={ing.amount}
@@ -773,9 +942,37 @@ export function ResearchDocumentPreview({
             <RefineBox section="steps" label="steps" onRefine={onRefine} />
           </SectionHeader>
           {steps.map((step, si) => (
-            <div key={si} className="space-y-2 rounded-lg border border-border p-3">
+            <div
+              key={si}
+              onDragOver={allowDrop}
+              onDrop={(event) => dropStep(event, si)}
+              className={`space-y-2 rounded-lg border p-3 transition-colors ${
+                dragging?.type === "step" && dragging.from !== si ? "border-brand/50 bg-brand-soft/20" : "border-border"
+              }`}
+            >
               <div className="flex gap-2">
                 <span className="mt-2 text-sm text-muted">{si + 1}.</span>
+                <DragHandle
+                  label="Drag step to reorder"
+                  onDragStart={(event) => startDrag(event, { type: "step", from: si })}
+                  onDragEnd={() => setDragging(null)}
+                />
+                <div className="flex shrink-0 items-start gap-1 pt-1">
+                  <IconButton
+                    label="Move step up"
+                    icon={<UploadIcon />}
+                    variant="ghost"
+                    disabled={si === 0}
+                    onClick={() => moveStep(si, -1)}
+                  />
+                  <IconButton
+                    label="Move step down"
+                    icon={<UploadIcon className="rotate-180" />}
+                    variant="ghost"
+                    disabled={si === steps.length - 1}
+                    onClick={() => moveStep(si, 1)}
+                  />
+                </div>
                 <CopyAssistField
                   recipeId={recipe.recipe_id}
                   fieldLabel={`step ${si + 1} instruction`}

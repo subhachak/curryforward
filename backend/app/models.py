@@ -194,6 +194,7 @@ class RecipeFeedback(Base):
 
     feedback_id = Column(String, primary_key=True, default=_uid)
     recipe_id = Column(String, index=True, nullable=False)
+    parent_feedback_id = Column(String, index=True, nullable=True)
     author_name = Column(String, nullable=True)
     rating = Column(Integer, nullable=True)
     comment = Column(Text, nullable=False)
@@ -206,6 +207,7 @@ class RecipeFeedback(Base):
         return {
             "feedback_id": self.feedback_id,
             "recipe_id": self.recipe_id,
+            "parent_feedback_id": self.parent_feedback_id,
             "author_name": self.author_name,
             "rating": self.rating,
             "comment": self.comment,

@@ -62,6 +62,64 @@ def test_compute_nutrition_uses_cached_ingredient_profile():
         db.close()
 
 
+def test_compute_nutrition_refreshes_existing_cache_row_without_duplicate(monkeypatch):
+    os.environ["USDA_FDC_API_KEY"] = "test-key"
+    init_db()
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        db.merge(
+            IngredientNutritionCache(
+                cache_key="duplicate proof ingredient",
+                ingredient_name="duplicate proof ingredient",
+                source="usda_fdc",
+                source_food_id="old",
+                source_food_name="Old cached item",
+                nutrients={},
+                raw_result={},
+                fetched_at=now - timedelta(days=400),
+                expires_at=now - timedelta(days=1),
+            )
+        )
+        db.commit()
+
+        def fake_fetch(name):
+            profile = nutrition.NutrientProfile(
+                calories=123,
+                protein_g=4,
+                fat_g=5,
+                carbs_g=6,
+                saturated_fat_g=1,
+                trans_fat_g=0,
+                cholesterol_mg=0,
+                sodium_mg=7,
+                fiber_g=1,
+                sugars_g=2,
+                added_sugars_g=0,
+                vitamin_d_mcg=0,
+                calcium_mg=8,
+                iron_mg=1,
+                potassium_mg=9,
+            )
+            return profile, {"fdc_id": "new", "description": name, "nutrients": profile._asdict()}
+
+        monkeypatch.setattr(nutrition, "_fetch_usda_profile", fake_fetch)
+
+        result = compute_nutrition(
+            [{"component_name": "main", "ingredients": [{"name": "duplicate proof ingredient", "amount": 100, "unit": "g"}]}],
+            db,
+        )
+        db.commit()
+
+        row = db.get(IngredientNutritionCache, "duplicate proof ingredient")
+        assert result["calories"] == 123
+        assert row.source_food_id == "new"
+        assert db.query(IngredientNutritionCache).filter_by(cache_key="duplicate proof ingredient").count() == 1
+    finally:
+        db.close()
+        os.environ.pop("USDA_FDC_API_KEY", None)
+
+
 def test_compute_nutrition_handles_imported_units_and_gram_options():
     os.environ.pop("USDA_FDC_API_KEY", None)
     os.environ.pop("USDA_API_KEY", None)
@@ -149,6 +207,8 @@ def test_compute_nutrition_reuses_pending_cache_row_for_duplicate_keys(monkeypat
     init_db()
     db = SessionLocal()
     calls: list[str] = []
+    db.query(IngredientNutritionCache).filter_by(cache_key="heavy cream").delete()
+    db.commit()
 
     def fake_fetch(name: str):
         calls.append(name)
@@ -188,9 +248,9 @@ def test_compute_nutrition_reuses_pending_cache_row_for_duplicate_keys(monkeypat
         db.commit()
 
         assert result["calories"] == 200
-        assert result["nutrition_sources"] == ["usda_fdc"]
+        assert result["nutrition_sources"] == ["cache", "usda_fdc"]
         assert db.query(IngredientNutritionCache).filter_by(cache_key="heavy cream").count() == 1
-        assert len(calls) == 2
+        assert len(calls) == 1
     finally:
         db.close()
         os.environ.pop("USDA_FDC_API_KEY", None)
