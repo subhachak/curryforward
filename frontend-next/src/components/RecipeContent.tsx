@@ -40,6 +40,8 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
   const [selectedPanIndex, setSelectedPanIndex] = useState(0);
   const selectedPan = panConversions[selectedPanIndex];
   const estimatedYieldGrams = estimatedRecipeYieldGrams(recipe);
+  const singleDefaultIngredientSection =
+    recipe.components.length === 1 && recipe.components[0]?.component_name?.trim().toLowerCase() === "main";
   const multiplierLabel = useMemo(() => {
     if (!estimatedYieldGrams || multiplier === 1) return null;
     const scaled = roundAmount(estimatedYieldGrams * multiplier);
@@ -200,14 +202,16 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
           </span>
         </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        {recipe.components.map((c) => (
-          <Card key={c.component_name} className="border-[#BDE8CB] bg-white">
+        {recipe.components.map((c, componentIdx) => (
+          <Card key={`${c.component_name || "ingredients"}-${componentIdx}`} className="border-[#BDE8CB] bg-white">
             <CardBody>
-              <div className="mb-3 flex items-center gap-1.5 font-semibold text-[#145C32]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/brand/icon-ingredients-leaf.svg" alt="" aria-hidden className="h-4 w-4" />
-                {c.component_name}
-              </div>
+              {!singleDefaultIngredientSection && (
+                <div className="mb-3 flex items-center gap-1.5 font-semibold text-[#145C32]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/brand/icon-ingredients-leaf.svg" alt="" aria-hidden className="h-4 w-4" />
+                  {c.component_name}
+                </div>
+              )}
               <ul className="space-y-1 text-sm">
                 {c.ingredients.map((ing, idx) => (
                   <li key={ing.ingredient_id ?? idx} className="flex items-center justify-between gap-2 rounded-md px-1 py-1 hover:bg-[#DFF3E6]/45">
@@ -216,7 +220,7 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
                       <span className="min-w-0">
                         <IngredientAmount
                           ingredient={ing}
-                          selectedIndex={selectedUnits[`${c.component_name}-${idx}`] ?? defaultUnitIndex(ing)}
+                          selectedIndex={selectedUnits[`${componentIdx}-${idx}`] ?? defaultUnitIndex(ing)}
                           multiplier={multiplier}
                         />{" "}
                         <span className="text-[#5A4038]">{ing.name}</span>
@@ -225,11 +229,11 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
                     {unitChoices(ing).length > 1 && (
                       <select
                         aria-label={`Unit for ${ing.name}`}
-                        value={selectedUnits[`${c.component_name}-${idx}`] ?? defaultUnitIndex(ing)}
+                        value={selectedUnits[`${componentIdx}-${idx}`] ?? defaultUnitIndex(ing)}
                         onChange={(e) =>
                           setSelectedUnits((prev) => ({
                             ...prev,
-                            [`${c.component_name}-${idx}`]: Number(e.target.value),
+                            [`${componentIdx}-${idx}`]: Number(e.target.value),
                           }))
                         }
                         className="h-8 max-w-28 rounded-md border border-[#BDE8CB] bg-white px-2 text-xs"
