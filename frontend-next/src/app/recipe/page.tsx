@@ -130,6 +130,7 @@ function RecipeDetailInner() {
   const feedback = recipe.feedback_summary;
   const totalMinutes = (recipe.prep_time_minutes ?? 0) + (recipe.cook_time_minutes ?? 0);
   const region = recipe.cuisine_tags[0] ?? recipe.category ?? "Recipe";
+  const servingCount = formatServingCount(recipe);
 
   return (
     <div className="space-y-6 text-[#2E1B14]">
@@ -150,9 +151,11 @@ function RecipeDetailInner() {
           {recipe.intro && <p className="max-w-2xl text-lg text-[#5A4038]">{recipe.intro}</p>}
           <div className="flex flex-wrap gap-2">
             {recipe.category && <span className="rounded-full bg-[#F7DDED] px-3 py-1 text-sm font-semibold text-[#5A2145]">{recipe.category}</span>}
-            <span className="rounded-full bg-[#DFF3E6] px-3 py-1 text-sm font-semibold text-[#2E9B57]">
-              Serves {recipe.base_servings.amount ?? "?"} {recipe.base_servings.unit}
-            </span>
+            {servingCount && (
+              <span className="rounded-full bg-[#DFF3E6] px-3 py-1 text-sm font-semibold text-[#2E9B57]">
+                Serves {servingCount}
+              </span>
+            )}
             {totalMinutes > 0 && (
               <span className="rounded-full bg-[#FFF0C1] px-3 py-1 text-sm font-semibold text-[#7A5200]">
                 {formatDuration(totalMinutes)}
@@ -322,6 +325,28 @@ function formatDuration(minutes: number) {
   if (!hours) return `${mins} min`;
   if (!mins) return `${hours} hr`;
   return `${hours} hr ${mins} min`;
+}
+
+function formatServingCount(recipe: RecipeDetail) {
+  const baseAmount = recipe.base_servings.amount;
+  const baseUnit = recipe.base_servings.unit?.trim().toLowerCase();
+  const servingSizeAmount = recipe.serving_size.amount;
+  const servingSizeUnit = recipe.serving_size.unit?.trim().toLowerCase();
+
+  if (baseAmount && baseUnit === "g" && servingSizeAmount && servingSizeUnit === "g") {
+    const count = Math.max(1, Math.round(baseAmount / servingSizeAmount));
+    return count.toString();
+  }
+
+  if (baseAmount && baseUnit && baseUnit !== "g") {
+    return `${formatCount(baseAmount)} ${recipe.base_servings.unit}`;
+  }
+
+  return null;
+}
+
+function formatCount(value: number) {
+  return Number.isInteger(value) ? value.toString() : value.toFixed(1).replace(/\.0$/, "");
 }
 
 export default function RecipeDetailPage() {
