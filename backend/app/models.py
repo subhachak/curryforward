@@ -66,6 +66,7 @@ class RecipeVersion(Base):
 
     base_servings_amount = Column(Float, nullable=True)
     base_servings_unit = Column(String, default="servings")
+    serving_count = Column(Float, nullable=True)
     serving_size_amount = Column(Float, nullable=True)
     serving_size_unit = Column(String, nullable=True)
 
@@ -127,6 +128,7 @@ class RecipeVersion(Base):
             "cuisine_tags": self.cuisine_tags or [],
             "hero_image_url": _secure_public_url(self.hero_image_url),
             "base_servings": {"amount": self.base_servings_amount, "unit": self.base_servings_unit},
+            "serving_count": self.serving_count,
             "serving_size": {"amount": self.serving_size_amount, "unit": self.serving_size_unit},
             "components": self.components or [],
             "steps": _secure_steps(self.steps),

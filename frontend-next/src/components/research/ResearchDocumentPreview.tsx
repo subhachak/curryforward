@@ -194,6 +194,12 @@ function estimateYieldGramsFromRows(rows: ComponentRow[]) {
   return hasValue ? Math.round(total * 10) / 10 : null;
 }
 
+function calculateServingCount(yieldGrams: number | null, servingSizeAmount: string) {
+  const servingGrams = Number(servingSizeAmount);
+  if (!yieldGrams || !Number.isFinite(servingGrams) || servingGrams <= 0) return null;
+  return Math.max(1, Math.round(yieldGrams / servingGrams));
+}
+
 function canonicalGramValue(ingredient: RecipeResearchDetail["components"][number]["ingredients"][number]) {
   if (ingredient.gram_amount != null) return ingredient.gram_amount;
   if (ingredient.gram_equivalent != null) return ingredient.gram_equivalent;
@@ -352,9 +358,13 @@ export function ResearchDocumentPreview({
   const [name, setName] = useState(recipe.name);
   const [category, setCategory] = useState(recipe.category ?? "");
   const [cuisineTags, setCuisineTags] = useState(recipe.cuisine_tags.join(", "));
-  const [servingSizeAmount, setServingSizeAmount] = useState(
-    recipe.serving_size.amount != null ? String(recipe.serving_size.amount) : ""
-  );
+  const initialServingSizeAmount = recipe.serving_size.amount != null ? String(recipe.serving_size.amount) : "";
+  const initialServingCount =
+    recipe.serving_count != null
+      ? String(recipe.serving_count)
+      : String(calculateServingCount(estimatedYieldGramsFromComponents(recipe.components), initialServingSizeAmount) ?? "");
+  const [servingSizeAmount, setServingSizeAmount] = useState(initialServingSizeAmount);
+  const [servingCount, setServingCount] = useState(initialServingCount);
   const [intro, setIntro] = useState(recipe.intro ?? "");
   const [history, setHistory] = useState(recipe.history ?? "");
   const [prepTime, setPrepTime] = useState(recipe.prep_time_minutes != null ? String(recipe.prep_time_minutes) : "");
@@ -374,6 +384,7 @@ export function ResearchDocumentPreview({
     recipe.nutrition?.estimated_total_yield_g ??
     estimateYieldGramsFromRows(components) ??
     estimatedYieldGramsFromComponents(recipe.components);
+  const calculatedServingCount = calculateServingCount(estimatedYieldGrams, servingSizeAmount);
 
   if (previewMode) {
     return (
@@ -539,6 +550,7 @@ export function ResearchDocumentPreview({
         "cuisine_tags",
         "base_servings_amount",
         "base_servings_unit",
+        "serving_count",
         "serving_size_amount",
         "serving_size_unit",
         "intro",
@@ -554,6 +566,7 @@ export function ResearchDocumentPreview({
               "cuisine_tags",
               "base_servings_amount",
               "base_servings_unit",
+              "serving_count",
               "serving_size_amount",
               "serving_size_unit",
               "intro",
@@ -631,6 +644,27 @@ export function ResearchDocumentPreview({
                 }
                 placeholder="100"
               />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Total servings</label>
+              <Input
+                type="number"
+                min="1"
+                step="0.5"
+                value={servingCount}
+                onChange={(e) => setServingCount(e.target.value)}
+                onBlur={() =>
+                  onCommit({
+                    serving_count: servingCount.trim() ? Number(servingCount) : null,
+                  })
+                }
+                placeholder={calculatedServingCount ? String(calculatedServingCount) : "Calculated"}
+              />
+              <div className="mt-1 text-xs text-muted">
+                {calculatedServingCount
+                  ? `Calculated default is ${calculatedServingCount}; edit if the serving count should read differently.`
+                  : "Calculated after yield and serving grams are available."}
+              </div>
             </div>
           </div>
           <div>

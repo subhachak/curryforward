@@ -43,6 +43,7 @@ _RECIPE_VERSION_COLUMN_ADDITIONS = [
     ("auto_research_job_id", "TEXT"),
     ("deleted_at", "DATETIME"),
     ("hero_image_url", "TEXT"),
+    ("serving_count", "REAL"),
     ("serving_size_amount", "REAL"),
     ("serving_size_unit", "TEXT"),
     ("suggested_utensils", "TEXT"),

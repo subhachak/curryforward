@@ -111,6 +111,7 @@ export interface RecipeDetail {
   cuisine_tags: string[];
   hero_image_url: string | null;
   base_servings: { amount: number | null; unit: string };
+  serving_count?: number | null;
   serving_size: { amount: number | null; unit: string | null };
   components: RecipeComponent[];
   steps: RecipeStep[];
@@ -355,6 +356,7 @@ export type ResearchPatchPayload = Partial<{
   cuisine_tags: string[];
   base_servings_amount: number | null;
   base_servings_unit: string;
+  serving_count?: number | null;
   serving_size_amount?: number | null;
   serving_size_unit?: string | null;
   components: RecipeComponent[];
@@ -386,6 +388,7 @@ export interface RecipeUpsertRequest {
   cuisine_tags: string[];
   base_servings_amount: number | null;
   base_servings_unit: string;
+  serving_count?: number | null;
   serving_size_amount: number | null;
   serving_size_unit: string | null;
   components: RecipeComponent[];

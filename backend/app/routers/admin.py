@@ -745,6 +745,7 @@ def commit_recipe_import(
             cuisine_tags=row.cuisine_tags,
             base_servings_amount=yield_grams,
             base_servings_unit="g",
+            serving_count=None,
             serving_size_amount=100,
             serving_size_unit="g",
             components=components,

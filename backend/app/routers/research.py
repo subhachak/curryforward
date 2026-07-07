@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 PATCHABLE_FIELDS = [
     "name", "category", "cuisine_tags", "base_servings_amount", "base_servings_unit",
-    "serving_size_amount", "serving_size_unit",
+    "serving_count", "serving_size_amount", "serving_size_unit",
     "components", "steps", "intro", "history", "prep_time_minutes",
     "cook_time_minutes", "tips", "watch_outs", "suggested_utensils",
     "pan_conversions", "notes", "starting_prompt", "hero_image_url",
@@ -60,6 +60,7 @@ class ResearchPatchRequest(BaseModel):
     cuisine_tags: list[str] | None = None
     base_servings_amount: float | None = None
     base_servings_unit: str | None = None
+    serving_count: float | None = None
     serving_size_amount: float | None = None
     serving_size_unit: str | None = None
     components: list[dict] | None = None
@@ -134,6 +135,12 @@ def _get_draft(db: Session, recipe_id: str) -> RecipeVersion:
         raise HTTPException(400, "This recipe is no longer a draft")
     ensure_recipe_identity(row, db)
     return row
+
+
+def _calculated_serving_count(yield_grams: float | None, serving_grams: float | None) -> float | None:
+    if not yield_grams or not serving_grams or serving_grams <= 0:
+        return None
+    return max(1, round(yield_grams / serving_grams))
 
 
 def _apply_patch(row: RecipeVersion, patch: dict, db: Session | None = None, allow_null: bool = False) -> None:
@@ -1001,6 +1008,7 @@ def publish_research_recipe(
         if not current_original or (current_original.status or "published") != "published":
             raise HTTPException(400, "Original recipe is not currently published.")
 
+        serving_count = row.serving_count or _calculated_serving_count(row.base_servings_amount, row.serving_size_amount)
         replacement = RecipeVersion(
             recipe_id=original.recipe_id,
             public_slug=current_original.public_slug or unique_public_slug(db, row.name, original.recipe_id),
@@ -1012,6 +1020,7 @@ def publish_research_recipe(
             cuisine_tags=row.cuisine_tags,
             base_servings_amount=row.base_servings_amount,
             base_servings_unit=row.base_servings_unit,
+            serving_count=serving_count,
             serving_size_amount=row.serving_size_amount,
             serving_size_unit=row.serving_size_unit,
             components=row.components,
@@ -1047,6 +1056,8 @@ def publish_research_recipe(
         return replacement.to_dict()
 
     row.status = "published"
+    if row.serving_count is None:
+        row.serving_count = _calculated_serving_count(row.base_servings_amount, row.serving_size_amount)
     row.public_slug = row.public_slug or unique_public_slug(db, row.name, row.recipe_id)
     audit_admin_action(
         db,

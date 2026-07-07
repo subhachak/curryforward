@@ -328,6 +328,10 @@ function formatDuration(minutes: number) {
 }
 
 function formatServingCount(recipe: RecipeDetail) {
+  if (recipe.serving_count != null && recipe.serving_count > 0) {
+    return formatCount(recipe.serving_count);
+  }
+
   const baseAmount = recipe.base_servings.amount;
   const baseUnit = recipe.base_servings.unit?.trim().toLowerCase();
   const servingSizeAmount = recipe.serving_size.amount;

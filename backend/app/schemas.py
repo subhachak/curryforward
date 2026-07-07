@@ -36,6 +36,7 @@ class RecipeUpsertRequest(BaseModel):
     cuisine_tags: list[str] = Field(default_factory=list)
     base_servings_amount: float | None = None
     base_servings_unit: str = "servings"
+    serving_count: float | None = None
     serving_size_amount: float | None = None
     serving_size_unit: str | None = None
     components: list[ComponentPayload] = Field(default_factory=list)
@@ -72,6 +73,7 @@ class RecipeDetailResponse(BaseModel):
     cuisine_tags: list[str]
     hero_image_url: str | None
     base_servings: BaseServings
+    serving_count: float | None = None
     serving_size: ServingSize
     components: list[dict[str, Any]]
     steps: list[dict[str, Any]]
