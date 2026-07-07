@@ -116,11 +116,11 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
       for (const recipe of selectedPublished) {
         await api.unpublishResearch(recipe.recipe_id);
       }
-      push(`Unpublished ${selectedPublished.length} recipe${selectedPublished.length === 1 ? "" : "s"}`, "success");
+      push(`Took down ${selectedPublished.length} recipe${selectedPublished.length === 1 ? "" : "s"} for servicing`, "success");
       setSelectedIds(new Set());
       onChanged();
     } catch (e) {
-      push(e instanceof ApiError ? e.message : "Bulk unpublish failed", "error");
+      push(e instanceof ApiError ? e.message : "Bulk take down failed", "error");
     } finally {
       setBulkBusy(false);
     }
@@ -146,10 +146,10 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
     setPendingId(recipe.recipe_id);
     try {
       await api.unpublishResearch(recipe.recipe_id);
-      push("Unpublished — recipe is now a draft", "success");
+      push("Taken down for servicing — recipe is now a draft", "success");
       onChanged();
     } catch (e) {
-      push(e instanceof ApiError ? e.message : "Unpublish failed", "error");
+      push(e instanceof ApiError ? e.message : "Take down failed", "error");
     } finally {
       setPendingId(null);
     }
@@ -160,7 +160,8 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
       <CardBody>
         <div className="mb-1 font-semibold">Recipes ({recipes.length})</div>
         <div className="mb-3 text-xs text-muted">
-          Published recipes are live. Edits create a draft copy; duplicates are always drafts. Unpublish a recipe before moving it to Trash.
+          Published recipes are live. Take down a recipe for servicing to hide it from guests and return it to draft.
+          Edits create a draft copy; duplicates are always drafts.
         </div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-surface p-2">
           <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
@@ -181,7 +182,7 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
               </Button>
               <Button size="sm" variant="secondary" loading={bulkBusy} disabled={selectedPublished.length === 0} onClick={bulkUnpublish}>
                 <EyeOffIcon className="h-3.5 w-3.5" />
-                Unpublish
+                Take down
               </Button>
               <Button size="sm" variant="danger" loading={bulkBusy} disabled={selectedDrafts.length === 0} onClick={bulkMoveToTrash}>
                 <TrashIcon className="h-3.5 w-3.5" />
@@ -202,7 +203,7 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
               },
               { label: "Duplicate as draft", icon: <CopyIcon />, onClick: () => copyRecipe(r) },
               ...(r.status === "published"
-                ? [{ label: "Unpublish", icon: <EyeOffIcon />, onClick: () => unpublish(r) }]
+                ? [{ label: "Take down for servicing", icon: <EyeOffIcon />, onClick: () => unpublish(r) }]
                 : []),
               {
                 label: "Move to Trash",

@@ -470,10 +470,12 @@ export default function AdminPage() {
 
       {activeTab === "dashboard" && (
         <DashboardTab
+          recipes={adminRecipes}
           publishedCount={publishedCount}
           draftCount={draftCount}
           pendingFeedbackCount={pendingFeedbackCount}
           totalViews={totalViews}
+          totalDownloads={totalDownloads}
           trashCount={trash.length}
           auditLog={auditLog}
           loadingAnalytics={loadingAnalytics}
@@ -577,84 +579,303 @@ function StatTile({
 }
 
 function DashboardTab({
+  recipes,
   publishedCount,
   draftCount,
   pendingFeedbackCount,
   totalViews,
+  totalDownloads,
   trashCount,
   auditLog,
   loadingAnalytics,
   onNavigate,
 }: {
+  recipes: AdminRecipeSummary[];
   publishedCount: number;
   draftCount: number;
   pendingFeedbackCount: number;
   totalViews: number;
+  totalDownloads: number;
   trashCount: number;
   auditLog: AdminAuditLog[];
   loadingAnalytics: boolean;
   onNavigate: (tab: WorkspaceTab) => void;
 }) {
+  const drafts = recipes.filter((recipe) => recipe.status === "draft");
+  const published = recipes.filter((recipe) => recipe.status === "published");
+  const missingHero = recipes.filter((recipe) => !recipe.hero_image_url);
+  const publishedMissingHero = published.filter((recipe) => !recipe.hero_image_url);
+  const missingIntro = recipes.filter((recipe) => !recipe.intro?.trim());
+  const staleDrafts = drafts.filter((recipe) => isOlderThanDays(recipe.updated_at, 14));
+  const activeDrafts = [...drafts]
+    .sort((a, b) => timestampValue(b.updated_at) - timestampValue(a.updated_at))
+    .slice(0, 6);
+  const highTrafficMissingHero = publishedMissingHero
+    .filter((recipe) => recipe.view_count + recipe.download_count > 0)
+    .sort((a, b) => b.view_count + b.download_count - (a.view_count + a.download_count));
+  const topRecipe = [...published].sort((a, b) => b.view_count + b.download_count - (a.view_count + a.download_count))[0];
+
+  const attentionItems = [
+    {
+      label: "Drafts waiting review",
+      detail: "Open the draft queue and move publishable recipes forward.",
+      value: draftCount,
+      tab: "recipes" as WorkspaceTab,
+      tone: "warning",
+    },
+    {
+      label: "Feedback pending approval",
+      detail: "AI-screened reviews and comments need an admin decision.",
+      value: pendingFeedbackCount,
+      tab: "feedback" as WorkspaceTab,
+      tone: "danger",
+    },
+    {
+      label: "Published recipes without hero images",
+      detail: "These are live, but visually underpowered.",
+      value: publishedMissingHero.length,
+      tab: "recipes" as WorkspaceTab,
+      tone: "warning",
+    },
+    {
+      label: "Recipes missing intro copy",
+      detail: "Add a short intro so cards, search, and recipe pages feel complete.",
+      value: missingIntro.length,
+      tab: "recipes" as WorkspaceTab,
+      tone: "warning",
+    },
+    {
+      label: "Trash ready for cleanup",
+      detail: "Restore useful records or permanently remove old clutter.",
+      value: trashCount,
+      tab: "trash" as WorkspaceTab,
+      tone: "danger",
+    },
+  ];
+
+  const nextActions = [
+    draftCount
+      ? {
+          title: "Review active drafts",
+          body: `${draftCount} draft${draftCount === 1 ? "" : "s"} can be checked for publish readiness.`,
+          tab: "recipes" as WorkspaceTab,
+        }
+      : null,
+    highTrafficMissingHero.length
+      ? {
+          title: "Add images to visible recipes",
+          body: `${highTrafficMissingHero.length} live recipe${highTrafficMissingHero.length === 1 ? "" : "s"} with traffic need hero images.`,
+          tab: "recipes" as WorkspaceTab,
+        }
+      : null,
+    pendingFeedbackCount
+      ? {
+          title: "Clear feedback queue",
+          body: `${pendingFeedbackCount} review${pendingFeedbackCount === 1 ? "" : "s"} are waiting for moderation.`,
+          tab: "feedback" as WorkspaceTab,
+        }
+      : null,
+    !draftCount
+      ? {
+          title: "Start a new recipe",
+          body: "Research, paste, or import a new recipe draft.",
+          tab: "research" as WorkspaceTab,
+        }
+      : null,
+  ].filter(Boolean) as { title: string; body: string; tab: WorkspaceTab }[];
+
   const healthItems = [
-    { label: "Drafts waiting review", value: draftCount, tone: "text-warning" },
-    { label: "Feedback needs approval", value: pendingFeedbackCount, tone: "text-danger" },
-    { label: "Items in trash", value: trashCount, tone: "text-danger" },
+    { label: "Published library", value: publishedCount, helper: "Live recipe pages", tone: "text-success", tab: "recipes" as WorkspaceTab },
+    { label: "Draft backlog", value: draftCount, helper: "Recipes in progress", tone: "text-warning", tab: "recipes" as WorkspaceTab },
+    { label: "Missing hero images", value: missingHero.length, helper: "Live and draft records", tone: "text-warning", tab: "recipes" as WorkspaceTab },
+    { label: "Stale drafts", value: staleDrafts.length, helper: "No update in 14 days", tone: "text-danger", tab: "recipes" as WorkspaceTab },
   ];
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+    <div className="space-y-4">
       <Card className="bg-white">
-        <CardBody>
-          <div className="flex items-center gap-2">
-            <SparklesIcon className="h-5 w-5 text-accent" />
-            <div className="font-semibold text-ink">Today</div>
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <DashboardFact label="Drafts waiting review" value={draftCount} />
-            <DashboardFact label="Feedback items" value={pendingFeedbackCount} />
-            <DashboardFact label="Published recipes" value={publishedCount} />
-            <DashboardFact label="Recipe views" value={totalViews} />
-          </div>
-        </CardBody>
-      </Card>
-
-      <Card className="bg-white">
-        <CardBody>
-          <div className="font-semibold text-ink">Quick actions</div>
-          <div className="mt-4 grid gap-2">
-            <Button className="justify-start" onClick={() => onNavigate("research")}>
-              <PlusIcon className="h-4 w-4" />
-              Create recipe
-            </Button>
-            <Button variant="secondary" className="justify-start" onClick={() => onNavigate("research")}>
-              <UploadIcon className="h-4 w-4" />
-              Import Excel
-            </Button>
-            <Button variant="secondary" className="justify-start" onClick={() => onNavigate("recipes")}>
-              <CopyIcon className="h-4 w-4" />
-              Review drafts
-            </Button>
-            <Button variant="secondary" className="justify-start" onClick={() => onNavigate("analytics")}>
-              <EyeIcon className="h-4 w-4" />
-              Open analytics
+        <CardBody className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-ink">Needs your attention</h3>
+              <p className="text-sm text-muted">The work most likely to improve the site right now.</p>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => onNavigate("research")}>
+              <PlusIcon className="h-3.5 w-3.5" />
+              New recipe
             </Button>
           </div>
-        </CardBody>
-      </Card>
-
-      <Card className="bg-white">
-        <CardBody>
-          <div className="font-semibold text-ink">Content health</div>
-          <div className="mt-4 space-y-3">
-            {healthItems.map((item) => (
-              <div key={item.label} className="flex items-center justify-between rounded-md border border-border bg-surface p-3">
-                <span className="text-sm text-muted">{item.label}</span>
-                <span className={`text-lg font-bold ${item.value ? item.tone : "text-success"}`}>{item.value}</span>
-              </div>
+          <div className="grid gap-3">
+            {attentionItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => onNavigate(item.tab)}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface p-3 text-left transition-colors hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
+              >
+                <span>
+                  <span className="block font-semibold text-foreground">{item.label}</span>
+                  <span className="block text-sm text-muted">{item.detail}</span>
+                </span>
+                <span
+                  className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                    item.value
+                      ? item.tone === "danger"
+                        ? "bg-danger/10 text-danger"
+                        : "bg-warning/15 text-warning"
+                      : "bg-success/10 text-success"
+                  }`}
+                >
+                  {item.value || "Clear"}
+                </span>
+              </button>
             ))}
           </div>
         </CardBody>
       </Card>
+
+      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="bg-white">
+          <CardBody>
+            <div className="font-semibold text-ink">Next best actions</div>
+            <div className="mt-4 grid gap-3">
+              {nextActions.length ? (
+                nextActions.slice(0, 3).map((action) => (
+                  <button
+                    key={action.title}
+                    type="button"
+                    onClick={() => onNavigate(action.tab)}
+                    className="rounded-md border border-border bg-surface p-3 text-left transition-colors hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
+                  >
+                    <span className="block text-sm font-semibold text-foreground">{action.title}</span>
+                    <span className="mt-1 block text-sm text-muted">{action.body}</span>
+                  </button>
+                ))
+              ) : (
+                <EmptyState
+                  icon={<CheckIcon />}
+                  title="Workspace looks clear"
+                  body="No urgent work is waiting. This is a good moment to start a new recipe or review analytics."
+                />
+              )}
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card className="bg-white">
+          <CardBody>
+            <div className="font-semibold text-ink">Traffic snapshot</div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <DashboardFact label="Views" value={totalViews} />
+              <DashboardFact label="Downloads" value={totalDownloads} />
+            </div>
+            {topRecipe ? (
+              <Link
+                href={publicRecipeHref(topRecipe)}
+                className="mt-3 block rounded-md border border-border bg-surface p-3 text-sm transition-colors hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
+              >
+                <span className="block font-semibold text-foreground">Top recipe</span>
+                <span className="mt-1 block text-muted">
+                  {topRecipe.name} · {topRecipe.view_count + topRecipe.download_count} interactions
+                </span>
+              </Link>
+            ) : (
+              <div className="mt-3 rounded-md border border-border bg-surface p-3 text-sm text-muted">Publish recipes to build traffic data.</div>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
+      <Card className="bg-white">
+        <CardBody>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="font-semibold text-ink">Active draft queue</div>
+              <p className="text-sm text-muted">Newest drafts and what they need before they become publish candidates.</p>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => onNavigate("recipes")}>
+              View all drafts
+            </Button>
+          </div>
+          {activeDrafts.length ? (
+            <div className="mt-4 grid gap-3">
+              {activeDrafts.map((recipe) => (
+                <Link
+                  key={recipe.recipe_id}
+                  href={adminRecipeHref(recipe)}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface p-3 transition-colors hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
+                >
+                  <span>
+                    <span className="block font-semibold text-foreground">{recipe.name}</span>
+                    <span className="block text-xs text-muted">
+                      {recipe.category || "No category"} · Updated {formatDate(recipe.updated_at)}
+                    </span>
+                  </span>
+                  <span className="flex flex-wrap gap-2">
+                    {draftBadges(recipe).map((badge) => (
+                      <span key={badge} className="rounded-full bg-surface-muted px-2 py-1 text-xs font-semibold text-muted">
+                        {badge}
+                      </span>
+                    ))}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={<SparklesIcon />}
+              title="No active drafts"
+              body="Start from research, pasted notes, or a spreadsheet import when you are ready to add more recipes."
+            />
+          )}
+        </CardBody>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <Card className="bg-white">
+          <CardBody>
+            <div className="font-semibold text-ink">Start something</div>
+            <div className="mt-4 grid gap-2">
+              <Button className="justify-start" onClick={() => onNavigate("research")}>
+                <PlusIcon className="h-4 w-4" />
+                Create or research recipe
+              </Button>
+              <Button variant="secondary" className="justify-start" onClick={() => onNavigate("research")}>
+                <UploadIcon className="h-4 w-4" />
+                Import spreadsheet
+              </Button>
+              <Button variant="secondary" className="justify-start" onClick={() => onNavigate("recipes")}>
+                <CopyIcon className="h-4 w-4" />
+                Manage recipes
+              </Button>
+              <Button variant="secondary" className="justify-start" onClick={() => onNavigate("analytics")}>
+                <EyeIcon className="h-4 w-4" />
+                Open analytics
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card className="bg-white">
+          <CardBody>
+            <div className="font-semibold text-ink">Content health</div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {healthItems.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => onNavigate(item.tab)}
+                  className="rounded-md border border-border bg-surface p-3 text-left transition-colors hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
+                >
+                  <span className={`block text-2xl font-bold ${item.value ? item.tone : "text-success"}`}>{item.value}</span>
+                  <span className="mt-1 block text-xs font-semibold uppercase tracking-wide text-muted">{item.label}</span>
+                  <span className="mt-1 block text-xs text-muted">{item.helper}</span>
+                </button>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      </div>
 
       <Card className="bg-white">
         <CardBody>
@@ -662,13 +883,12 @@ function DashboardTab({
           {loadingAnalytics ? (
             <PageSpinner label="Loading activity..." />
           ) : auditLog.length ? (
-            <div className="mt-4 space-y-3">
-              {auditLog.slice(0, 5).map((row) => (
-                <div key={row.log_id} className="border-l-2 border-accent/60 pl-3">
-                  <div className="text-sm font-medium text-foreground">{row.action.replaceAll("_", " ")}</div>
-                  <div className="text-xs text-muted">
-                    {[row.target_type, row.target_id].filter(Boolean).join(" · ") || "workspace"} ·{" "}
-                    {formatDate(row.created_at)}
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {auditLog.slice(0, 6).map((row) => (
+                <div key={row.log_id} className="rounded-md border border-border bg-surface p-3">
+                  <div className="text-sm font-medium capitalize text-foreground">{row.action.replaceAll("_", " ")}</div>
+                  <div className="mt-1 text-xs text-muted">
+                    {[row.target_type, row.target_id].filter(Boolean).join(" · ") || "workspace"} · {formatDate(row.created_at)}
                   </div>
                 </div>
               ))}
@@ -684,6 +904,27 @@ function DashboardTab({
       </Card>
     </div>
   );
+}
+
+function timestampValue(value: string | null) {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function isOlderThanDays(value: string | null, days: number) {
+  const timestamp = timestampValue(value);
+  if (!timestamp) return false;
+  return Date.now() - timestamp > days * 24 * 60 * 60 * 1000;
+}
+
+function draftBadges(recipe: AdminRecipeSummary) {
+  const badges = [];
+  if (!recipe.hero_image_url) badges.push("Needs image");
+  if (!recipe.intro?.trim()) badges.push("Needs intro");
+  if (isOlderThanDays(recipe.updated_at, 14)) badges.push("Stale");
+  if (!badges.length) badges.push("Ready to review");
+  return badges;
 }
 
 function DashboardFact({ label, value }: { label: string; value: number }) {

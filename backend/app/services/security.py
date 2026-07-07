@@ -55,13 +55,19 @@ def client_ip(request: Request) -> str:
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         response = await call_next(request)
+        forwarded_proto = (request.headers.get("x-forwarded-proto") or "").lower()
+        force_https = (
+            is_production()
+            or env_bool("FORCE_HTTPS", default=False)
+            or request.url.scheme == "https"
+            or "https" in {part.strip() for part in forwarded_proto.split(",")}
+        )
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
         response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
-        response.headers.setdefault(
-            "Content-Security-Policy",
+        csp = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline'; "
@@ -70,9 +76,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "connect-src 'self'; "
             "frame-ancestors 'none'; "
             "base-uri 'self'; "
-            "form-action 'self'",
+            "form-action 'self'"
         )
-        if is_production() or env_bool("FORCE_HTTPS", default=False):
+        if force_https:
+            csp = f"{csp}; upgrade-insecure-requests; block-all-mixed-content"
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            csp,
+        )
+        if force_https:
             response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         return response
 
