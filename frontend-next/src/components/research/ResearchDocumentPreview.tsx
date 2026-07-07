@@ -1,17 +1,15 @@
 "use client";
 
-import { ChangeEvent, useRef, useState } from "react";
+import { useState } from "react";
 import type { DragEvent, ReactNode } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { IconButton } from "@/components/ui/IconButton";
-import { CheckIcon, PlusIcon, RefreshIcon, SparklesIcon, UploadIcon, XIcon } from "@/components/ui/icons";
+import { CheckIcon, PlusIcon, RefreshIcon, SparklesIcon, XIcon } from "@/components/ui/icons";
 import { NutritionCard } from "@/components/NutritionCard";
 import { RecipeContent } from "@/components/RecipeContent";
 import { CopyAssistField } from "@/components/research/CopyAssistField";
 import { useRecipes } from "@/context/RecipesContext";
-import { useToast } from "@/context/ToastContext";
-import { api, ApiError } from "@/lib/api";
 import { smartUnitChoices } from "@/lib/ingredientUnits";
 import { estimatedYieldGramsFromComponents } from "@/lib/recipeNutrition";
 import type { Ingredient, PanConversion, RecipeResearchDetail, ResearchPatchPayload } from "@/lib/types";
@@ -215,9 +213,9 @@ function toStepRows(recipe: RecipeResearchDetail): StepRow[] {
 
 function buildComponentsPatch(rows: ComponentRow[]) {
   return rows
-    .filter((c) => c.component_name.trim())
+    .filter((c) => c.component_name.trim() || c.ingredients.some((ingredient) => ingredient.name.trim()))
     .map((c) => ({
-      component_name: c.component_name.trim(),
+      component_name: c.component_name.trim() || "main",
       ingredients: c.ingredients
         .filter((i) => i.name.trim())
         .map((i) => ({
@@ -344,7 +342,6 @@ export function ResearchDocumentPreview({
   highlightedFields = [],
   onClearHighlights,
 }: ResearchDocumentPreviewProps) {
-  const { push } = useToast();
   const { categories } = useRecipes();
   const highlightSet = new Set(highlightedFields);
   const isHighlighted = (fields: string[]) => fields.some((field) => highlightSet.has(field));
@@ -370,10 +367,6 @@ export function ResearchDocumentPreview({
   const [steps, setSteps] = useState<StepRow[]>(() => toStepRows(recipe));
   const [dragging, setDragging] = useState<DragState>(null);
   const [heroImageUrl, setHeroImageUrl] = useState(recipe.hero_image_url);
-  const [uploadingHero, setUploadingHero] = useState(false);
-  const [uploadingStep, setUploadingStep] = useState<number | null>(null);
-  const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
-  const heroFileInputRef = useRef<HTMLInputElement | null>(null);
   const nutritionIssues = recipe.nutrition?.nutrition_issues || [];
   const nutritionIssueForIngredient = (ingredientName: string) =>
     nutritionIssues.find((issue) => normalizeIssueName(issue.ingredient) === normalizeIssueName(ingredientName));
@@ -482,13 +475,6 @@ export function ResearchDocumentPreview({
       return next;
     });
   }
-  function moveComponent(idx: number, direction: -1 | 1) {
-    setComponents((rows) => {
-      const next = reorderRows(rows, idx, idx + direction);
-      commitComponents(next);
-      return next;
-    });
-  }
   function addIngredient(ci: number) {
     setComponents((rows) => {
       const next = rows.map((c, i) => (i === ci ? { ...c, ingredients: [...c.ingredients, emptyIngredient()] } : c));
@@ -505,18 +491,6 @@ export function ResearchDocumentPreview({
       return next;
     });
   }
-  function moveIngredient(ci: number, ii: number, direction: -1 | 1) {
-    setComponents((rows) => {
-      const next = rows.map((component, componentIndex) =>
-        componentIndex === ci
-          ? { ...component, ingredients: reorderRows(component.ingredients, ii, ii + direction) }
-          : component
-      );
-      commitComponents(next);
-      return next;
-    });
-  }
-
   function updateStep(idx: number, patch: Partial<StepRow>) {
     setSteps((rows) => rows.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
   }
@@ -544,52 +518,9 @@ export function ResearchDocumentPreview({
       return next;
     });
   }
-  function moveStep(idx: number, direction: -1 | 1) {
-    setSteps((rows) => {
-      const next = reorderRows(rows, idx, idx + direction);
-      commitSteps(next);
-      return next;
-    });
-  }
-
-  async function handleHeroImageSelected(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setUploadingHero(true);
-    try {
-      const { url } = await api.uploadImage(file);
-      setHeroImageUrl(url);
-      onCommit({ hero_image_url: url });
-    } catch (err) {
-      push(err instanceof ApiError ? err.message : "Image upload failed", "error");
-    } finally {
-      setUploadingHero(false);
-    }
-  }
-
   function handleHeroImageRemove() {
     setHeroImageUrl(null);
     onCommit({ hero_image_url: null });
-  }
-
-  async function handleImageSelected(idx: number, e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setUploadingStep(idx);
-    try {
-      const { url } = await api.uploadImage(file);
-      setSteps((rows) => {
-        const next = rows.map((s, i) => (i === idx ? { ...s, image_url: url } : s));
-        commitSteps(next);
-        return next;
-      });
-    } catch (err) {
-      push(err instanceof ApiError ? err.message : "Image upload failed", "error");
-    } finally {
-      setUploadingStep(null);
-    }
   }
 
   return (
@@ -647,19 +578,6 @@ export function ResearchDocumentPreview({
                   No image
                 </div>
               )}
-              <input
-                ref={heroFileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="hidden"
-                onChange={handleHeroImageSelected}
-              />
-              <IconButton
-                label={heroImageUrl ? "Replace hero image" : "Upload hero image"}
-                icon={<UploadIcon />}
-                loading={uploadingHero}
-                onClick={() => heroFileInputRef.current?.click()}
-              />
               {heroImageUrl && (
                 <IconButton label="Remove hero image" icon={<XIcon />} variant="ghost" onClick={handleHeroImageRemove} />
               )}
@@ -806,22 +724,6 @@ export function ResearchDocumentPreview({
                   onDragStart={(event) => startDrag(event, { type: "component", from: ci })}
                   onDragEnd={() => setDragging(null)}
                 />
-                <div className="flex shrink-0 items-center gap-1">
-                  <IconButton
-                    label="Move component up"
-                    icon={<UploadIcon />}
-                    variant="ghost"
-                    disabled={ci === 0}
-                    onClick={() => moveComponent(ci, -1)}
-                  />
-                  <IconButton
-                    label="Move component down"
-                    icon={<UploadIcon className="rotate-180" />}
-                    variant="ghost"
-                    disabled={ci === components.length - 1}
-                    onClick={() => moveComponent(ci, 1)}
-                  />
-                </div>
                 <div className="flex-1">
                   <Input
                     value={component.component_name}
@@ -852,22 +754,6 @@ export function ResearchDocumentPreview({
                         onDragStart={(event) => startDrag(event, { type: "ingredient", componentIndex: ci, from: ii })}
                         onDragEnd={() => setDragging(null)}
                       />
-                      <div className="flex shrink-0 items-center gap-1">
-                        <IconButton
-                          label="Move ingredient up"
-                          icon={<UploadIcon />}
-                          variant="ghost"
-                          disabled={ii === 0}
-                          onClick={() => moveIngredient(ci, ii, -1)}
-                        />
-                        <IconButton
-                          label="Move ingredient down"
-                          icon={<UploadIcon className="rotate-180" />}
-                          variant="ghost"
-                          disabled={ii === component.ingredients.length - 1}
-                          onClick={() => moveIngredient(ci, ii, 1)}
-                        />
-                      </div>
                       <div className="w-24 shrink-0">
                         <Input
                           value={ing.amount}
@@ -957,22 +843,6 @@ export function ResearchDocumentPreview({
                   onDragStart={(event) => startDrag(event, { type: "step", from: si })}
                   onDragEnd={() => setDragging(null)}
                 />
-                <div className="flex shrink-0 items-start gap-1 pt-1">
-                  <IconButton
-                    label="Move step up"
-                    icon={<UploadIcon />}
-                    variant="ghost"
-                    disabled={si === 0}
-                    onClick={() => moveStep(si, -1)}
-                  />
-                  <IconButton
-                    label="Move step down"
-                    icon={<UploadIcon className="rotate-180" />}
-                    variant="ghost"
-                    disabled={si === steps.length - 1}
-                    onClick={() => moveStep(si, 1)}
-                  />
-                </div>
                 <CopyAssistField
                   recipeId={recipe.recipe_id}
                   fieldLabel={`step ${si + 1} instruction`}
@@ -994,21 +864,6 @@ export function ResearchDocumentPreview({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={step.image_url} alt="" className="h-16 w-16 rounded-md border border-border object-cover" />
                 ) : null}
-                <input
-                  ref={(el) => {
-                    fileInputRefs.current[si] = el;
-                  }}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  className="hidden"
-                  onChange={(e) => handleImageSelected(si, e)}
-                />
-                <IconButton
-                  label={step.image_url ? "Replace step image" : "Add step image"}
-                  icon={<UploadIcon />}
-                  loading={uploadingStep === si}
-                  onClick={() => fileInputRefs.current[si]?.click()}
-                />
               </div>
             </div>
           ))}

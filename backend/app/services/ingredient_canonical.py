@@ -111,6 +111,7 @@ def normalize_components_to_grams(components: list[dict[str, Any]] | None) -> li
     normalized = []
     for component in components or []:
         next_component = dict(component)
+        next_component["component_name"] = str(next_component.get("component_name") or "").strip() or "main"
         next_component["ingredients"] = [
             normalize_ingredient_to_grams(ingredient)
             for ingredient in component.get("ingredients", [])

@@ -145,6 +145,23 @@ def test_patch_recomputes_nutrition_when_components_change():
     assert r.json()["nutrition"]["calories"] > 0
 
 
+def test_patch_preserves_single_ingredient_section_with_blank_header():
+    draft = _start_draft()
+    components = [
+        {"component_name": "", "ingredients": [{"name": "chicken", "amount": 200, "unit": "g"}]}
+    ]
+    r = client.patch(
+        f"/api/recipes/research/{draft['recipe_id']}",
+        json={"components": components},
+        headers=ADMIN_HEADERS,
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["components"][0]["component_name"] == "main"
+    assert body["components"][0]["ingredients"][0]["name"] == "chicken"
+    assert body["nutrition"]["calories"] > 0
+
+
 def test_refresh_nutrition_recomputes_current_draft():
     draft = _start_draft()
     components = [
