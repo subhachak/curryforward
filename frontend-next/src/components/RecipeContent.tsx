@@ -201,7 +201,10 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
                 )}
                 <ul className="space-y-1 text-sm">
                   {c.ingredients.map((ing, idx) => (
-                    <li key={ing.ingredient_id ?? idx} className="flex items-center justify-between gap-2 rounded-md px-1 py-1 hover:bg-[#DFF3E6]/45">
+                    <li
+                      key={ing.ingredient_id ?? idx}
+                      className="grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-3 rounded-md px-1 py-1 hover:bg-[#DFF3E6]/45"
+                    >
                       <label className="flex min-w-0 items-center gap-2">
                         <input type="checkbox" className="h-4 w-4 rounded border-[#BDE8CB] accent-[#2E9B57]" />
                         <span className="min-w-0">
@@ -213,25 +216,27 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
                           <span className="text-[#5A4038]">{ing.name}</span>
                         </span>
                       </label>
-                      {unitChoices(ing).length > 1 && (
-                        <select
-                          aria-label={`Unit for ${ing.name}`}
-                          value={selectedUnits[`${componentIdx}-${idx}`] ?? defaultUnitIndex(ing)}
-                          onChange={(e) =>
-                            setSelectedUnits((prev) => ({
-                              ...prev,
-                              [`${componentIdx}-${idx}`]: Number(e.target.value),
-                            }))
-                          }
-                          className="h-8 max-w-28 rounded-md border border-[#BDE8CB] bg-white px-2 text-xs"
-                        >
-                          {unitChoices(ing).map((option, optionIdx) => (
-                            <option key={`${option.unit}-${optionIdx}`} value={optionIdx}>
-                              {option.label || option.unit || "base"}
-                            </option>
-                          ))}
-                        </select>
-                      )}
+                      <div className="flex justify-end">
+                        {unitChoices(ing).length > 1 && (
+                          <select
+                            aria-label={`Unit for ${ing.name}`}
+                            value={selectedUnits[`${componentIdx}-${idx}`] ?? defaultUnitIndex(ing)}
+                            onChange={(e) =>
+                              setSelectedUnits((prev) => ({
+                                ...prev,
+                                [`${componentIdx}-${idx}`]: Number(e.target.value),
+                              }))
+                            }
+                            className="h-8 w-24 rounded-md border border-[#BDE8CB] bg-white px-2 text-xs"
+                          >
+                            {unitChoices(ing).map((option, optionIdx) => (
+                              <option key={`${option.unit}-${optionIdx}`} value={optionIdx}>
+                                {option.label || option.unit || "base"}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                     </li>
                   ))}
                 </ul>

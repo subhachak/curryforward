@@ -85,9 +85,6 @@ export function NutritionCard({ recipe }: { recipe: RecipeDetail }) {
     <div className="rounded-md border-2 border-[#2E1B14] bg-white p-4 font-sans shadow-sm">
       <div className="mb-2 h-2 rounded-full bg-[#FF6B00]" />
       <h3 className="text-3xl font-black leading-none text-[#2E1B14]">Nutrition Facts</h3>
-      <div className="mt-1 text-sm text-[#5A4038]">
-        {totalYieldGrams ? `Approx. ${totalYieldGrams} g per recipe` : "Recipe yield not calculated"}
-      </div>
       <div className="border-b-8 border-[#2E1B14] pb-1 text-base font-bold text-[#2E1B14]">
         Serving size {servingGrams} g
       </div>

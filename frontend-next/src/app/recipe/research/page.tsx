@@ -118,9 +118,9 @@ function ResearchWorkspaceInner() {
     }
   }
 
-  async function handleWideEdit() {
+  async function handleWideEdit(instructionOverride?: string) {
     if (!recipeId) return;
-    const instruction = wideEditPrompt.trim();
+    const instruction = (instructionOverride ?? wideEditPrompt).trim();
     if (!instruction) return;
     setWideEditing(true);
     try {
@@ -128,7 +128,7 @@ function ResearchWorkspaceInner() {
       setRecipe(result.recipe);
       setReviewHighlights(result.changed_fields);
       setReviewNotes(result.review_notes);
-      setWideEditPrompt("");
+      if (!instructionOverride) setWideEditPrompt("");
       setSaveStatus("saved");
       push(`Updated ${result.changed_fields.length || 0} section${result.changed_fields.length === 1 ? "" : "s"} for review`, "success");
     } catch (e) {
@@ -354,7 +354,7 @@ function ResearchWorkspaceInner() {
                       icon={<SendIcon />}
                       loading={wideEditing}
                       disabled={!wideEditPrompt.trim()}
-                      onClick={handleWideEdit}
+                      onClick={() => void handleWideEdit()}
                     />
                   </div>
                   {(reviewHighlights.length > 0 || reviewNotes) && (
@@ -376,6 +376,7 @@ function ResearchWorkspaceInner() {
               previewMode={previewMode}
               onCommit={handleCommit}
               onRefine={handleRefineSection}
+              onModifyRecipe={(instruction) => handleWideEdit(instruction)}
               onRefreshNutrition={isDraft ? handleRefreshNutrition : undefined}
               refreshingNutrition={refreshingNutrition}
               highlightedFields={reviewHighlights}
