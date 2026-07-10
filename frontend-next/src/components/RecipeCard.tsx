@@ -18,7 +18,7 @@ export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
 
   return (
     <Link href={publicRecipeHref(recipe)}>
-      <Card className="h-full overflow-hidden p-0 transition hover:-translate-y-0.5 hover:shadow-md">
+      <Card className="recipe-card h-full overflow-hidden p-0 transition hover:-translate-y-0.5 hover:shadow-md">
         {recipe.hero_image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={recipe.hero_image_url} alt="" className="food-image h-32 w-full border-b border-border object-cover" />
@@ -33,13 +33,13 @@ export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
         )}
         <div className="p-4">
           <div className="flex items-start justify-between gap-2">
-            <div className="font-semibold">{recipe.name}</div>
+            <div className="recipe-card-title font-semibold">{recipe.name}</div>
             <div className="flex shrink-0 items-center gap-1 text-xs text-muted">
               <HeartIcon className="h-3.5 w-3.5" fill={recipe.like_count > 0 ? "currentColor" : "none"} />
               <span>{recipe.like_count}</span>
             </div>
           </div>
-          {recipe.intro && <p className="mt-1 line-clamp-2 text-sm text-muted">{recipe.intro}</p>}
+          {recipe.intro && <p className="recipe-card-secondary mt-1 line-clamp-2 text-sm text-muted">{recipe.intro}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {recipe.category && <Badge tone="neutral">{recipe.category}</Badge>}
             {recipe.cuisine_tags.slice(0, 2).map((tag) => (

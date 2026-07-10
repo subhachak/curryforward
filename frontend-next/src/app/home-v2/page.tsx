@@ -235,8 +235,8 @@ export default function HomeV2Page() {
             </p>
             <div className="mt-4 flex flex-wrap gap-2 text-sm">
               <span className="rounded-full bg-[#FFF8F1] px-3 py-1 text-[#5A4038]">35 min</span>
-              <span className="rounded-full bg-[#FFE0DA] px-3 py-1 font-semibold text-[#E6462D]">Medium spice</span>
-              <span className="rounded-full bg-[#F7DDED] px-3 py-1 font-semibold text-[#5A2145]">
+              <span className="badge-pink rounded-full bg-[#FFE0DA] px-3 py-1 font-semibold text-[#E6462D]">Medium spice</span>
+              <span className="badge-lavender rounded-full bg-[#F7DDED] px-3 py-1 font-semibold text-[#5A2145]">
                 {featured?.cuisine_tags[0] ?? "Bengali"}
               </span>
             </div>
@@ -332,7 +332,7 @@ export default function HomeV2Page() {
                 <Link
                   key={recipe.name}
                   href={recipe.href}
-                  className="overflow-hidden rounded-md border border-[#FFD2AE] bg-[#FFF1E6] shadow-sm transition hover:-translate-y-0.5"
+                  className="recipe-card overflow-hidden rounded-md border border-[#FFD2AE] bg-[#FFF1E6] shadow-sm transition hover:-translate-y-0.5"
                   style={{ borderTop: `5px solid ${recipeAccent}` }}
                 >
                   {imageUrl ? (
@@ -345,13 +345,13 @@ export default function HomeV2Page() {
                   )}
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="font-bold text-[#2E1B14]">{recipe.name}</div>
+                      <div className="recipe-card-title font-bold text-[#2E1B14]">{recipe.name}</div>
                       <HeartIcon className="h-5 w-5" style={{ color: recipeAccent }} />
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-full bg-[#F7DDED] px-2 py-1 font-medium text-[#5A2145]">{recipe.region}</span>
-                      <span className="rounded-full bg-[#FFF0C1] px-2 py-1 font-medium text-[#7A5200]">{recipe.time}</span>
-                      <span className="rounded-full px-2 py-1 font-medium" style={spiceTone}>
+                      <span className="badge-lavender rounded-full bg-[#F7DDED] px-2 py-1 font-medium text-[#5A2145]">{recipe.region}</span>
+                      <span className="recipe-card-duration py-1 font-semibold text-[#B84600]">{recipe.time}</span>
+                      <span className={`rounded-full px-2 py-1 font-medium ${recipe.spice === "Medium" ? "badge-pink" : "badge-mint"}`} style={spiceTone}>
                         {recipe.spice}
                       </span>
                     </div>

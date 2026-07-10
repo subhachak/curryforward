@@ -59,6 +59,16 @@
   --warning-soft: #44381f;
   --danger: #c76a5a;
   --danger-soft: #492822;
+
+  --color-dark-card-bg: #221f1d;
+  --color-dark-card-border: rgba(255, 255, 255, 0.08);
+  --color-dark-text-primary: #f5f2ed;
+  --color-dark-text-secondary: #b9b1aa;
+  --color-dark-accent-orange: #e97820;
+  --color-badge-pink-text: #7a214f;
+  --color-badge-lavender-text: #5f246f;
+  --color-badge-mint-text: #1f5a3c;
+  --color-badge-green-text: #245433;
 }
 
 @theme inline {
@@ -129,6 +139,39 @@ body {
 :root[data-theme="dark"] .food-image {
   border-color: rgb(255 255 255 / 0.06);
   box-shadow: 0 14px 32px rgb(0 0 0 / 0.34);
+}
+
+:root[data-theme="dark"] .recipe-card-title {
+  color: var(--color-dark-text-primary) !important;
+}
+
+:root[data-theme="dark"] .recipe-card {
+  background-color: var(--color-dark-card-bg) !important;
+  border-color: var(--color-dark-card-border) !important;
+}
+
+:root[data-theme="dark"] .recipe-card-secondary {
+  color: var(--color-dark-text-secondary) !important;
+}
+
+:root[data-theme="dark"] .recipe-card-duration {
+  color: var(--color-dark-accent-orange) !important;
+}
+
+:root[data-theme="dark"] .badge-pink {
+  color: var(--color-badge-pink-text) !important;
+}
+
+:root[data-theme="dark"] .badge-lavender {
+  color: var(--color-badge-lavender-text) !important;
+}
+
+:root[data-theme="dark"] .badge-mint {
+  color: var(--color-badge-mint-text) !important;
+}
+
+:root[data-theme="dark"] .badge-green {
+  color: var(--color-badge-green-text) !important;
 }
 
 :root[data-theme="dark"] input,

@@ -324,8 +324,8 @@ export default function HomePage() {
             <h3 className="text-2xl font-bold text-[#2A160F]">{featured?.name ?? "Nolen Gur Payesh"}</h3>
             <div className="mt-4 flex flex-wrap gap-2 text-sm">
               <span className="rounded-full bg-[#FFF8F1] px-3 py-1 text-[#6B4A3A]">45 min</span>
-              <span className="rounded-full bg-[#DFF3E6] px-3 py-1 font-semibold text-[#2E9B57]">Comforting</span>
-              <span className="rounded-full bg-[#FFE2EA] px-3 py-1 font-semibold text-[#D94F70]">
+              <span className="badge-green rounded-full bg-[#DFF3E6] px-3 py-1 font-semibold text-[#2E9B57]">Comforting</span>
+              <span className="badge-pink rounded-full bg-[#FFE2EA] px-3 py-1 font-semibold text-[#D94F70]">
                 {featured?.cuisine_tags[0] ?? "Bengali"}
               </span>
             </div>
@@ -400,7 +400,7 @@ export default function HomePage() {
                 <Link
                   key={recipe.name}
                   href={recipe.href}
-                  className="overflow-hidden rounded-md border border-[#FFD2AE] bg-[#FFF0DD] shadow-sm transition hover:-translate-y-0.5"
+                  className="recipe-card overflow-hidden rounded-md border border-[#FFD2AE] bg-[#FFF0DD] shadow-sm transition hover:-translate-y-0.5"
                   style={{ borderTop: `5px solid ${recipeAccent}` }}
                 >
                   {imageUrl ? (
@@ -413,13 +413,13 @@ export default function HomePage() {
                   )}
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="font-bold text-[#2A160F]">{recipe.name}</div>
+                      <div className="recipe-card-title font-bold text-[#2A160F]">{recipe.name}</div>
                       <HeartIcon className="h-5 w-5" style={{ color: recipeAccent }} />
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-full bg-[#F7DDED] px-2 py-1 font-medium text-[#5A2145]">{recipe.region}</span>
-                      <span className="rounded-full bg-[#FFF0C1] px-2 py-1 font-medium text-[#7A3E1D]">{recipe.time}</span>
-                      <span className="rounded-full bg-[#DFF3E6] px-2 py-1 font-medium text-[#2E9B57]">{recipe.occasion}</span>
+                      <span className="badge-pink rounded-full bg-[#F7DDED] px-2 py-1 font-medium text-[#5A2145]">{recipe.region}</span>
+                      <span className="recipe-card-duration py-1 font-semibold text-[#B84600]">{recipe.time}</span>
+                      <span className="badge-mint rounded-full bg-[#DFF3E6] px-2 py-1 font-medium text-[#2E9B57]">{recipe.occasion}</span>
                     </div>
                   </div>
                 </Link>
