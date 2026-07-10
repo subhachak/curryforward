@@ -28,7 +28,8 @@ export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
             aria-hidden
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/mark-cloche-forward.svg" alt="" className="h-14 w-auto opacity-80" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/heritage/light/emblem.svg" alt="" className="theme-asset h-20 w-auto opacity-90" />
           </div>
         )}
         <div className="p-4">

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { ToastProvider } from "@/context/ToastContext";
@@ -8,8 +8,23 @@ import { NavBar } from "@/components/NavBar";
 import { AuthFooterControl } from "@/components/AuthFooterControl";
 
 export const metadata: Metadata = {
-  title: "CurryForward",
-  description: "A living recipe collection - browse, customize, and generate recipes through chat.",
+  title: {
+    default: "Curry Forward — Recipes with roots",
+    template: "%s · Curry Forward",
+  },
+  description: "A living collection of Indian and global recipes with Bengali roots, adapted for today's kitchen.",
+  applicationName: "Curry Forward",
+  icons: {
+    icon: "/brand/heritage/light/favicon.svg",
+    apple: "/brand/heritage/light/app-icon.svg",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F7F0E3" },
+    { media: "(prefers-color-scheme: dark)", color: "#1E1A17" },
+  ],
 };
 
 export default function RootLayout({
@@ -35,8 +50,8 @@ export default function RootLayout({
                 <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
                   {children}
                 </main>
-                <footer className="relative flex items-center justify-center gap-2 border-t border-border py-4 text-center text-xs text-muted">
-                  <span>CurryForward - recipes with roots, adapted for today.</span>
+                <footer className="heritage-footer relative flex items-center justify-center gap-2 border-t border-border px-16 py-6 text-center text-xs text-muted">
+                  <span>Curry Forward · Recipes with roots, adapted for today.</span>
                   <span className="absolute right-4">
                     <AuthFooterControl />
                   </span>

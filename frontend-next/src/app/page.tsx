@@ -135,7 +135,7 @@ const FALLBACK_RECIPES = [
 function ClocheMark({ className = "" }: { className?: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src="/brand/mark-cloche-forward.svg" alt="" aria-hidden className={className} />
+    <img src="/brand/heritage/light/app-icon.svg" alt="" aria-hidden className={`theme-app-asset ${className}`} />
   );
 }
 
@@ -169,9 +169,9 @@ export default function HomePage() {
   }
 
   return (
-    <div className="-mx-4 -my-6 bg-[#FFF8F1] text-[#2A160F] sm:-mx-6">
+    <div className="heritage-home -mx-4 -my-6 bg-[#FFF8F1] text-[#2A160F] sm:-mx-6">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <section className="grid min-h-[560px] gap-8 overflow-hidden rounded-md border border-[#FFD2AE] bg-[#FFF0DD] p-5 sm:p-8 lg:grid-cols-[1fr_440px] lg:items-center">
+        <section className="heritage-frame grid min-h-[560px] gap-8 overflow-hidden rounded-md border border-[#FFD2AE] bg-[#FFF0DD] p-5 sm:p-8 lg:grid-cols-[1fr_440px] lg:items-center">
           <div className="max-w-2xl space-y-6">
             <span className="inline-flex rounded-full bg-[#D94F70] px-3 py-1 text-xs font-semibold text-white">
               Indian and global recipes with Bengali roots
@@ -226,7 +226,7 @@ export default function HomePage() {
             <div className="absolute left-12 top-24 h-24 w-24 rounded-full border-8 border-[#FFB000]" aria-hidden />
             <div className="absolute bottom-20 right-16 h-20 w-20 rounded-full border-8 border-[#2E9B57]" aria-hidden />
             <div className="absolute right-16 top-14 h-14 w-14 rounded-full bg-[#FFE0DA]" aria-hidden />
-            <ClocheMark className="relative z-10 h-56 w-auto drop-shadow-sm sm:h-64" />
+            <ClocheMark className="relative z-10 h-48 w-auto rounded-[2.5rem] drop-shadow-sm sm:h-56" />
           </div>
         </section>
 

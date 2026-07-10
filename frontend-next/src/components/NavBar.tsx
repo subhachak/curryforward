@@ -137,11 +137,13 @@ export function NavBar() {
   const showWorkspace = isAdmin && !loading;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur">
+    <header className="heritage-header sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur">
       <div className="relative mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-5 sm:px-6">
-        <Link href="/" className="flex shrink-0 items-center">
+        <Link href="/" className="flex shrink-0 items-center" aria-label="Curry Forward home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/logo-primary-horizontal.svg" alt="CurryForward" className="h-11 w-auto sm:h-12" />
+          <img src="/brand/heritage/light/logo-horizontal.svg" alt="Curry Forward" className="brand-logo brand-logo-light h-10 w-auto sm:h-12" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/heritage/dark/logo-horizontal.svg" alt="Curry Forward" className="brand-logo brand-logo-dark hidden h-10 w-auto sm:h-12" />
         </Link>
 
         <nav className="hidden items-center gap-5 sm:flex">
