@@ -266,7 +266,7 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
                       <img
                         src={r.hero_image_url}
                         alt=""
-                        className="h-16 w-16 shrink-0 rounded-md border border-border object-cover"
+                        className="food-image h-16 w-16 shrink-0 rounded-md border border-border object-cover"
                       />
                     ) : (
                       <div

@@ -497,7 +497,7 @@ export function ResearchDocumentPreview({
           <div className="relative flex min-h-72 items-center justify-center overflow-hidden rounded-md border border-[#FFD2AE] bg-[#FFF8F1]">
             {recipe.hero_image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={recipe.hero_image_url} alt="" className="h-full min-h-72 w-full object-cover" />
+              <img src={recipe.hero_image_url} alt="" className="food-image h-full min-h-72 w-full object-cover" />
             ) : (
               <>
                 <div className="absolute left-6 top-8 h-20 w-20 rounded-full border-8 border-[#FFB000]" aria-hidden />

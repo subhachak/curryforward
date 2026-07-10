@@ -405,7 +405,7 @@ export default function HomePage() {
                 >
                   {imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={imageUrl} alt="" className="h-36 w-full object-cover" />
+                    <img src={imageUrl} alt="" className="food-image h-36 w-full object-cover" />
                   ) : (
                     <div className="flex h-36 items-center justify-center bg-[#FFF8F1]">
                       <ClocheMark className="h-20 w-auto" />

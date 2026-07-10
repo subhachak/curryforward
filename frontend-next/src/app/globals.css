@@ -6,6 +6,7 @@
   --background: #fbf5e9; /* warm cream */
   --foreground: #2a2118; /* warm near-black */
   --surface: #fffdf8;
+  --surface-elevated: #ffffff;
   --surface-muted: #f5ead2; /* cream card alt, used in hero/feature sections */
   --border: #e7d9be; /* warm tan */
   --muted: #8a7a63; /* warm taupe, secondary text */
@@ -34,28 +35,29 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --background: #171812;
-  --foreground: #f3eadc;
-  --surface: #22231b;
-  --surface-muted: #303025;
-  --border: #484536;
-  --muted: #b8aa94;
+  --background: #141211;
+  --foreground: #f5f2ed;
+  --surface: #1d1a18;
+  --surface-elevated: #262220;
+  --surface-muted: #302b28;
+  --border: rgba(255, 255, 255, 0.06);
+  --muted: #b8b2aa;
 
   --ink: #edf1df;
 
-  --brand: #e4ad3d;
-  --brand-hover: #f2c45f;
-  --brand-soft: #493a1e;
+  --brand: #d8a657;
+  --brand-hover: #e6b96f;
+  --brand-soft: #43351f;
 
-  --accent: #e2744e;
-  --accent-hover: #f08a65;
+  --accent: #e09a3e;
+  --accent-hover: #edac59;
   --accent-soft: #4b2c24;
 
-  --success: #8fbd7e;
+  --success: #78a37a;
   --success-soft: #293d28;
-  --warning: #e4b94e;
+  --warning: #d8a657;
   --warning-soft: #44381f;
-  --danger: #ef886f;
+  --danger: #c76a5a;
   --danger-soft: #492822;
 }
 
@@ -63,6 +65,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
   --color-surface-muted: var(--surface-muted);
   --color-border: var(--border);
   --color-muted: var(--muted);
@@ -99,7 +102,33 @@ body {
 /* A few older views use literal white utilities rather than surface tokens. */
 :root[data-theme="dark"] .bg-white,
 :root[data-theme="dark"] .bg-white\/95 {
-  background-color: var(--surface);
+  background-color: var(--surface-elevated);
+}
+
+:root[data-theme="dark"] [class*="bg-[#FFF"],
+:root[data-theme="dark"] [class*="bg-[#FDF"] {
+  background-color: var(--surface-elevated) !important;
+}
+
+:root[data-theme="dark"] [class*="text-[#2A"],
+:root[data-theme="dark"] [class*="text-[#2E"],
+:root[data-theme="dark"] [class*="text-[#5A"],
+:root[data-theme="dark"] [class*="text-[#6B"] {
+  color: var(--foreground) !important;
+}
+
+:root[data-theme="dark"] [class*="border-[#"] {
+  border-color: var(--border) !important;
+}
+
+:root[data-theme="dark"] .shadow-sm,
+:root[data-theme="dark"] .shadow-md {
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.22);
+}
+
+:root[data-theme="dark"] .food-image {
+  border-color: rgb(255 255 255 / 0.06);
+  box-shadow: 0 14px 32px rgb(0 0 0 / 0.34);
 }
 
 :root[data-theme="dark"] input,

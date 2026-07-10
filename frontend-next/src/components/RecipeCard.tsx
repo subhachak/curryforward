@@ -21,7 +21,7 @@ export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
       <Card className="h-full overflow-hidden p-0 transition hover:-translate-y-0.5 hover:shadow-md">
         {recipe.hero_image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={recipe.hero_image_url} alt="" className="h-32 w-full object-cover" />
+          <img src={recipe.hero_image_url} alt="" className="food-image h-32 w-full border-b border-border object-cover" />
         ) : (
           <div
             className="flex h-32 w-full items-center justify-center bg-gradient-to-br from-brand-soft to-accent-soft"
