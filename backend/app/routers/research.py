@@ -574,6 +574,7 @@ def _run_auto_research_job(
     sessions aren't safe to share across threads/requests, so this can't
     reuse the request-scoped session from Depends(get_db)."""
     db = SessionLocal()
+    usage_log: dict | None = None
     try:
         row = (
             db.query(RecipeVersion)
@@ -626,11 +627,17 @@ def _run_auto_research_job(
                 job.finished_at = datetime.now(timezone.utc)
                 job.progress = row.auto_research_progress or []
             logger.info("auto_research_completed", extra={"recipe_id": recipe_id, "job_id": job_id})
-            record_llm_usage(task="auto_research_crew", model=model, role="admin")
+            usage_log = {"task": "auto_research_crew", "model": model, "role": "admin"}
         except Exception as e:
             logger.exception("auto_research_failed", extra={"recipe_id": recipe_id, "job_id": job_id})
-            record_llm_usage(task="auto_research_crew", model=model, role="admin", status="error", error=str(e))
             db.rollback()
+            usage_log = {
+                "task": "auto_research_crew",
+                "model": model,
+                "role": "admin",
+                "status": "error",
+                "error": str(e),
+            }
             db.refresh(row)
             if row.auto_research_job_id != job_id or row.deleted_at is not None:
                 return
@@ -643,6 +650,11 @@ def _run_auto_research_job(
                 job.error = str(e)
                 job.finished_at = datetime.now(timezone.utc)
         db.commit()
+        if usage_log:
+            try:
+                record_llm_usage(**usage_log)
+            except Exception:
+                logger.warning("auto_research_usage_log_failed", extra={"recipe_id": recipe_id, "job_id": job_id}, exc_info=True)
     finally:
         db.close()
 

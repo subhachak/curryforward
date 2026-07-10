@@ -208,6 +208,39 @@ def test_run_applies_merged_patch_from_mocked_crew(monkeypatch):
     assert set(jobs[0]["progress"]) == {"history", "ingredients", "steps", "tips", "merge"}
 
 
+def test_usage_logging_failure_does_not_poison_completed_run(monkeypatch):
+    monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
+    monkeypatch.setattr("app.routers.research.run_web_search", lambda query: f"mocked results for {query}")
+
+    def fake_run_auto_research_crew(dish_name, current_document, search_results, starting_prompt, model, on_task_done=None):
+        if on_task_done:
+            on_task_done("merge")
+        return {"intro": "Finished before telemetry failed."}
+
+    def failing_usage_log(**kwargs):
+        if kwargs["task"] == "auto_research_crew":
+            raise RuntimeError("usage db is locked")
+
+    monkeypatch.setattr("app.routers.research.run_auto_research_crew", fake_run_auto_research_crew)
+    monkeypatch.setattr("app.routers.research.record_llm_usage", failing_usage_log)
+
+    draft = _start_draft()
+    r = client.post(
+        f"/api/recipes/research/{draft['recipe_id']}/auto/run",
+        json={"approved_queries": ["test query"]},
+        headers=ADMIN_HEADERS,
+    )
+    assert r.status_code == 200
+
+    body = _wait_until_finished(draft["recipe_id"])
+    assert body["auto_research_status"] is None
+    assert body["auto_research_error"] is None
+    assert body["intro"] == "Finished before telemetry failed."
+
+    jobs = client.get(f"/api/recipes/research/{draft['recipe_id']}/jobs", headers=ADMIN_HEADERS).json()
+    assert jobs[0]["status"] == "completed"
+
+
 def test_run_with_no_approved_queries_still_runs_crew(monkeypatch):
     monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
 

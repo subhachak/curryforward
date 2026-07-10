@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from ..models import LLMUsageLog
+
+logger = logging.getLogger(__name__)
 
 
 def _usage_value(usage: Any, key: str) -> int | None:
@@ -66,5 +71,8 @@ def record_llm_usage(
             )
         )
         db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        logger.warning("llm_usage_log_failed", exc_info=True)
     finally:
         db.close()
