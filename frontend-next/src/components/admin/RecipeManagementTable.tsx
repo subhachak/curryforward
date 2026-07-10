@@ -36,6 +36,19 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
   const [bulkBusy, setBulkBusy] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<"updated" | "name" | "status" | "completeness" | "views">("updated");
+
+  const sortedRecipes = useMemo(() => {
+    const rows = [...recipes];
+    rows.sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "status") return a.status.localeCompare(b.status) || a.name.localeCompare(b.name);
+      if (sortBy === "completeness") return completenessScore(b) - completenessScore(a) || a.name.localeCompare(b.name);
+      if (sortBy === "views") return b.view_count - a.view_count || a.name.localeCompare(b.name);
+      return new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
+    });
+    return rows;
+  }, [recipes, sortBy]);
 
   const selectedRecipes = useMemo(
     () => recipes.filter((recipe) => selectedIds.has(recipe.recipe_id)),
@@ -190,11 +203,27 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
               </Button>
             </div>
           )}
+          <label className="ml-auto inline-flex items-center gap-2 text-sm text-muted">
+            Sort by
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="rounded-md border border-border bg-white px-3 py-1.5 text-sm text-foreground focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40"
+            >
+              <option value="updated">Recently updated</option>
+              <option value="name">Name</option>
+              <option value="status">Status</option>
+              <option value="completeness">Most complete</option>
+              <option value="views">Most viewed</option>
+            </select>
+          </label>
         </div>
         <div className="space-y-2">
-          {recipes.map((r) => {
+          {sortedRecipes.map((r) => {
             const href = r.status === "published" ? publicRecipeHref(r) : adminRecipeHref(r);
             const busy = pendingId === r.recipe_id;
+            const score = completenessScore(r);
+            const missing = completenessEntries(r).filter(([, complete]) => !complete).map(([label]) => label);
             const menuItems: MenuItem[] = [
               {
                 label: r.status === "published" ? "Create or open edit draft" : "Edit draft",
@@ -274,6 +303,21 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
                           <HeartIcon className="h-3.5 w-3.5" fill={r.like_count > 0 ? "currentColor" : "none"} />
                           {r.like_count}
                         </span>
+                        <span
+                          className={`inline-flex items-center gap-1 font-medium ${score === 6 ? "text-success" : "text-warning"}`}
+                          title={missing.length ? `Missing: ${missing.join(", ")}` : "All recipe details complete"}
+                        >
+                          <span className="flex gap-0.5" aria-hidden>
+                            {completenessEntries(r).map(([label, complete]) => (
+                              <span
+                                key={label}
+                                className={`h-2 w-2 rounded-full ${complete ? "bg-success" : "bg-border"}`}
+                              />
+                            ))}
+                          </span>
+                          {score}/6 complete
+                          {missing.length > 0 && <span>· Missing {missing.join(", ")}</span>}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -281,20 +325,6 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
                     {busy && (
                       <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent text-muted" />
                     )}
-                    <Button size="sm" variant="secondary" onClick={() => editRecipe(r)} loading={busy}>
-                      <PencilIcon className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-                    <Link
-                      href={href}
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface text-foreground transition-colors hover:bg-surface-muted"
-                      aria-label={r.status === "published" ? "View public recipe" : "Open draft"}
-                      title={r.status === "published" ? "View public recipe" : "Open draft"}
-                    >
-                      <span className="h-4 w-4">
-                        <EyeIcon />
-                      </span>
-                    </Link>
                     <MoreMenu items={menuItems} label={`More actions for ${r.name}`} />
                   </div>
                 </div>
@@ -333,4 +363,19 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
 function formatDate(value: string | null) {
   if (!value) return "not yet";
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+}
+
+function completenessEntries(recipe: AdminRecipeSummary): [string, boolean][] {
+  return [
+    ["ingredients", recipe.completeness.ingredients],
+    ["steps", recipe.completeness.steps],
+    ["intro", recipe.completeness.intro],
+    ["timing", recipe.completeness.timing],
+    ["image", recipe.completeness.image],
+    ["category", recipe.completeness.category],
+  ];
+}
+
+function completenessScore(recipe: AdminRecipeSummary) {
+  return completenessEntries(recipe).filter(([, complete]) => complete).length;
 }

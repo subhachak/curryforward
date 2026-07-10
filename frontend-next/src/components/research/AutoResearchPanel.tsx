@@ -3,18 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { IconButton } from "@/components/ui/IconButton";
 import { CheckIcon, SearchIcon, XIcon } from "@/components/ui/icons";
-import { CopyAssistField } from "@/components/research/CopyAssistField";
 import { api, ApiError } from "@/lib/api";
 import {
   AUTO_RESEARCH_SECTIONS,
   type RecipeResearchDetail,
-  type ResearchJobSummary,
 } from "@/lib/types";
 
 interface AutoResearchPanelProps {
   recipe: RecipeResearchDetail;
   onComplete: (recipe: RecipeResearchDetail) => void;
-  onPromptChange: (value: string) => void;
 }
 
 type Phase = "idle" | "running";
@@ -30,13 +27,12 @@ const SECTION_LABELS: Record<string, string> = {
   merge: "Merge",
 };
 
-export function AutoResearchPanel({ recipe, onComplete, onPromptChange }: AutoResearchPanelProps) {
+export function AutoResearchPanel({ recipe, onComplete }: AutoResearchPanelProps) {
   const recipeId = recipe.recipe_id;
   const [phase, setPhase] = useState<Phase>(recipe.auto_research_status === "running" ? "running" : "idle");
   const [error, setError] = useState<string | null>(recipe.auto_research_error);
   const [progress, setProgress] = useState<string[]>(recipe.auto_research_progress || []);
   const [activity, setActivity] = useState<string[]>(recipe.auto_research_activity || []);
-  const [jobs, setJobs] = useState<ResearchJobSummary[]>([]);
   const [cancelling, setCancelling] = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollDelayRef = useRef(INITIAL_POLL_INTERVAL_MS);
@@ -51,10 +47,6 @@ export function AutoResearchPanel({ recipe, onComplete, onPromptChange }: AutoRe
     return stopPolling;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    api.listResearchJobs(recipeId).then(setJobs).catch(() => undefined);
-  }, [recipeId]);
 
   function stopPolling() {
     if (pollRef.current) {
@@ -103,7 +95,6 @@ export function AutoResearchPanel({ recipe, onComplete, onPromptChange }: AutoRe
     setProgress([]);
     setActivity(updated.auto_research_activity || []);
     setPhase("idle");
-    api.listResearchJobs(recipeId).then(setJobs).catch(() => undefined);
     onComplete(updated);
   }
 
@@ -126,7 +117,6 @@ export function AutoResearchPanel({ recipe, onComplete, onPromptChange }: AutoRe
     try {
       stopPolling();
       await api.cancelAutoResearch(recipeId);
-      api.listResearchJobs(recipeId).then(setJobs).catch(() => undefined);
       setProgress([]);
       setActivity(["Auto-research stopped."]);
       setPhase("idle");
@@ -147,21 +137,6 @@ export function AutoResearchPanel({ recipe, onComplete, onPromptChange }: AutoRe
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-muted">
-            Starting prompt — a name, a description, or a pasted draft to refine
-          </label>
-          <CopyAssistField
-            recipeId={recipeId}
-            fieldLabel="auto-research starting prompt"
-            value={recipe.starting_prompt ?? ""}
-            onChange={onPromptChange}
-            rows={3}
-            multiline
-            placeholder="What should the crew research and build?"
-          />
-        </div>
-
         {error && (
           <div className="rounded-md border border-danger/40 bg-danger-soft/40 px-3 py-2 text-sm text-danger">
             {error}
@@ -230,31 +205,6 @@ export function AutoResearchPanel({ recipe, onComplete, onPromptChange }: AutoRe
           </div>
         )}
 
-        {jobs.length > 0 && (
-          <div className="border-t border-border pt-3">
-            <div className="mb-2 text-xs font-semibold text-ink">Research trail</div>
-            <div className="space-y-2">
-              {jobs.slice(0, 3).map((job) => (
-                <div key={job.job_id} className="rounded-md border border-border bg-surface-muted p-2">
-                  <div className="flex items-center justify-between gap-2 text-xs">
-                    <span className="font-medium text-foreground">{job.status}</span>
-                    <span className="text-muted">
-                      {job.started_at ? new Date(job.started_at).toLocaleString() : ""}
-                    </span>
-                  </div>
-                  {job.approved_queries.length > 0 && (
-                    <ul className="mt-1 list-inside list-disc space-y-0.5 text-xs text-muted">
-                      {job.approved_queries.slice(0, 3).map((query) => (
-                        <li key={query}>{query}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {job.error && <div className="mt-1 text-xs text-danger">{job.error}</div>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

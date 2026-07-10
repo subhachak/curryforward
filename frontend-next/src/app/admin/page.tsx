@@ -226,17 +226,6 @@ export default function AdminPage() {
     }
   }
 
-  async function handleResearchDraftPromptChange(value: string) {
-    setActiveResearchDraft((prev) => (prev ? { ...prev, starting_prompt: value } : prev));
-    if (!activeResearchDraft) return;
-    try {
-      const updated = await api.patchResearch(adminRecipeRef(activeResearchDraft), { starting_prompt: value });
-      setActiveResearchDraft(updated);
-    } catch {
-      // Keep typing responsive; explicit planning/run calls will surface errors.
-    }
-  }
-
   function handleResearchComplete(updated: RecipeResearchDetail) {
     setActiveResearchDraft(updated);
     push("Research complete — opening the editor for review", "success");
@@ -510,7 +499,6 @@ export default function AdminPage() {
           onPromptChange={setResearchPrompt}
           onSubmit={handleStartResearch}
           activeDraft={activeResearchDraft}
-          onResearchDraftPromptChange={handleResearchDraftPromptChange}
           onResearchComplete={handleResearchComplete}
           onPreview={handleImportPreview}
           onImport={handleImportCommit}
@@ -1106,7 +1094,6 @@ function NewRecipeTab({
   importing,
   onPromptChange,
   onSubmit,
-  onResearchDraftPromptChange,
   onResearchComplete,
   onPreview,
   onImport,
@@ -1121,7 +1108,6 @@ function NewRecipeTab({
   importing: boolean;
   onPromptChange: (value: string) => void;
   onSubmit: (event: FormEvent) => void;
-  onResearchDraftPromptChange: (value: string) => void;
   onResearchComplete: (recipe: RecipeResearchDetail) => void;
   onPreview: (file: File) => void;
   onImport: (rows: RecipeImportRow[]) => void;
@@ -1196,7 +1182,6 @@ function NewRecipeTab({
               <AutoResearchPanel
                 recipe={activeDraft}
                 onComplete={onResearchComplete}
-                onPromptChange={onResearchDraftPromptChange}
               />
             </div>
           </CardBody>

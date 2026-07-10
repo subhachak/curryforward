@@ -82,6 +82,14 @@ export interface AdminRecipeSummary {
   lineage: string;
   hero_image_url: string | null;
   intro: string | null;
+  completeness: {
+    ingredients: boolean;
+    steps: boolean;
+    intro: boolean;
+    timing: boolean;
+    image: boolean;
+    category: boolean;
+  };
   first_published_at: string | null;
   updated_at: string | null;
   view_count: number;
