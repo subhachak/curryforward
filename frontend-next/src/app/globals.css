@@ -65,6 +65,7 @@
   --color-dark-text-primary: #f5f2ed;
   --color-dark-text-secondary: #b9b1aa;
   --color-dark-accent-orange: #e97820;
+  --color-dark-accent-magenta: #e08aaa;
   --color-badge-pink-text: #7a214f;
   --color-badge-lavender-text: #5f246f;
   --color-badge-mint-text: #1f5a3c;
@@ -121,14 +122,82 @@ body {
 }
 
 :root[data-theme="dark"] [class*="text-[#2A"],
-:root[data-theme="dark"] [class*="text-[#2E"],
-:root[data-theme="dark"] [class*="text-[#5A"],
-:root[data-theme="dark"] [class*="text-[#6B"] {
+:root[data-theme="dark"] [class*="text-[#2E"] {
   color: var(--foreground) !important;
+}
+
+:root[data-theme="dark"] [class*="text-[#5A4038]"],
+:root[data-theme="dark"] [class*="text-[#6B4A3A]"],
+:root[data-theme="dark"] [class*="text-[#6B3A5A]"],
+:root[data-theme="dark"] [class*="text-[#8A7564]"],
+:root[data-theme="dark"] [class*="text-[#8A766C]"] {
+  color: var(--color-dark-text-secondary) !important;
+}
+
+:root[data-theme="dark"] [class*="text-[#5A2145]"],
+:root[data-theme="dark"] [class*="text-[#D94F70]"],
+:root[data-theme="dark"] [class*="text-[#8F2645]"] {
+  color: var(--color-dark-accent-magenta) !important;
+}
+
+:root[data-theme="dark"] [class*="text-[#FF6B00]"],
+:root[data-theme="dark"] [class*="text-[#E6462D]"],
+:root[data-theme="dark"] [class*="text-[#B84600]"] {
+  color: var(--color-dark-accent-orange) !important;
+}
+
+:root[data-theme="dark"] [class*="text-[#2E9B57]"],
+:root[data-theme="dark"] [class*="text-[#145C32]"],
+:root[data-theme="dark"] [class*="text-[#245B3B]"] {
+  color: var(--success) !important;
+}
+
+:root[data-theme="dark"] [class*="text-[#A6321B]"],
+:root[data-theme="dark"] [class*="text-[#E6392E]"] {
+  color: var(--danger) !important;
+}
+
+:root[data-theme="dark"] [class*="text-[#7A5200]"],
+:root[data-theme="dark"] [class*="text-[#7A3E1D]"],
+:root[data-theme="dark"] [class*="text-[#A36A00]"] {
+  color: var(--warning) !important;
 }
 
 :root[data-theme="dark"] [class*="border-[#"] {
   border-color: var(--border) !important;
+}
+
+/* Preserve light pastel chips and give each hue a readable dark foreground. */
+:root[data-theme="dark"] [class*="bg-[#F7DDED]"],
+:root[data-theme="dark"] [class*="bg-[#FFE2EA]"] {
+  color: var(--color-badge-lavender-text) !important;
+}
+
+:root[data-theme="dark"] [class*="bg-[#FFE0DA]"] {
+  color: var(--color-badge-pink-text) !important;
+}
+
+:root[data-theme="dark"] [class*="bg-[#DFF3E6]"] {
+  color: var(--color-badge-mint-text) !important;
+}
+
+:root[data-theme="dark"] [class*="bg-[#FFF0C1]"] {
+  background-color: #fff0c1 !important;
+  color: #684600 !important;
+}
+
+:root[data-theme="dark"] [class*="bg-[#FFE7D1]"] {
+  color: #743a12 !important;
+}
+
+/* Larger pastel panels can retain their light palette and dark child copy. */
+:root[data-theme="dark"] [class*="bg-[#DFF3E6]"] [class*="text-[#145C32]"],
+:root[data-theme="dark"] [class*="bg-[#DFF3E6]"] [class*="text-[#245B3B]"] {
+  color: var(--color-badge-green-text) !important;
+}
+
+:root[data-theme="dark"] [class*="hover:text-[#FF"]:hover {
+  color: var(--brand-hover) !important;
 }
 
 :root[data-theme="dark"] .shadow-sm,

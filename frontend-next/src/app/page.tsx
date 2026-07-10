@@ -20,26 +20,6 @@ const SWEETS = [
   "Mihidana",
 ];
 
-const BENGALI_NAMES: Record<string, string> = {
-  "Nolen Gur Rosogolla": "নলেন গুড়ের রসগোল্লা",
-  Patishapta: "পাটিসাপটা",
-  Sandesh: "সন্দেশ",
-  Langcha: "ল্যাংচা",
-  Pantua: "পান্তুয়া",
-  Chomchom: "চমচম",
-  "Kheer Kadam": "ক্ষীরকদম",
-  Mihidana: "মিহিদানা",
-  "Joynagarer Moa": "জয়নগরের মোয়া",
-  "Narkel Naru": "নারকেল নাড়ু",
-  Malpoa: "মালপোয়া",
-  Labra: "লাবড়া",
-  Shukto: "শুক্তো",
-  "Mochar Ghonto": "মোচার ঘণ্ট",
-  "Dhokar Dalna": "ধোকার ডালনা",
-  "Nolen Gur Payesh": "নলেন গুড়ের পায়েস",
-  "Kolkata Chicken Rezala": "কলকাতা চিকেন রেজালা",
-};
-
 const PILLARS = [
   {
     title: "Indian Classics",
@@ -159,12 +139,6 @@ function ClocheMark({ className = "" }: { className?: string }) {
   );
 }
 
-function BengaliCaption({ name }: { name: string }) {
-  const bengali = BENGALI_NAMES[name];
-  if (!bengali) return null;
-  return <span className="mt-1 block text-xs font-normal text-muted">({bengali})</span>;
-}
-
 export default function HomePage() {
   const { setOpen } = useAssistant();
   const { recipes } = useRecipes();
@@ -280,8 +254,7 @@ export default function HomePage() {
                     className="rounded-md border border-white/70 bg-[#FFF8F1] p-4 font-semibold text-[#2A160F] shadow-sm transition hover:-translate-y-0.5"
                     style={{ borderLeft: `5px solid ${accent}` }}
                   >
-                    <span>{sweet}</span>
-                    <BengaliCaption name={sweet} />
+                    {sweet}
                   </Link>
                 );
               })}
@@ -336,10 +309,7 @@ export default function HomePage() {
         <section className="grid gap-6 py-4 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
           <div>
             <div className="mb-2 text-sm font-semibold uppercase text-[#FF6B00]">Under the cloche this week</div>
-            <h2 className="text-3xl font-bold text-[#2A160F]">
-              {featured?.name ?? "Nolen Gur Payesh"}
-              <BengaliCaption name={featured?.name ?? "Nolen Gur Payesh"} />
-            </h2>
+            <h2 className="text-3xl font-bold text-[#2A160F]">{featured?.name ?? "Nolen Gur Payesh"}</h2>
             <p className="mt-3 max-w-md text-[#6B4A3A]">
               {featured?.intro ??
                 "A winter Bengali classic made with date palm jaggery, milk, and fragrant rice."}
@@ -351,10 +321,7 @@ export default function HomePage() {
               <span className="rounded-full bg-[#FFB000] px-3 py-1 text-xs font-bold text-[#2A160F]">Featured</span>
               <ClocheMark className="h-9 w-auto" />
             </div>
-            <h3 className="text-2xl font-bold text-[#2A160F]">
-              {featured?.name ?? "Nolen Gur Payesh"}
-              <BengaliCaption name={featured?.name ?? "Nolen Gur Payesh"} />
-            </h3>
+            <h3 className="text-2xl font-bold text-[#2A160F]">{featured?.name ?? "Nolen Gur Payesh"}</h3>
             <div className="mt-4 flex flex-wrap gap-2 text-sm">
               <span className="rounded-full bg-[#FFF8F1] px-3 py-1 text-[#6B4A3A]">45 min</span>
               <span className="badge-green rounded-full bg-[#DFF3E6] px-3 py-1 font-semibold text-[#2E9B57]">Comforting</span>
@@ -410,8 +377,7 @@ export default function HomePage() {
                   className="rounded-md bg-[#FFF8F1] p-4 font-semibold text-[#2A160F] shadow-sm transition hover:-translate-y-0.5"
                   style={{ borderLeft: `5px solid ${accent}` }}
                 >
-                  <span>{item}</span>
-                  <BengaliCaption name={item} />
+                  {item}
                 </Link>
               );
             })}
@@ -447,10 +413,7 @@ export default function HomePage() {
                   )}
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="recipe-card-title font-bold text-[#2A160F]">
-                        {recipe.name}
-                        <BengaliCaption name={recipe.name} />
-                      </div>
+                      <div className="recipe-card-title font-bold text-[#2A160F]">{recipe.name}</div>
                       <HeartIcon className="h-5 w-5" style={{ color: recipeAccent }} />
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2 text-xs">
