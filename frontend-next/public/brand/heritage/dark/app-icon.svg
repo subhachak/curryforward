@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
-<title id="title">Curry Forward app icon, dark mode</title><desc id="desc">Curry Forward Heritage and Artisan brand asset</desc>
-<rect width="512" height="512" rx="112" fill="#1E1A17"/><path fill="none" stroke="#E2AA50" stroke-width="12" d="M93 45h326l48 48v326l-48 48H93l-48-48V93Z"/><path fill="none" stroke="#E2AA50" stroke-width="5" opacity=".65" d="M111 67h290l44 44v290l-44 44H111l-44-44V111Z"/><g transform="translate(116 116) scale(3.25)"><g aria-label="cf" fill="#F5E8D2"><path d="M31 20c-11 0-18 8-18 21s7 21 19 21c6 0 11-2 15-6l-4-7c-3 3-6 4-10 4-6 0-10-5-10-12 0-8 4-13 11-13 3 0 6 1 9 4l4-8c-4-3-9-4-16-4Z"/><path d="M55 62V31h-8v-8h8v-3c0-11 6-17 17-17 4 0 8 1 11 3l-3 8c-2-1-4-2-6-2-5 0-8 3-8 9v2h13v8H66v31Z"/></g></g><circle cx="256" cy="410" r="8" fill="#E8794D"/>
-</svg>

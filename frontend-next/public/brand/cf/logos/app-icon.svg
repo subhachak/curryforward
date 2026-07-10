@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+<title>Curry Forward app icon</title>
+
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#7A2E2E"/>
+    <stop offset="1" stop-color="#982D2D"/>
+  </linearGradient>
+</defs>
+<rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
+<circle cx="128" cy="128" r="72" stroke="#F6EFE3" stroke-width="4"/>
+<path d="M 203.00 128.00 Q 210.00 120.00 217.00 128.00 Q 210.00 136.00 203.00 128.00 Z" transform="rotate(90 210.00 128.00)" stroke="#F6EFE3" stroke-width="4" fill="none"/>
+<path d="M 178.98 185.98 Q 185.98 177.98 192.98 185.98 Q 185.98 193.98 178.98 185.98 Z" transform="rotate(135 185.98 185.98)" stroke="#F6EFE3" stroke-width="4" fill="none"/>
+<path d="M 121.00 210.00 Q 128.00 202.00 135.00 210.00 Q 128.00 218.00 121.00 210.00 Z" transform="rotate(180 128.00 210.00)" stroke="#F6EFE3" stroke-width="4" fill="none"/>
+<path d="M 63.02 185.98 Q 70.02 177.98 77.02 185.98 Q 70.02 193.98 63.02 185.98 Z" transform="rotate(225 70.02 185.98)" stroke="#F6EFE3" stroke-width="4" fill="none"/>
+<path d="M 39.00 128.00 Q 46.00 120.00 53.00 128.00 Q 46.00 136.00 39.00 128.00 Z" transform="rotate(270 46.00 128.00)" stroke="#F6EFE3" stroke-width="4" fill="none"/>
+<path d="M 63.02 70.02 Q 70.02 62.02 77.02 70.02 Q 70.02 78.02 63.02 70.02 Z" transform="rotate(315 70.02 70.02)" stroke="#F6EFE3" stroke-width="4" fill="none"/>
+<path d="M 121.00 46.00 Q 128.00 38.00 135.00 46.00 Q 128.00 54.00 121.00 46.00 Z" transform="rotate(360 128.00 46.00)" stroke="#F6EFE3" stroke-width="4" fill="none"/>
+<path d="M 178.98 70.02 Q 185.98 62.02 192.98 70.02 Q 185.98 78.02 178.98 70.02 Z" transform="rotate(405 185.98 70.02)" stroke="#F6EFE3" stroke-width="4" fill="none"/>
+<text x="128" y="148" text-anchor="middle" font-family="Playfair Display, Georgia, serif"
+      font-size="78" font-style="italic" fill="#F6EFE3">cf</text>
+</svg>

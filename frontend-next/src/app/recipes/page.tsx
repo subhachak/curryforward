@@ -100,7 +100,7 @@ function RecipesInner() {
         <div className="rounded-md border border-border bg-surface py-14 text-center">
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-brand-soft">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/heritage/light/emblem.svg" alt="" className="theme-asset h-11 w-auto" />
+            <img src="/brand/cf/logos/symbol-light.svg" alt="" className="theme-asset h-11 w-auto" />
           </div>
           <PageSpinner label="Opening the cloche..." />
           <p className="mt-2 text-sm text-muted">Finding today&apos;s recipes.</p>
@@ -118,7 +118,7 @@ function RecipesInner() {
             <div className="mx-auto max-w-sm space-y-3">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-soft">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/brand/heritage/light/emblem.svg" alt="" className="theme-asset h-11 w-auto" />
+                <img src="/brand/cf/logos/symbol-light.svg" alt="" className="theme-asset h-11 w-auto" />
               </div>
               <div>
                 <div className="font-semibold text-ink">No recipes found yet.</div>

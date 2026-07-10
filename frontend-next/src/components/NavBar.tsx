@@ -141,9 +141,13 @@ export function NavBar() {
       <div className="relative mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-5 sm:px-6">
         <Link href="/" className="flex shrink-0 items-center" aria-label="Curry Forward home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/heritage/light/logo-horizontal.svg" alt="Curry Forward" className="brand-logo brand-logo-light h-10 w-auto sm:h-12" />
+          <img src="/brand/cf/logos/symbol-micro-light.svg" alt="Curry Forward" className="brand-logo-light brand-mobile h-10 w-10" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/heritage/dark/logo-horizontal.svg" alt="Curry Forward" className="brand-logo brand-logo-dark hidden h-10 w-auto sm:h-12" />
+          <img src="/brand/cf/logos/symbol-micro-dark.svg" alt="Curry Forward" className="brand-logo-dark brand-mobile h-10 w-10" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/cf/logos/logo-compact-light.svg" alt="Curry Forward" className="brand-logo-light brand-desktop h-11 w-auto" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/cf/logos/logo-compact-dark.svg" alt="Curry Forward" className="brand-logo-dark brand-desktop h-11 w-auto" />
         </Link>
 
         <nav className="hidden items-center gap-5 sm:flex">

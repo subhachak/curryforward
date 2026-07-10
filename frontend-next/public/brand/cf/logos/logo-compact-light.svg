@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="84" viewBox="0 0 360 84" fill="none">
+<title>Curry Forward compact logo light</title>
+<circle cx="42" cy="42" r="25" stroke="#7A2E2E" stroke-width="2"/>
+<path d="M 70.00 42.00 Q 77.00 34.00 84.00 42.00 Q 77.00 50.00 70.00 42.00 Z" transform="rotate(90 77.00 42.00)" stroke="#7A2E2E" stroke-width="2" fill="none"/>
+<path d="M 59.75 66.75 Q 66.75 58.75 73.75 66.75 Q 66.75 74.75 59.75 66.75 Z" transform="rotate(135 66.75 66.75)" stroke="#7A2E2E" stroke-width="2" fill="none"/>
+<path d="M 35.00 77.00 Q 42.00 69.00 49.00 77.00 Q 42.00 85.00 35.00 77.00 Z" transform="rotate(180 42.00 77.00)" stroke="#7A2E2E" stroke-width="2" fill="none"/>
+<path d="M 10.25 66.75 Q 17.25 58.75 24.25 66.75 Q 17.25 74.75 10.25 66.75 Z" transform="rotate(225 17.25 66.75)" stroke="#7A2E2E" stroke-width="2" fill="none"/>
+<path d="M 0.00 42.00 Q 7.00 34.00 14.00 42.00 Q 7.00 50.00 0.00 42.00 Z" transform="rotate(270 7.00 42.00)" stroke="#7A2E2E" stroke-width="2" fill="none"/>
+<path d="M 10.25 17.25 Q 17.25 9.25 24.25 17.25 Q 17.25 25.25 10.25 17.25 Z" transform="rotate(315 17.25 17.25)" stroke="#7A2E2E" stroke-width="2" fill="none"/>
+<path d="M 35.00 7.00 Q 42.00 -1.00 49.00 7.00 Q 42.00 15.00 35.00 7.00 Z" transform="rotate(360 42.00 7.00)" stroke="#7A2E2E" stroke-width="2" fill="none"/>
+<path d="M 59.75 17.25 Q 66.75 9.25 73.75 17.25 Q 66.75 25.25 59.75 17.25 Z" transform="rotate(405 66.75 17.25)" stroke="#7A2E2E" stroke-width="2" fill="none"/>
+<text x="42" y="50" text-anchor="middle" font-family="Playfair Display, Georgia, serif"
+      font-size="23" font-style="italic" fill="#7A2E2E">cf</text>
+<text x="84" y="51" font-family="Playfair Display, Georgia, serif" font-size="28" fill="#7A2E2E">curry forward</text>
+</svg>

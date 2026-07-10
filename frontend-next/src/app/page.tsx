@@ -24,30 +24,30 @@ const PILLARS = [
   {
     title: "Indian Classics",
     body: "Regional curries, dals, rice dishes, snacks, and festive meals.",
-    icon: "/brand/icon-curry-bowl.svg",
-    accent: "#FF6B00",
-    bg: "#FFE7D1",
+    icon: "/brand/cf/icons/brand/regional.svg",
+    accent: "#7A2E2E",
+    bg: "#F6EFE3",
   },
   {
     title: "Bengali Kitchen",
     body: "Fish curries, bhajas, shukto, panch phoron flavors, and home-style comfort food.",
-    icon: "/brand/icon-menu-cloche.svg",
-    accent: "#2E9B57",
-    bg: "#DFF3E6",
+    icon: "/brand/cf/icons/brand/bengali-classics.svg",
+    accent: "#4E6B4E",
+    bg: "#EDF1E9",
   },
   {
     title: "Traditional Sweets",
     body: "Mishti, pitha, payesh, sandesh, jaggery sweets, and festive desserts.",
-    icon: "/brand/icon-spice-chili.svg",
-    accent: "#D94F70",
-    bg: "#FFE2EA",
+    icon: "/brand/cf/icons/brand/sweets.svg",
+    accent: "#D48C3A",
+    bg: "#F6E8D5",
   },
   {
     title: "Global Recipes",
     body: "Everyday dishes from around the world, adapted for home cooks.",
-    icon: "/brand/icon-recipes-book.svg",
-    accent: "#5A2145",
-    bg: "#F7DDED",
+    icon: "/brand/cf/icons/brand/collections.svg",
+    accent: "#7A2E2E",
+    bg: "#F0DDDD",
   },
 ];
 
@@ -135,7 +135,7 @@ const FALLBACK_RECIPES = [
 function ClocheMark({ className = "" }: { className?: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src="/brand/heritage/light/app-icon.svg" alt="" aria-hidden className={`theme-app-asset ${className}`} />
+    <img src="/brand/cf/logos/symbol-light.svg" alt="" aria-hidden className={`theme-app-asset ${className}`} />
   );
 }
 
@@ -169,9 +169,9 @@ export default function HomePage() {
   }
 
   return (
-    <div className="heritage-home -mx-4 -my-6 bg-[#FFF8F1] text-[#2A160F] sm:-mx-6">
+    <div className="heritage-home -mx-4 -my-6 bg-background text-foreground sm:-mx-6">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <section className="heritage-frame grid min-h-[560px] gap-8 overflow-hidden rounded-md border border-[#FFD2AE] bg-[#FFF0DD] p-5 sm:p-8 lg:grid-cols-[1fr_440px] lg:items-center">
+        <section className="heritage-frame grid min-h-[560px] gap-8 overflow-hidden rounded-[22px] border border-border bg-surface-muted p-6 sm:p-10 lg:grid-cols-[1fr_440px] lg:items-center">
           <div className="max-w-2xl space-y-6">
             <span className="inline-flex rounded-full bg-[#D94F70] px-3 py-1 text-xs font-semibold text-white">
               Indian and global recipes with Bengali roots
@@ -184,18 +184,10 @@ export default function HomePage() {
               your taste, diet, and pantry with CurryForward.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Link href="/recipes">
-                <Button className="bg-[#FF6B00] text-white shadow-[0_8px_18px_rgba(255,107,0,0.25)] hover:bg-[#E6392E]">
-                  Explore Recipes
-                </Button>
-              </Link>
-              <a href="#bengali-sweets">
-                <Button className="border border-[#D94F70] bg-[#FFE2EA] text-[#8F2645] hover:bg-[#FFD1DE]">
-                  Browse Bengali Sweets
-                </Button>
-              </a>
+              <Link href="/recipes"><Button>Explore recipes</Button></Link>
               <Button variant="secondary" onClick={() => setOpen(true)}>
-                Ask CurryForward
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/brand/cf/icons/ui/ask.svg" alt="" className="h-5 w-5" /> Ask CurryForward
               </Button>
             </div>
             <div className="flex flex-wrap gap-2">

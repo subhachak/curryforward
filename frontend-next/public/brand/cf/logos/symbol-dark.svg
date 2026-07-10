@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" fill="none">
+<title>Curry Forward symbol dark</title>
+<circle cx="80" cy="80" r="48" stroke="#F6EFE3" stroke-width="3"/>
+<path d="M 131.00 80.00 Q 138.00 72.00 145.00 80.00 Q 138.00 88.00 131.00 80.00 Z" transform="rotate(90 138.00 80.00)" stroke="#F6EFE3" stroke-width="3" fill="none"/>
+<path d="M 114.01 121.01 Q 121.01 113.01 128.01 121.01 Q 121.01 129.01 114.01 121.01 Z" transform="rotate(135 121.01 121.01)" stroke="#F6EFE3" stroke-width="3" fill="none"/>
+<path d="M 73.00 138.00 Q 80.00 130.00 87.00 138.00 Q 80.00 146.00 73.00 138.00 Z" transform="rotate(180 80.00 138.00)" stroke="#F6EFE3" stroke-width="3" fill="none"/>
+<path d="M 31.99 121.01 Q 38.99 113.01 45.99 121.01 Q 38.99 129.01 31.99 121.01 Z" transform="rotate(225 38.99 121.01)" stroke="#F6EFE3" stroke-width="3" fill="none"/>
+<path d="M 15.00 80.00 Q 22.00 72.00 29.00 80.00 Q 22.00 88.00 15.00 80.00 Z" transform="rotate(270 22.00 80.00)" stroke="#F6EFE3" stroke-width="3" fill="none"/>
+<path d="M 31.99 38.99 Q 38.99 30.99 45.99 38.99 Q 38.99 46.99 31.99 38.99 Z" transform="rotate(315 38.99 38.99)" stroke="#F6EFE3" stroke-width="3" fill="none"/>
+<path d="M 73.00 22.00 Q 80.00 14.00 87.00 22.00 Q 80.00 30.00 73.00 22.00 Z" transform="rotate(360 80.00 22.00)" stroke="#F6EFE3" stroke-width="3" fill="none"/>
+<path d="M 114.01 38.99 Q 121.01 30.99 128.01 38.99 Q 121.01 46.99 114.01 38.99 Z" transform="rotate(405 121.01 38.99)" stroke="#F6EFE3" stroke-width="3" fill="none"/>
+<text x="80" y="92" text-anchor="middle" font-family="Playfair Display, Georgia, serif"
+      font-size="46" font-style="italic" fill="#F6EFE3">cf</text>
+</svg>

@@ -274,7 +274,7 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
                         aria-hidden
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src="/brand/mark-cloche-forward.svg" alt="" className="h-8 w-auto opacity-80" />
+                        <img src="/brand/cf/logos/symbol-light.svg" alt="" className="theme-asset h-8 w-auto opacity-80" />
                       </div>
                     )}
                     <div className="min-w-0">

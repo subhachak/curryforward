@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap');
+
+:root {
+  --cf-font-display: "Playfair Display", Georgia, serif;
+  --cf-font-ui: "Inter", system-ui, sans-serif;
+
+  --cf-burgundy: #7A2E2E;
+  --cf-orange: #D48C3A;
+  --cf-green: #4E6B4E;
+  --cf-cream: #F6EFE3;
+  --cf-espresso: #3A2A23;
+
+  --cf-bg: #FAF7F1;
+  --cf-surface: #FFFFFF;
+  --cf-surface-subtle: #F6EFE3;
+  --cf-text: #3A2A23;
+  --cf-text-muted: #7B6B62;
+  --cf-border: #E5D8C9;
+  --cf-primary: #7A2E2E;
+  --cf-primary-hover: #652525;
+  --cf-primary-contrast: #FFFFFF;
+  --cf-accent: #D48C3A;
+  --cf-success: #4E6B4E;
+  --cf-focus: rgba(122, 46, 46, 0.28);
+
+  --cf-radius-sm: 8px;
+  --cf-radius-md: 14px;
+  --cf-radius-lg: 22px;
+  --cf-shadow-card: 0 8px 24px rgba(58, 42, 35, 0.08);
+}
+
+[data-theme="dark"], .dark {
+  --cf-bg: #211411;
+  --cf-surface: #2D1B17;
+  --cf-surface-subtle: #3A241E;
+  --cf-text: #F8F1E7;
+  --cf-text-muted: #CBBCAF;
+  --cf-border: #5B4038;
+  --cf-primary: #D9674E;
+  --cf-primary-hover: #E3785E;
+  --cf-primary-contrast: #211411;
+  --cf-accent: #E7A64F;
+  --cf-success: #90A989;
+  --cf-focus: rgba(231, 166, 79, 0.32);
+  --cf-shadow-card: 0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+body {
+  background: var(--cf-bg);
+  color: var(--cf-text);
+  font-family: var(--cf-font-ui);
+}
+
+h1, h2, h3, .cf-display {
+  font-family: var(--cf-font-display);
+  letter-spacing: -0.02em;
+}
+
+.cf-card {
+  background: var(--cf-surface);
+  border: 1px solid var(--cf-border);
+  border-radius: var(--cf-radius-md);
+  box-shadow: var(--cf-shadow-card);
+}
+
+.cf-button-primary {
+  background: var(--cf-primary);
+  color: var(--cf-primary-contrast);
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+
+.cf-button-secondary {
+  background: transparent;
+  color: var(--cf-text);
+  border: 1px solid var(--cf-border);
+  border-radius: 999px;
+}
+
+.cf-input {
+  background: var(--cf-surface);
+  color: var(--cf-text);
+  border: 1px solid var(--cf-border);
+  border-radius: var(--cf-radius-sm);
+}
+
+.cf-input:focus-visible,
+.cf-button-primary:focus-visible,
+.cf-button-secondary:focus-visible {
+  outline: 3px solid var(--cf-focus);
+  outline-offset: 2px;
+}

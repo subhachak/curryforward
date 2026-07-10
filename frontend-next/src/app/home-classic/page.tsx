@@ -78,7 +78,7 @@ export default function HomePage() {
       <section className="relative overflow-hidden rounded-md border border-border bg-surface px-4 py-8 shadow-sm sm:px-8 sm:py-12 lg:px-10">
         <div className="absolute right-4 top-4 hidden opacity-10 sm:block" aria-hidden>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/mark-cloche-forward.svg" alt="" className="h-56 w-auto" />
+          <img src="/brand/cf/logos/symbol-light.svg" alt="" className="theme-asset h-56 w-auto" />
         </div>
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
           <div className="relative z-10 max-w-2xl space-y-5">
@@ -104,7 +104,7 @@ export default function HomePage() {
             <div className="relative mx-auto flex h-full max-w-sm flex-col justify-center">
               <div className="mx-auto flex h-36 w-36 items-center justify-center rounded-full border border-border bg-background shadow-sm">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/brand/mark-cloche-forward.svg" alt="" className="h-24 w-auto" />
+                <img src="/brand/cf/logos/symbol-light.svg" alt="" className="theme-asset h-24 w-auto" />
               </div>
               <div className="mt-5 grid gap-2">
                 {PROMPTS.map((prompt, index) => (

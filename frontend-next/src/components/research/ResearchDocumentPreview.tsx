@@ -504,7 +504,7 @@ export function ResearchDocumentPreview({
                 <div className="absolute bottom-8 right-8 h-16 w-16 rounded-full border-8 border-[#2E9B57]" aria-hidden />
                 <div className="absolute right-14 top-12 h-12 w-12 rounded-full bg-[#FFE0DA]" aria-hidden />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/brand/mark-cloche-forward.svg" alt="" className="relative z-10 h-36 w-auto" />
+                <img src="/brand/cf/logos/symbol-light.svg" alt="" className="theme-asset relative z-10 h-36 w-auto" />
               </>
             )}
           </div>

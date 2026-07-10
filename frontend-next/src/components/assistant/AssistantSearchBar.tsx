@@ -9,7 +9,7 @@ import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
 import { looksLikeCreateRequest, looksLikeDraftPaste, searchRecipes } from "@/lib/assistantHeuristics";
 import { publicRecipeHref } from "@/lib/recipeLinks";
-import { RefreshIcon, SearchIcon, SendIcon, SparklesIcon, XIcon } from "@/components/ui/icons";
+import { RefreshIcon, SearchIcon, SendIcon, XIcon } from "@/components/ui/icons";
 import type { ChatHistoryTurn, DraftRecipeResult } from "@/lib/types";
 
 interface Message {
@@ -491,20 +491,21 @@ export function AssistantSearchBar() {
     <>
       <form onSubmit={handleHeaderSubmit} className="ml-auto min-w-0 flex-1 max-w-sm">
         <div className="relative">
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8A7564]" />
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             value={headerInput}
             onChange={(e) => setHeaderInput(e.target.value)}
             placeholder={assistantContext.headerPlaceholder}
-            className="w-full rounded-md border border-[#E8D3B8] bg-white py-2 pl-9 pr-10 text-sm placeholder:text-[#8A7564] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/25"
+            className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-10 text-sm placeholder:text-muted shadow-sm focus:border-brand focus:outline-none focus:ring-[3px] focus:ring-brand/25"
           />
           <button
             type="submit"
             aria-label="Open Ask CurryForward"
             title="Open Ask CurryForward"
-            className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md bg-[#FFF1E6] text-[#5A2145] hover:bg-[#FFE0C4]"
+            className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md bg-surface-muted text-brand hover:bg-brand-soft"
           >
-            <SparklesIcon className="h-4 w-4" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/cf/icons/ui/ask.svg" alt="" className="h-4 w-4" />
           </button>
         </div>
       </form>
@@ -517,14 +518,16 @@ export function AssistantSearchBar() {
             className="absolute inset-0 bg-black/10"
             onClick={() => setOpen(false)}
           />
-          <aside className="relative z-[81] flex h-dvh w-full max-w-[460px] flex-col border-l border-[#E8D3B8] bg-white shadow-2xl sm:w-[440px]">
-            <div className="shrink-0 border-b border-[#E8D3B8] bg-[#FFF8F1] px-4 py-3">
+          <aside className="relative z-[81] flex h-dvh w-full max-w-[460px] flex-col border-l border-border bg-surface shadow-2xl sm:w-[440px]">
+            <div className="shrink-0 border-b border-border bg-surface-muted px-4 py-3">
               <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-bold text-[#2E1B14]">{assistantContext.title}</div>
-                  <div className="mt-1 inline-flex rounded-full bg-[#F7DDED] px-2 py-0.5 text-[11px] font-semibold text-[#5A2145]">
+                <div className="flex items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/brand/cf/logos/symbol-micro-light.svg" alt="" className="theme-micro-asset h-10 w-10" />
+                  <div><div className="text-sm font-bold text-foreground">{assistantContext.title}</div>
+                  <div className="mt-1 inline-flex rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
                     {assistantContext.badge}
-                  </div>
+                  </div></div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -532,7 +535,7 @@ export function AssistantSearchBar() {
                     onClick={clearChat}
                     aria-label="Clear assistant chat"
                     title="Clear chat"
-                    className="flex h-9 w-9 items-center justify-center rounded-md border border-[#E8D3B8] bg-white text-[#5A4038] hover:bg-[#FFF1E6]"
+                    className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-muted hover:bg-surface-muted"
                   >
                     <RefreshIcon className="h-4 w-4" />
                   </button>
@@ -541,7 +544,7 @@ export function AssistantSearchBar() {
                     onClick={() => setOpen(false)}
                     aria-label="Close Ask CurryForward"
                     title="Close Ask CurryForward"
-                    className="flex h-9 w-9 items-center justify-center rounded-md border border-[#E8D3B8] bg-white text-[#5A4038] hover:bg-[#FFF1E6]"
+                    className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-muted hover:bg-surface-muted"
                   >
                     <XIcon className="h-4 w-4" />
                   </button>
@@ -549,10 +552,10 @@ export function AssistantSearchBar() {
               </div>
             </div>
 
-            <div ref={listRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-white px-4 py-4">
+            <div ref={listRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-surface px-4 py-4">
               {messages.length === 0 && (
                 <div className="space-y-3">
-                  <div className="rounded-md border border-[#E8D3B8] bg-[#FFF8F1] px-3 py-2 text-sm text-[#2E1B14]">
+                  <div className="rounded-[14px] border border-border bg-surface-muted px-3 py-2 text-sm text-foreground">
                     {researchRecipeId && isAdmin ? (
                       <>
                         I can answer edit questions using the draft, internal schemas, local nutrition data, and web lookup when needed.
@@ -578,7 +581,7 @@ export function AssistantSearchBar() {
                         key={suggestion}
                         type="button"
                         onClick={() => sendMessage(suggestion)}
-                        className="rounded-full border border-[#E8D3B8] bg-white px-3 py-1.5 text-xs font-medium text-[#5A4038] hover:border-[#FF6B00] hover:text-[#2E1B14]"
+                        className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-muted hover:border-brand hover:text-foreground"
                       >
                         {suggestion}
                       </button>
@@ -590,7 +593,7 @@ export function AssistantSearchBar() {
                 <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div
                     className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                      m.role === "user" ? "bg-[#FFB000] text-[#2E1B14]" : "bg-[#FFF8F1] text-[#2E1B14]"
+                      m.role === "user" ? "bg-surface-muted text-foreground" : "border border-border bg-surface text-foreground"
                     }`}
                 >
                   {m.role === "assistant" && typeof m.content === "string" ? (
@@ -601,24 +604,24 @@ export function AssistantSearchBar() {
                 </div>
               </div>
               ))}
-              {sending && <div className="text-xs text-[#8A7564]">Thinking...</div>}
+              {sending && <div className="text-xs text-muted">Thinking...</div>}
             </div>
 
-            <form onSubmit={handleSend} className="shrink-0 border-t border-[#E8D3B8] bg-[#FFF8F1] p-3">
+            <form onSubmit={handleSend} className="shrink-0 border-t border-border bg-surface-muted p-3">
               <div className="flex gap-2">
                 <input
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder={assistantContext.inputPlaceholder}
-                  className="min-w-0 flex-1 rounded-md border border-[#E8D3B8] bg-white px-3 py-2 text-sm placeholder:text-[#8A7564] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/25"
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm placeholder:text-muted focus:border-brand focus:outline-none focus:ring-[3px] focus:ring-brand/25"
                 />
                 <button
                   type="submit"
                   disabled={!input.trim() || sending}
                   aria-label="Send to Ask CurryForward"
                   title="Send"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#FF6B00] text-white disabled:opacity-50"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-white dark:text-[#211411] disabled:opacity-50"
                 >
                   {sending ? (
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />

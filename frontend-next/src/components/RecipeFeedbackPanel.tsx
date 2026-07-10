@@ -41,11 +41,9 @@ export function RecipeFeedbackPanel({ recipeId }: { recipeId: string }) {
     };
   }, [recipeId, push]);
 
-  useEffect(() => {
-    if (!isAdmin || !displayName) return;
-    setAuthorName((current) => current || displayName);
-    setReplyAuthorName((current) => current || displayName);
-  }, [isAdmin, displayName]);
+  const defaultAuthorName = isAdmin ? displayName || "" : "";
+  const resolvedAuthorName = authorName || defaultAuthorName;
+  const resolvedReplyAuthorName = replyAuthorName || defaultAuthorName;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -54,7 +52,7 @@ export function RecipeFeedbackPanel({ recipeId }: { recipeId: string }) {
     setSubmitting(true);
     try {
       const created = await api.createRecipeFeedback(recipeId, {
-        author_name: authorName.trim() || undefined,
+        author_name: resolvedAuthorName.trim() || undefined,
         rating,
         comment: text,
       });
@@ -83,7 +81,7 @@ export function RecipeFeedbackPanel({ recipeId }: { recipeId: string }) {
     setSubmittingReply(true);
     try {
       const created = await api.createRecipeFeedback(recipeId, {
-        author_name: replyAuthorName.trim() || undefined,
+        author_name: resolvedReplyAuthorName.trim() || undefined,
         comment: text,
         parent_feedback_id: parentFeedbackId,
       });
@@ -127,7 +125,7 @@ export function RecipeFeedbackPanel({ recipeId }: { recipeId: string }) {
         <form onSubmit={submit} className="space-y-3 rounded-md border border-border bg-surface-muted p-3">
           <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
             <Input
-              value={authorName}
+              value={resolvedAuthorName}
               onChange={(e) => setAuthorName(e.target.value)}
               placeholder="Your name (optional)"
               maxLength={80}
@@ -172,7 +170,7 @@ export function RecipeFeedbackPanel({ recipeId }: { recipeId: string }) {
                 key={item.feedback_id}
                 item={item}
                 replyingTo={replyingTo}
-                replyAuthorName={replyAuthorName}
+                replyAuthorName={resolvedReplyAuthorName}
                 replyComment={replyComment}
                 submittingReply={submittingReply}
                 onReplyStart={(feedbackId) => {

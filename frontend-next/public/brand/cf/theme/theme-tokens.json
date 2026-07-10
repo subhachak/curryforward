@@ -1,0 +1,29 @@
+{
+  "brand": "Curry Forward",
+  "typography": {
+    "display": "Playfair Display",
+    "ui": "Inter"
+  },
+  "light": {
+    "background": "#FAF7F1",
+    "surface": "#FFFFFF",
+    "surfaceSubtle": "#F6EFE3",
+    "text": "#3A2A23",
+    "textMuted": "#7B6B62",
+    "border": "#E5D8C9",
+    "primary": "#7A2E2E",
+    "accent": "#D48C3A",
+    "success": "#4E6B4E"
+  },
+  "dark": {
+    "background": "#211411",
+    "surface": "#2D1B17",
+    "surfaceSubtle": "#3A241E",
+    "text": "#F8F1E7",
+    "textMuted": "#CBBCAF",
+    "border": "#5B4038",
+    "primary": "#D9674E",
+    "accent": "#E7A64F",
+    "success": "#90A989"
+  }
+}

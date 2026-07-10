@@ -136,7 +136,7 @@ const PROMPT_CHIPS = [
 function ClocheMark({ className = "" }: { className?: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src="/brand/mark-cloche-forward.svg" alt="" aria-hidden className={className} />
+    <img src="/brand/cf/logos/symbol-light.svg" alt="" aria-hidden className={`theme-asset ${className}`} />
   );
 }
 

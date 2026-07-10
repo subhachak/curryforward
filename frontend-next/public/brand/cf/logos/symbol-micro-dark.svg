@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+<title>Curry Forward micro symbol dark</title>
+
+<circle cx="32" cy="32" r="24" stroke="#F6EFE3" stroke-width="2.5"/>
+<path d="M32 3 L37 10 L32 15 L27 10 Z M61 32 L54 37 L49 32 L54 27 Z M32 61 L27 54 L32 49 L37 54 Z M3 32 L10 27 L15 32 L10 37 Z"
+      stroke="#F6EFE3" stroke-width="2" fill="none"/>
+<text x="32" y="39" text-anchor="middle" font-family="Playfair Display, Georgia, serif"
+      font-size="24" font-style="italic" fill="#F6EFE3">cf</text>
+</svg>

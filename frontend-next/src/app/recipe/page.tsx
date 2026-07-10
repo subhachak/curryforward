@@ -11,7 +11,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
-import { CopyIcon, DownloadIcon, RefreshIcon, SparklesIcon } from "@/components/ui/icons";
+import { DownloadIcon, RefreshIcon } from "@/components/ui/icons";
 import { LikeButton } from "@/components/LikeButton";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { useAuth } from "@/context/AuthContext";
@@ -168,12 +168,14 @@ function RecipeDetailInner() {
               className="bg-[#FF6B00] text-white shadow-[0_8px_18px_rgba(255,107,0,0.22)] hover:bg-[#E6462D]"
               onClick={() => setOpen(true)}
             >
-              <SparklesIcon className="h-4 w-4" />
-              Ask assistant
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/cf/icons/ui/ask.svg" alt="" className="h-5 w-5" />
+              Ask CurryForward
             </Button>
             <LikeButton key={recipe.recipe_id} recipeId={recipe.recipe_id} likeCount={recipe.like_count} />
             <Button variant="secondary" onClick={() => setOpen(true)}>
-              <CopyIcon className="h-4 w-4" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/cf/icons/ui/version.svg" alt="" className="h-5 w-5" />
               Copy as new version
             </Button>
             {(recipe.status === "published" || isAdmin) && (
@@ -199,7 +201,7 @@ function RecipeDetailInner() {
               <div className="absolute bottom-8 right-8 h-16 w-16 rounded-full border-8 border-[#2E9B57]" aria-hidden />
               <div className="absolute right-14 top-12 h-12 w-12 rounded-full bg-[#FFE0DA]" aria-hidden />
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/mark-cloche-forward.svg" alt="" className="relative z-10 h-36 w-auto" />
+              <img src="/brand/cf/logos/symbol-light.svg" alt="" className="theme-asset relative z-10 h-36 w-auto" />
             </>
           )}
         </div>
@@ -261,7 +263,7 @@ function RecipeLoadingState() {
     <div className="rounded-md border border-[#FFD2AE] bg-[#FFF8F1] px-4 py-14 text-center">
       <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[#FFE7D1]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/mark-cloche-forward.svg" alt="" className="h-10 w-auto animate-pulse" />
+        <img src="/brand/cf/logos/symbol-light.svg" alt="" className="theme-asset h-10 w-auto animate-pulse" />
       </div>
       <PageSpinner label="Opening the cloche..." />
       <p className="mt-2 text-sm text-[#5A4038]">Preparing your recipe.</p>

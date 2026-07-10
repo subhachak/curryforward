@@ -15,15 +15,15 @@ export const metadata: Metadata = {
   description: "A living collection of Indian and global recipes with Bengali roots, adapted for today's kitchen.",
   applicationName: "Curry Forward",
   icons: {
-    icon: "/brand/heritage/light/favicon.svg",
-    apple: "/brand/heritage/light/app-icon.svg",
+    icon: "/brand/cf/logos/favicon.svg",
+    apple: "/brand/cf/logos/app-icon.svg",
   },
 };
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F7F0E3" },
-    { media: "(prefers-color-scheme: dark)", color: "#1E1A17" },
+    { media: "(prefers-color-scheme: light)", color: "#FAF7F1" },
+    { media: "(prefers-color-scheme: dark)", color: "#211411" },
   ],
 };
 
