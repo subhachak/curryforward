@@ -444,4 +444,3 @@ def run_web_search(query: str) -> str:
     )
     text = (getattr(response, "output_text", "") or "").strip()
     return text or "No useful web search results were returned for this query."
-

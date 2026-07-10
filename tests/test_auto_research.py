@@ -49,6 +49,10 @@ def _wait_until_finished(recipe_id, timeout=2.0):
     raise AssertionError("background auto-research job never finished within timeout")
 
 
+def _skip_auto_plan(monkeypatch):
+    monkeypatch.setattr("app.routers.research.propose_search_batch", lambda dish_name, starting_prompt, model: {"queries": []})
+
+
 # --- admin gating ------------------------------------------------------------
 
 
@@ -243,6 +247,7 @@ def test_usage_logging_failure_does_not_poison_completed_run(monkeypatch):
 
 def test_run_with_no_approved_queries_still_runs_crew(monkeypatch):
     monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
+    _skip_auto_plan(monkeypatch)
 
     def fake_run_auto_research_crew(dish_name, current_document, search_results, starting_prompt, model, on_task_done=None):
         assert search_results == []
@@ -260,10 +265,43 @@ def test_run_with_no_approved_queries_still_runs_crew(monkeypatch):
 
     body = _wait_until_finished(draft["recipe_id"])
     assert body["intro"] == "No searches needed."
+    assert "No web searches were needed" in " ".join(body["auto_research_activity"])
+
+
+def test_run_without_approved_queries_plans_and_searches_in_background(monkeypatch):
+    monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
+    monkeypatch.setattr(
+        "app.routers.research.propose_search_batch",
+        lambda dish_name, starting_prompt, model: {"queries": [{"query": "best chocolate cake technique"}]},
+    )
+    monkeypatch.setattr("app.routers.research.run_web_search", lambda query: f"mocked results for {query}")
+
+    def fake_run_auto_research_crew(dish_name, current_document, search_results, starting_prompt, model, on_task_done=None):
+        assert search_results[0]["query"] == "best chocolate cake technique"
+        return {"intro": "Auto-planned and done."}
+
+    monkeypatch.setattr("app.routers.research.run_auto_research_crew", fake_run_auto_research_crew)
+
+    draft = _start_draft("Chocolate Cake")
+    r = client.post(
+        f"/api/recipes/research/{draft['recipe_id']}/auto/run",
+        json={"approved_queries": []},
+        headers=ADMIN_HEADERS,
+    )
+    assert r.status_code == 200
+
+    body = _wait_until_finished(draft["recipe_id"])
+    assert body["intro"] == "Auto-planned and done."
+    assert "Planning focused web searches." in body["auto_research_activity"]
+    assert any("Searching 1/1" in item for item in body["auto_research_activity"])
+
+    jobs = client.get(f"/api/recipes/research/{draft['recipe_id']}/jobs", headers=ADMIN_HEADERS).json()
+    assert jobs[0]["approved_queries"] == ["best chocolate cake technique"]
 
 
 def test_run_passes_starting_prompt_through_to_crew(monkeypatch):
     monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
+    _skip_auto_plan(monkeypatch)
     seen = {}
 
     def fake_run_auto_research_crew(dish_name, current_document, search_results, starting_prompt, model, on_task_done=None):
@@ -288,6 +326,7 @@ def test_run_passes_starting_prompt_through_to_crew(monkeypatch):
 
 def test_run_surfaces_crew_error_via_status_poll(monkeypatch):
     monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
+    _skip_auto_plan(monkeypatch)
 
     def failing_crew(dish_name, current_document, search_results, starting_prompt, model, on_task_done=None):
         raise RuntimeError("the crew blew up")
@@ -305,10 +344,12 @@ def test_run_surfaces_crew_error_via_status_poll(monkeypatch):
     body = _wait_until_finished(draft["recipe_id"])
     assert body["auto_research_status"] == "error"
     assert "the crew blew up" in body["auto_research_error"]
+    assert any("Auto-research failed" in item for item in body["auto_research_activity"])
 
 
 def test_cannot_start_a_second_run_while_one_is_in_progress(monkeypatch):
     monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
+    _skip_auto_plan(monkeypatch)
 
     def slow_crew(dish_name, current_document, search_results, starting_prompt, model, on_task_done=None):
         time.sleep(0.3)
@@ -336,6 +377,7 @@ def test_cannot_start_a_second_run_while_one_is_in_progress(monkeypatch):
 
 def test_cannot_publish_while_auto_research_is_running(monkeypatch):
     monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
+    _skip_auto_plan(monkeypatch)
 
     def slow_crew(dish_name, current_document, search_results, starting_prompt, model, on_task_done=None):
         time.sleep(0.3)
@@ -372,6 +414,7 @@ def test_cancel_unblocks_immediately_and_discards_stale_result(monkeypatch):
     the second job's already-applied one, because its job id no longer
     matches the row's current job id."""
     monkeypatch.setattr("app.routers.research.is_web_search_configured", lambda: True)
+    _skip_auto_plan(monkeypatch)
 
     def slow_stale_crew(dish_name, current_document, search_results, starting_prompt, model, on_task_done=None):
         time.sleep(0.4)  # finishes after the second (fast) job below

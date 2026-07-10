@@ -97,6 +97,7 @@ class RecipeVersion(Base):
     auto_research_status = Column(String, nullable=True)  # None | "running" | "error"
     auto_research_error = Column(Text, nullable=True)
     auto_research_progress = Column(JSON, nullable=True)  # list of completed section keys: history/ingredients/steps/tips/merge
+    auto_research_activity = Column(JSON, nullable=True)  # human-readable progress events for the polling UI
     # Fencing token: set to a fresh id on every /auto/run kickoff. A
     # background job only applies its result if this still matches the id it
     # was started with — /auto/cancel clears it so an abandoned job's result
@@ -160,6 +161,7 @@ class RecipeVersion(Base):
             "auto_research_status": self.auto_research_status,
             "auto_research_error": self.auto_research_error,
             "auto_research_progress": self.auto_research_progress or [],
+            "auto_research_activity": self.auto_research_activity or [],
         }
 
 

@@ -519,6 +519,7 @@ def auto_research_run(
     row.auto_research_status = "running"
     row.auto_research_error = None
     row.auto_research_progress = []
+    row.auto_research_activity = ["Queued auto-research run."]
     row.auto_research_job_id = job_id
     audit_admin_action(
         db,
@@ -559,6 +560,7 @@ def _mark_task_done(recipe_id: str, job_id: str, section: str) -> None:
         if section not in progress:
             progress.append(section)
         row.auto_research_progress = progress
+        _append_activity_on_row(row, f"Completed {section} section.")
         job = db.query(ResearchJob).filter(ResearchJob.job_id == job_id).first()
         if job:
             job.progress = progress
@@ -588,10 +590,38 @@ def _run_auto_research_job(
         if not row:
             return
         try:
+            if not approved_queries:
+                _append_activity_on_row(row, "Planning focused web searches.")
+                db.commit()
+                plan = propose_search_batch(row.name, starting_prompt, model)
+                approved_queries = [
+                    (item.get("query") or "").strip()
+                    for item in plan.get("queries", [])
+                    if (item.get("query") or "").strip()
+                ][:4]
+                job = db.query(ResearchJob).filter(ResearchJob.job_id == job_id).first()
+                if job:
+                    job.approved_queries = approved_queries
+                if approved_queries:
+                    _append_activity_on_row(row, f"Planned {len(approved_queries)} web searches.")
+                else:
+                    _append_activity_on_row(row, "No web searches were needed; drafting from the starting prompt.")
+                db.commit()
+                if not _auto_research_job_is_active(db, row, job_id):
+                    return
             search_results = []
-            for q in approved_queries:
+            for i, q in enumerate(approved_queries, start=1):
+                _append_activity_on_row(row, f"Searching {i}/{len(approved_queries)}: {q}")
+                db.commit()
                 result_text = run_web_search(q)
+                if not _auto_research_job_is_active(db, row, job_id):
+                    return
                 search_results.append({"query": q, "result": result_text})
+                _append_activity_on_row(row, f"Finished search {i}/{len(approved_queries)}.")
+                db.commit()
+                if not _auto_research_job_is_active(db, row, job_id):
+                    return
+            _append_activity_on_row(row, "Drafting recipe sections with specialist agents.")
             job = db.query(ResearchJob).filter(ResearchJob.job_id == job_id).first()
             if job:
                 job.search_results = search_results
@@ -621,6 +651,7 @@ def _run_auto_research_job(
             row.auto_research_status = None
             row.auto_research_error = None
             row.auto_research_job_id = None
+            _append_activity_on_row(row, "Auto-research completed.")
             job = db.query(ResearchJob).filter(ResearchJob.job_id == job_id).first()
             if job:
                 job.status = "completed"
@@ -644,6 +675,7 @@ def _run_auto_research_job(
             row.auto_research_status = "error"
             row.auto_research_error = str(e)
             row.auto_research_job_id = None
+            _append_activity_on_row(row, f"Auto-research failed: {str(e)[:180]}")
             job = db.query(ResearchJob).filter(ResearchJob.job_id == job_id).first()
             if job:
                 job.status = "error"
@@ -657,6 +689,18 @@ def _run_auto_research_job(
                 logger.warning("auto_research_usage_log_failed", extra={"recipe_id": recipe_id, "job_id": job_id}, exc_info=True)
     finally:
         db.close()
+
+
+def _append_activity_on_row(row: RecipeVersion, message: str) -> None:
+    activity = list(row.auto_research_activity or [])
+    if not activity or activity[-1] != message:
+        activity.append(message)
+    row.auto_research_activity = activity[-30:]
+
+
+def _auto_research_job_is_active(db: Session, row: RecipeVersion, job_id: str) -> bool:
+    db.refresh(row)
+    return row.auto_research_job_id == job_id and row.deleted_at is None
 
 
 @router.post("/{recipe_id}/auto/cancel")
@@ -677,6 +721,7 @@ def auto_research_cancel(
     row.auto_research_status = None
     row.auto_research_error = None
     row.auto_research_progress = None
+    row.auto_research_activity = ["Auto-research stopped."]
     job_id = row.auto_research_job_id
     row.auto_research_job_id = None
     if job_id:

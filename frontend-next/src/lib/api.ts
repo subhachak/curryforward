@@ -118,7 +118,7 @@ export const api = {
   listModels: () => apiFetch<ModelOption[]>("/models"),
   planAutoResearch: (recipeId: string) =>
     apiFetch<AutoResearchPlan>(`/recipes/research/${recipeId}/auto/plan`, { method: "POST" }),
-  runAutoResearch: (recipeId: string, approvedQueries: string[]) =>
+  runAutoResearch: (recipeId: string, approvedQueries: string[] = []) =>
     apiFetch<RecipeResearchDetail>(`/recipes/research/${recipeId}/auto/run`, {
       method: "POST",
       body: JSON.stringify({ approved_queries: approvedQueries }),

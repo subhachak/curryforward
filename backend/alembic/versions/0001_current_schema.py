@@ -50,6 +50,7 @@ def upgrade() -> None:
         sa.Column("auto_research_status", sa.String(), nullable=True),
         sa.Column("auto_research_error", sa.Text(), nullable=True),
         sa.Column("auto_research_progress", sa.JSON(), nullable=True),
+        sa.Column("auto_research_activity", sa.JSON(), nullable=True),
         sa.Column("auto_research_job_id", sa.String(), nullable=True),
         sa.Column("status", sa.String(), nullable=True),
         sa.Column("source", sa.String(), nullable=True),

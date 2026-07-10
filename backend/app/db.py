@@ -40,6 +40,7 @@ _RECIPE_VERSION_COLUMN_ADDITIONS = [
     ("auto_research_error", "TEXT"),
     ("starting_prompt", "TEXT"),
     ("auto_research_progress", "TEXT"),
+    ("auto_research_activity", "TEXT"),
     ("auto_research_job_id", "TEXT"),
     ("deleted_at", "DATETIME"),
     ("hero_image_url", "TEXT"),

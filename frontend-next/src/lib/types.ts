@@ -232,6 +232,8 @@ export interface RecipeResearchDetail extends RecipeDetail {
   auto_research_error: string | null;
   // Completed section keys so far: history/ingredients/steps/tips/merge.
   auto_research_progress: string[];
+  // Human-readable activity events such as planning, searching, and drafting.
+  auto_research_activity: string[];
 }
 
 export const AUTO_RESEARCH_SECTIONS = ["history", "ingredients", "steps", "tips", "merge"] as const;

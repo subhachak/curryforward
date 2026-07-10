@@ -134,6 +134,7 @@ class RecipeResearchResponse(RecipeDetailResponse):
     auto_research_status: Literal["running", "error"] | None
     auto_research_error: str | None
     auto_research_progress: list[str]
+    auto_research_activity: list[str]
 
 
 class RecipeSummaryResponse(BaseModel):
