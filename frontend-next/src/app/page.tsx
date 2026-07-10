@@ -231,11 +231,11 @@ export default function HomePage() {
         </section>
 
         <section id="bengali-sweets" className="py-14">
-          <div className="grid gap-6 rounded-md border border-[#F0B8C7] bg-[#FFE2EA] p-5 sm:p-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+          <div className="sweets-feature-panel grid gap-6 rounded-md border border-[#F0B8C7] bg-[#FFE2EA] p-5 sm:p-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
             <div>
               <div className="mb-2 text-sm font-semibold uppercase text-[#D94F70]">Featured pillar</div>
-              <h2 className="text-3xl font-bold text-[#2A160F]">Traditional Bengali sweets, brought forward.</h2>
-              <p className="mt-3 text-[#6B4A3A]">
+              <h2 className="sweets-feature-copy text-3xl font-bold text-[#2A160F]">Traditional Bengali sweets, brought forward.</h2>
+              <p className="sweets-feature-copy mt-3 text-[#6B4A3A]">
                 From patishapta and payesh to sandesh and nolen gur classics, discover sweets many of us miss outside
                 India - explained for modern kitchens.
               </p>
