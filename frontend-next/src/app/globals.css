@@ -32,6 +32,33 @@
   --radius-lg: 1rem;
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #171812;
+  --foreground: #f3eadc;
+  --surface: #22231b;
+  --surface-muted: #303025;
+  --border: #484536;
+  --muted: #b8aa94;
+
+  --ink: #edf1df;
+
+  --brand: #e4ad3d;
+  --brand-hover: #f2c45f;
+  --brand-soft: #493a1e;
+
+  --accent: #e2744e;
+  --accent-hover: #f08a65;
+  --accent-soft: #4b2c24;
+
+  --success: #8fbd7e;
+  --success-soft: #293d28;
+  --warning: #e4b94e;
+  --warning-soft: #44381f;
+  --danger: #ef886f;
+  --danger-soft: #492822;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -67,4 +94,16 @@ body {
 
 * {
   border-color: var(--color-border);
+}
+
+/* A few older views use literal white utilities rather than surface tokens. */
+:root[data-theme="dark"] .bg-white,
+:root[data-theme="dark"] .bg-white\/95 {
+  background-color: var(--surface);
+}
+
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea,
+:root[data-theme="dark"] select {
+  color: var(--foreground);
 }

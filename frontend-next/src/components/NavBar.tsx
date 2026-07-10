@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { useRecipes } from "@/context/RecipesContext";
 import { useAuth } from "@/context/AuthContext";
 import { AssistantSearchBar } from "@/components/assistant/AssistantSearchBar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 function RecipesMenu() {
   const { categories } = useRecipes();
@@ -168,6 +169,7 @@ export function NavBar() {
 
         <AssistantSearchBar />
 
+        <ThemeToggle />
         <MobileMenu />
       </div>
     </header>
