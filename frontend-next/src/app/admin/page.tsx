@@ -210,8 +210,12 @@ export default function AdminPage() {
     setStartingResearch(true);
     try {
       const draft = await api.startResearch(prompt);
+      // A new research prompt is already the user's intent to run the crew;
+      // don't make them confirm that intent with a second click.
       setActiveResearchDraft(draft);
       setResearchPrompt("");
+      const started = await api.runAutoResearch(adminRecipeRef(draft));
+      setActiveResearchDraft(started);
     } catch (e) {
       push(e instanceof ApiError ? e.message : "Couldn't start research", "error");
     } finally {
@@ -1180,9 +1184,9 @@ function NewRecipeTab({
         <Card className="bg-white">
           <CardBody className="space-y-3">
             <div>
-              <h2 className="text-lg font-semibold text-ink">Research plan & progress</h2>
+              <h2 className="text-lg font-semibold text-ink">Research progress</h2>
               <p className="text-sm text-muted">
-                Approve the research plan here. When the draft is ready, CurryForward opens the editor automatically.
+                Research starts automatically. When the draft is ready, CurryForward opens the editor automatically.
               </p>
             </div>
             <div className="min-h-[32rem]">
