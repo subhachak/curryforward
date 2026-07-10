@@ -208,15 +208,18 @@ export default function AdminPage() {
     const prompt = researchPrompt.trim();
     if (!prompt) return;
     setStartingResearch(true);
+    let draft: RecipeResearchDetail | null = null;
     try {
-      const draft = await api.startResearch(prompt);
+      draft = await api.startResearch(prompt);
       // A new research prompt is already the user's intent to run the crew;
       // don't make them confirm that intent with a second click.
-      setActiveResearchDraft(draft);
       setResearchPrompt("");
       const started = await api.runAutoResearch(adminRecipeRef(draft));
       setActiveResearchDraft(started);
     } catch (e) {
+      // If draft creation succeeded but launching failed, keep the draft on
+      // screen so the admin can retry instead of losing their prompt.
+      if (draft) setActiveResearchDraft(draft);
       push(e instanceof ApiError ? e.message : "Couldn't start research", "error");
     } finally {
       setStartingResearch(false);
