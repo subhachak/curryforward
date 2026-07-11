@@ -15,17 +15,19 @@ logging.basicConfig(
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .auth import router as auth_router
 from .db import SessionLocal, init_db
 from .routers.admin import router as admin_router
+from .routers.analytics import router as analytics_router
 from .routers.models import router as models_router
 from .routers.recipes import router as recipes_router
 from .routers.research import router as research_router
 from .routers.uploads import router as uploads_router, UPLOADS_DIR
 from .seed_loader import load_seed_data
+from .models import RecipeVersion
 from .services.security import RateLimitMiddleware, SecurityHeadersMiddleware
 
 app = FastAPI(title="CurryForward")
@@ -48,6 +50,7 @@ app.add_middleware(
 )
 
 app.include_router(admin_router)
+app.include_router(analytics_router)
 app.include_router(auth_router)
 app.include_router(models_router)
 app.include_router(recipes_router)
@@ -63,6 +66,32 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 @app.get("/api/health")
 def health_check():
     return {"ok": True}
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+def sitemap_xml():
+    base_url = os.environ.get("SITE_URL", "http://localhost:3000").rstrip("/")
+    db = SessionLocal()
+    try:
+        recipes = (
+            db.query(RecipeVersion)
+            .filter(
+                RecipeVersion.is_current_head == True,  # noqa: E712
+                RecipeVersion.status == "published",
+                RecipeVersion.deleted_at.is_(None),
+                RecipeVersion.public_slug.isnot(None),
+            )
+            .all()
+        )
+        urls = [f"<url><loc>{base_url}/</loc></url>", f"<url><loc>{base_url}/recipes/</loc></url>"]
+        for recipe in recipes:
+            modified = recipe.updated_at or recipe.created_at
+            lastmod = f"<lastmod>{modified.date().isoformat()}</lastmod>" if modified else ""
+            urls.append(f"<url><loc>{base_url}/{recipe.public_slug}</loc>{lastmod}</url>")
+        xml = '<?xml version="1.0" encoding="UTF-8"?>' + '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + "".join(urls) + "</urlset>"
+        return Response(content=xml, media_type="application/xml")
+    finally:
+        db.close()
 
 
 # Production: `next build` with output:'export' writes static files to

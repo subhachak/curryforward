@@ -14,6 +14,7 @@ import io
 import json
 import re
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from openpyxl import load_workbook
@@ -24,7 +25,7 @@ from sqlalchemy.orm import Session
 from ..auth import require_admin
 from ..db import get_db
 from ..llm_client import is_litellm_configured, is_model_available, litellm_completion
-from ..models import AdminAuditLog, LLMUsageLog, RecipeAnalytics, RecipeFeedback, RecipeVersion, _secure_public_url
+from ..models import AdminAuditLog, LLMUsageLog, RecipeAnalytics, RecipeFeedback, RecipeVersion, SiteVisit, _secure_public_url
 from ..nutrition import compute_nutrition, estimated_yield_grams
 from ..services.audit import audit_admin_action
 from ..services.ingredient_canonical import normalize_components_to_grams
@@ -1159,4 +1160,28 @@ def list_llm_usage(limit: int = 100, db: Session = Depends(get_db), role: str = 
             }
             for task, model, count, total_tokens in totals
         ],
+    }
+
+
+@router.get("/site-analytics")
+def site_analytics(db: Session = Depends(get_db), role: str = Depends(require_admin)):
+    now = datetime.now(timezone.utc)
+    last_30_days = now - timedelta(days=30)
+    rows = db.query(SiteVisit).filter(SiteVisit.visited_at >= last_30_days).all()
+    visitor_ids = {row.visitor_id for row in rows}
+    paths: dict[str, int] = {}
+    sources: dict[str, int] = {}
+    daily: dict[str, int] = {}
+    for row in rows:
+        paths[row.path] = paths.get(row.path, 0) + 1
+        source = row.referrer or "Direct"
+        sources[source] = sources.get(source, 0) + 1
+        day = row.visited_at.date().isoformat()
+        daily[day] = daily.get(day, 0) + 1
+    return {
+        "page_views_30d": len(rows),
+        "unique_visitors_30d": len(visitor_ids),
+        "top_pages": [{"path": key, "views": value} for key, value in sorted(paths.items(), key=lambda item: item[1], reverse=True)[:10]],
+        "top_sources": [{"source": key, "views": value} for key, value in sorted(sources.items(), key=lambda item: item[1], reverse=True)[:10]],
+        "daily": [{"date": key, "views": daily[key]} for key in sorted(daily)],
     }

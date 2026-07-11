@@ -188,6 +188,22 @@ class RecipeAnalytics(Base):
         }
 
 
+class SiteVisit(Base):
+    """Privacy-light first-party page view event.
+
+    Stores only an anonymous browser-generated id, public path, referrer host,
+    and timestamp. IP addresses and user-agent strings are intentionally not
+    retained.
+    """
+    __tablename__ = "site_visits"
+
+    visit_id = Column(String, primary_key=True, default=_uid)
+    visitor_id = Column(String, index=True, nullable=False)
+    path = Column(String, index=True, nullable=False)
+    referrer = Column(String, nullable=True)
+    visited_at = Column(DateTime, default=_now, index=True, nullable=False)
+
+
 class RecipeFeedback(Base):
     """Public per-recipe ratings, reviews, and comments.
 

@@ -8,7 +8,8 @@ import { AssistantSearchBar } from "@/components/assistant/AssistantSearchBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 function RecipesMenu() {
-  const { categories } = useRecipes();
+  const { recipes } = useRecipes();
+  const categories = [...new Set(recipes.filter((recipe) => recipe.status !== "draft").map((recipe) => recipe.category).filter((category): category is string => Boolean(category)))].sort();
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -23,24 +24,30 @@ function RecipesMenu() {
   return (
     <div className="relative" onMouseEnter={openNow} onMouseLeave={closeSoon}>
       <Link
-        href="/recipes"
+        href="/recipes?published=1"
         className="text-sm font-medium text-foreground hover:text-brand-hover"
       >
         Recipes
       </Link>
-      {open && categories.length > 0 && (
+      {open && (
         <div className="absolute left-0 top-full z-50 mt-2 w-48 rounded-lg border border-border bg-surface py-1.5 shadow-lg">
           <Link
-            href="/recipes"
+            href="/recipes?published=1"
             className="block px-3 py-1.5 text-sm text-foreground hover:bg-surface-muted"
           >
             All recipes
+          </Link>
+          <Link href="/#bengali-sweets" className="block px-3 py-1.5 text-sm text-foreground hover:bg-surface-muted">
+            Bengali Sweets
+          </Link>
+          <Link href="/#hard-to-find" className="block px-3 py-1.5 text-sm text-foreground hover:bg-surface-muted">
+            Classics
           </Link>
           <div className="my-1 border-t border-border" />
           {categories.map((c) => (
             <Link
               key={c}
-              href={`/recipes?category=${encodeURIComponent(c)}`}
+              href={`/recipes?published=1&category=${encodeURIComponent(c)}`}
               className="block px-3 py-1.5 text-sm capitalize text-foreground hover:bg-surface-muted"
             >
               {c}
@@ -53,7 +60,8 @@ function RecipesMenu() {
 }
 
 function MobileMenu() {
-  const { categories } = useRecipes();
+  const { recipes } = useRecipes();
+  const categories = [...new Set(recipes.filter((recipe) => recipe.status !== "draft").map((recipe) => recipe.category).filter((category): category is string => Boolean(category)))].sort();
   const { isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
 
@@ -83,22 +91,22 @@ function MobileMenu() {
             Home
           </Link>
           <Link
-            href="/recipes"
-            className="block rounded-md px-2 py-2 text-sm font-medium text-foreground hover:bg-surface-muted"
+            href="/recipes?published=1"
+            className="block rounded-md py-2 pl-5 pr-2 text-sm text-foreground hover:bg-surface-muted"
             onClick={() => setOpen(false)}
           >
             All recipes
           </Link>
           <Link
             href="/#bengali-sweets"
-            className="block rounded-md px-2 py-2 text-sm font-medium text-foreground hover:bg-surface-muted"
+            className="block rounded-md py-2 pl-5 pr-2 text-sm text-foreground hover:bg-surface-muted"
             onClick={() => setOpen(false)}
           >
             Bengali Sweets
           </Link>
           <Link
             href="/#hard-to-find"
-            className="block rounded-md px-2 py-2 text-sm font-medium text-foreground hover:bg-surface-muted"
+            className="block rounded-md py-2 pl-5 pr-2 text-sm text-foreground hover:bg-surface-muted"
             onClick={() => setOpen(false)}
           >
             Classics
@@ -117,7 +125,7 @@ function MobileMenu() {
               {categories.map((c) => (
                 <Link
                   key={c}
-                  href={`/recipes?category=${encodeURIComponent(c)}`}
+                  href={`/recipes?published=1&category=${encodeURIComponent(c)}`}
                   className="block rounded-md px-2 py-2 text-sm capitalize text-muted hover:bg-surface-muted"
                   onClick={() => setOpen(false)}
                 >
@@ -155,12 +163,6 @@ export function NavBar() {
             Home
           </Link>
           <RecipesMenu />
-          <Link href="/#bengali-sweets" className="text-sm font-medium text-foreground hover:text-brand-hover">
-            Bengali Sweets
-          </Link>
-          <Link href="/#hard-to-find" className="text-sm font-medium text-foreground hover:text-brand-hover">
-            Classics
-          </Link>
           <Link
             href="/admin"
             aria-hidden={!showWorkspace}

@@ -35,12 +35,25 @@ function FilterChip({
 function RecipesInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { recipes, categories, tags, loading } = useRecipes();
+  const { recipes, loading } = useRecipes();
   const { setOpen } = useAssistant();
 
   const query = (searchParams.get("q") || "").trim().toLowerCase();
   const category = searchParams.get("category") || "";
   const tag = searchParams.get("tag") || "";
+  const publishedOnly = searchParams.get("published") === "1";
+  const visibleRecipes = useMemo(
+    () => (publishedOnly ? recipes.filter((recipe) => recipe.status !== "draft") : recipes),
+    [recipes, publishedOnly],
+  );
+  const categories = useMemo(
+    () => [...new Set(visibleRecipes.map((recipe) => recipe.category).filter((value): value is string => Boolean(value)))].sort(),
+    [visibleRecipes],
+  );
+  const tags = useMemo(
+    () => [...new Set(visibleRecipes.flatMap((recipe) => recipe.cuisine_tags))].sort(),
+    [visibleRecipes],
+  );
 
   function setFilter(key: "category" | "tag", value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -53,7 +66,7 @@ function RecipesInner() {
   }
 
   const filtered = useMemo(() => {
-    return recipes.filter((r) => {
+    return visibleRecipes.filter((r) => {
       if (category && r.category !== category) return false;
       if (tag && !r.cuisine_tags.includes(tag)) return false;
       if (query) {
@@ -62,7 +75,7 @@ function RecipesInner() {
       }
       return true;
     });
-  }, [recipes, query, category, tag]);
+  }, [visibleRecipes, query, category, tag]);
 
   return (
     <div className="space-y-6">
@@ -110,7 +123,7 @@ function RecipesInner() {
           {query || category || tag ? (
             <>
               No recipes match your filters.{" "}
-              <button className="underline" onClick={() => router.push("/recipes")}>
+              <button className="underline" onClick={() => router.push(publishedOnly ? "/recipes?published=1" : "/recipes")}>
                 Clear filters
               </button>
             </>

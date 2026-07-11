@@ -219,6 +219,14 @@ export interface LLMUsageSummary {
   total_tokens: number;
 }
 
+export interface SiteAnalytics {
+  page_views_30d: number;
+  unique_visitors_30d: number;
+  top_pages: { path: string; views: number }[];
+  top_sources: { source: string; views: number }[];
+  daily: { date: string; views: number }[];
+}
+
 export interface LLMUsageResponse {
   items: LLMUsageLog[];
   summary: LLMUsageSummary[];

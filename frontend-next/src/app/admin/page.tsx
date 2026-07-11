@@ -39,6 +39,7 @@ import type {
   RecipeImportPreview,
   RecipeImportRow,
   RecipeResearchDetail,
+  SiteAnalytics,
   TrashedRecipeSummary,
 } from "@/lib/types";
 
@@ -128,6 +129,7 @@ export default function AdminPage() {
   const [llmSettings, setLLMSettings] = useState<LLMSettingsResponse | null>(null);
   const [loadingLLMSettings, setLoadingLLMSettings] = useState(true);
   const [llmUsage, setLLMUsage] = useState<LLMUsageResponse | null>(null);
+  const [siteAnalytics, setSiteAnalytics] = useState<SiteAnalytics | null>(null);
   const [auditLog, setAuditLog] = useState<AdminAuditLog[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState(true);
   const [adminRecipes, setAdminRecipes] = useState<AdminRecipeSummary[]>([]);
@@ -183,9 +185,10 @@ export default function AdminPage() {
   const loadAnalytics = useCallback(async () => {
     setLoadingAnalytics(true);
     try {
-      const [usage, audit] = await Promise.all([api.getLLMUsage(), api.getAuditLog()]);
+      const [usage, audit, site] = await Promise.all([api.getLLMUsage(), api.getAuditLog(), api.getSiteAnalytics()]);
       setLLMUsage(usage);
       setAuditLog(audit);
+      setSiteAnalytics(site);
     } catch (e) {
       push(e instanceof ApiError ? e.message : "Failed to load analytics", "error");
     } finally {
@@ -530,6 +533,7 @@ export default function AdminPage() {
           trashCount={trash.length}
           loadingAnalytics={loadingAnalytics}
           llmUsage={llmUsage}
+          siteAnalytics={siteAnalytics}
           auditLog={auditLog}
         />
       )}
@@ -1612,6 +1616,7 @@ function AnalyticsTab({
   trashCount,
   loadingAnalytics,
   llmUsage,
+  siteAnalytics,
   auditLog,
 }: {
   topRecipes: AdminRecipeSummary[];
@@ -1620,6 +1625,7 @@ function AnalyticsTab({
   trashCount: number;
   loadingAnalytics: boolean;
   llmUsage: LLMUsageResponse | null;
+  siteAnalytics: SiteAnalytics | null;
   auditLog: AdminAuditLog[];
 }) {
   const totalModelCalls = llmUsage?.summary.reduce((sum, row) => sum + row.call_count, 0) ?? 0;
@@ -1628,6 +1634,24 @@ function AnalyticsTab({
 
   return (
     <div className="grid gap-4 xl:grid-cols-3">
+      <Card className="bg-white xl:col-span-3">
+        <CardBody>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="font-semibold">Public traffic · last 30 days</div>
+              <div className="mt-1 text-sm text-muted">Admin sessions and private workspace routes are excluded.</div>
+            </div>
+            <div className="flex gap-6 text-right">
+              <div><div className="text-2xl font-semibold text-ink">{siteAnalytics?.page_views_30d ?? 0}</div><div className="text-xs text-muted">Page views</div></div>
+              <div><div className="text-2xl font-semibold text-ink">{siteAnalytics?.unique_visitors_30d ?? 0}</div><div className="text-xs text-muted">Visitors</div></div>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            <div><div className="mb-2 text-xs font-semibold uppercase text-muted">Top pages</div>{(siteAnalytics?.top_pages ?? []).slice(0, 5).map((row) => <div key={row.path} className="flex justify-between border-b border-border py-2 text-sm last:border-0"><span className="truncate text-foreground">{row.path}</span><span className="text-muted">{row.views}</span></div>)}</div>
+            <div><div className="mb-2 text-xs font-semibold uppercase text-muted">Traffic sources</div>{(siteAnalytics?.top_sources ?? []).slice(0, 5).map((row) => <div key={row.source} className="flex justify-between border-b border-border py-2 text-sm last:border-0"><span className="truncate text-foreground">{row.source}</span><span className="text-muted">{row.views}</span></div>)}</div>
+          </div>
+        </CardBody>
+      </Card>
       <Card className="bg-white xl:col-span-2">
         <CardBody>
           <div className="font-semibold">Recipe engagement</div>

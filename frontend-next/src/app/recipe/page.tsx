@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { DownloadIcon, RefreshIcon } from "@/components/ui/icons";
 import { LikeButton } from "@/components/LikeButton";
+import { RecipeSeo } from "@/components/RecipeSeo";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { useAuth } from "@/context/AuthContext";
 import { useAssistant } from "@/context/AssistantContext";
@@ -134,6 +135,7 @@ function RecipeDetailInner() {
 
   return (
     <div className="space-y-6 text-[#2E1B14]">
+      <RecipeSeo recipe={recipe} />
       <Link href="/recipes" className="text-sm font-medium text-[#5A4038] hover:text-[#FF6B00]">
         &larr; Back to recipes
       </Link>

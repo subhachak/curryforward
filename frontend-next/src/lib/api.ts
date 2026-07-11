@@ -26,6 +26,7 @@ import type {
   RecipeUpsertRequest,
   ResearchPatchPayload,
   Role,
+  SiteAnalytics,
   TrashedRecipeSummary,
 } from "./types";
 
@@ -181,6 +182,7 @@ export const api = {
   listTrash: () => apiFetch<TrashedRecipeSummary[]>("/admin/recipes/trash"),
   getLLMSettings: () => apiFetch<LLMSettingsResponse>("/admin/llm-settings"),
   getLLMUsage: () => apiFetch<LLMUsageResponse>("/admin/llm-usage"),
+  getSiteAnalytics: () => apiFetch<SiteAnalytics>("/admin/site-analytics"),
   getAuditLog: () => apiFetch<AdminAuditLog[]>("/admin/audit-log"),
   updateLLMSetting: (key: string, model: string) =>
     apiFetch<{ key: string; model: string; updated_at: string | null }>(`/admin/llm-settings/${key}`, {
