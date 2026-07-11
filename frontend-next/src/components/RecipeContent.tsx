@@ -345,12 +345,20 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
       )}
 
       {recipe.tips.length > 0 && (
-        <Card className="border-[#FFDD85] bg-[#FFF8F1]">
-          <CardBody>
-            <div className="mb-2 font-semibold text-[#7A5200]">Tips &amp; tricks</div>
-            <ul className="list-inside list-disc space-y-1 text-sm">
+        <Card className="recipe-guidance recipe-guidance--tips border-accent/40 bg-accent-soft">
+          <CardBody className="space-y-5">
+            <div>
+              <h2 className="text-xl font-semibold text-foreground">Tips &amp; tricks</h2>
+              <p className="mt-1 text-sm text-muted">Small details that make this recipe easier and more reliable.</p>
+            </div>
+            <ul className="grid gap-3 md:grid-cols-2" role="list">
               {recipe.tips.map((tip, idx) => (
-                <li key={idx}>{tip}</li>
+                <li key={idx} className="recipe-guidance-item">
+                  <span className="recipe-guidance-marker recipe-guidance-marker--tip" aria-hidden>
+                    {idx + 1}
+                  </span>
+                  <span>{tip}</span>
+                </li>
               ))}
             </ul>
           </CardBody>
@@ -358,12 +366,20 @@ export function RecipeContent({ recipe }: { recipe: RecipeDetail }) {
       )}
 
       {recipe.watch_outs.length > 0 && (
-        <Card className="border-[#F2B7AD] bg-[#FFE0DA]">
-          <CardBody>
-            <div className="mb-2 font-semibold text-[#E6462D]">Things to watch out for</div>
-            <ul className="list-inside list-disc space-y-1 text-sm">
+        <Card className="recipe-guidance recipe-guidance--watch border-brand/40 bg-brand-soft">
+          <CardBody className="space-y-5">
+            <div>
+              <h2 className="text-xl font-semibold text-foreground">Things to watch out for</h2>
+              <p className="mt-1 text-sm text-muted">Common trouble spots to check before and while you cook.</p>
+            </div>
+            <ul className="grid gap-3 md:grid-cols-2" role="list">
               {recipe.watch_outs.map((item, idx) => (
-                <li key={idx}>{item}</li>
+                <li key={idx} className="recipe-guidance-item">
+                  <span className="recipe-guidance-marker recipe-guidance-marker--watch" aria-hidden>
+                    !
+                  </span>
+                  <span>{item}</span>
+                </li>
               ))}
             </ul>
           </CardBody>

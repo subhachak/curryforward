@@ -144,6 +144,55 @@ h1, h2, h3, .recipe-card-title {
   border-radius: .75rem;
 }
 
+.recipe-guidance-item {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  align-items: start;
+  gap: .75rem;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: .75rem;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  padding: .875rem;
+  color: var(--foreground);
+  font-size: .9375rem;
+  line-height: 1.65;
+}
+
+.recipe-guidance-marker {
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.recipe-guidance-marker--tip {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+
+.recipe-guidance-marker--watch {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+:root[data-theme="dark"] .recipe-guidance-item {
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  color: var(--foreground);
+}
+
+:root[data-theme="dark"] .recipe-guidance-marker--tip {
+  color: var(--accent);
+}
+
+:root[data-theme="dark"] .recipe-guidance-marker--watch {
+  color: #f8f1e7;
+}
+
 :root[data-theme="dark"] .theme-asset {
   content: url("/brand/cf/logos/symbol-dark.svg");
 }
