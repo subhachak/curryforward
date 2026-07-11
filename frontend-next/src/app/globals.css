@@ -209,6 +209,8 @@ h1, h2, h3, .recipe-card-title {
 .brand-desktop { display: none; }
 :root[data-theme="dark"] .brand-logo-light { display: none; }
 :root[data-theme="dark"] .brand-logo-dark.brand-mobile { display: block; }
+:root[data-theme="dark"] .footer-logo-light { display: none; }
+:root[data-theme="dark"] .footer-logo-dark { display: block; }
 
 @media (min-width: 640px) {
   .brand-mobile { display: none !important; }

@@ -496,13 +496,13 @@ export function AssistantSearchBar() {
             value={headerInput}
             onChange={(e) => setHeaderInput(e.target.value)}
             placeholder={assistantContext.headerPlaceholder}
-            className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-10 text-sm placeholder:text-muted shadow-sm focus:border-brand focus:outline-none focus:ring-[3px] focus:ring-brand/25"
+            className="min-h-11 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-12 text-sm placeholder:text-muted shadow-sm focus:border-brand focus:outline-none focus:ring-[3px] focus:ring-brand/25"
           />
           <button
             type="submit"
             aria-label="Open Ask CurryForward"
             title="Open Ask CurryForward"
-            className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md bg-surface-muted text-brand hover:bg-brand-soft"
+            className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg bg-surface-muted text-brand hover:bg-brand-soft"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/cf/icons/ui/ask.svg" alt="" className="h-4 w-4" />

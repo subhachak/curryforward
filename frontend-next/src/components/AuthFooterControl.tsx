@@ -18,7 +18,7 @@ export function AuthFooterControl() {
       onClick={() => router.push(isAdmin ? "/admin" : "/login")}
       title={isAdmin ? "Admin" : "Log in"}
       aria-label={isAdmin ? "Admin" : "Log in"}
-      className={`inline-flex h-6 w-6 items-center justify-center rounded-full transition-colors ${
+      className={`inline-flex h-11 w-11 items-center justify-center rounded-full transition-colors ${
         isAdmin ? "text-brand-hover hover:text-accent" : "text-muted/60 hover:text-muted"
       }`}
     >

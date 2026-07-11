@@ -3,476 +3,193 @@
 import Link from "next/link";
 import { FormEvent, useMemo } from "react";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { useAssistant } from "@/context/AssistantContext";
 import { useRecipes } from "@/context/RecipesContext";
-import { HeartIcon } from "@/components/ui/icons";
 import { publicRecipeHref } from "@/lib/recipeLinks";
+import type { RecipeSummary } from "@/lib/types";
 
-const SWEETS = [
-  "Nolen Gur Rosogolla",
-  "Patishapta",
-  "Sandesh",
-  "Langcha",
-  "Pantua",
-  "Chomchom",
-  "Kheer Kadam",
-  "Mihidana",
+const COLLECTIONS = [
+  { title: "Bengali Classics", query: "Bengali", icon: "/brand/cf/icons/brand/bengali-classics.svg", copy: "Home-style dishes with regional context." },
+  { title: "Bengali Sweets", query: "Sweets", icon: "/brand/cf/icons/brand/sweets.svg", copy: "Mishti, pitha, payesh, and jaggery favorites." },
+  { title: "Everyday Curries", query: "Curry", icon: "/brand/cf/icons/brand/regional.svg", copy: "Comforting recipes for the weekly table." },
+  { title: "Festive Cooking", query: "Festive", icon: "/brand/cf/icons/brand/festive.svg", copy: "Celebration dishes made manageable." },
+  { title: "Global Favorites", query: "Global", icon: "/brand/cf/icons/brand/collections.svg", copy: "Familiar dishes adapted for home cooks." },
 ];
 
-const PILLARS = [
-  {
-    title: "Indian Classics",
-    body: "Regional curries, dals, rice dishes, snacks, and festive meals.",
-    icon: "/brand/cf/icons/brand/regional.svg",
-    accent: "#7A2E2E",
-    bg: "#F6EFE3",
-  },
-  {
-    title: "Bengali Kitchen",
-    body: "Fish curries, bhajas, shukto, panch phoron flavors, and home-style comfort food.",
-    icon: "/brand/cf/icons/brand/bengali-classics.svg",
-    accent: "#4E6B4E",
-    bg: "#EDF1E9",
-  },
-  {
-    title: "Traditional Sweets",
-    body: "Mishti, pitha, payesh, sandesh, jaggery sweets, and festive desserts.",
-    icon: "/brand/cf/icons/brand/sweets.svg",
-    accent: "#D48C3A",
-    bg: "#F6E8D5",
-  },
-  {
-    title: "Global Recipes",
-    body: "Everyday dishes from around the world, adapted for home cooks.",
-    icon: "/brand/cf/icons/brand/collections.svg",
-    accent: "#7A2E2E",
-    bg: "#F0DDDD",
-  },
-];
-
-const CAPABILITIES = [
-  {
-    title: "Customize recipes",
-    body: "Make it less spicy, eggless, dairy-free, lower sugar, or scaled for guests.",
-    accent: "#FF6B00",
-  },
-  {
-    title: "Preserve versions",
-    body: "Keep the original recipe and save every adaptation as a new version.",
-    accent: "#5A2145",
-  },
-  {
-    title: "Understand nutrition",
-    body: "See nutrition estimates change when ingredients or servings change.",
-    accent: "#2E9B57",
-  },
-  {
-    title: "Cook with context",
-    body: "Learn why ingredients matter, what substitutions work, and where the dish comes from.",
-    accent: "#FFB000",
-  },
-];
-
-const DISCOVERY = [
-  { label: "Bengali", color: "#2E9B57", bg: "#DFF3E6" },
-  { label: "Sweets", color: "#D94F70", bg: "#FFE2EA" },
-  { label: "Festive", color: "#FF6B00", bg: "#FFE7D1" },
-  { label: "Vegetarian", color: "#2E9B57", bg: "#DFF3E6" },
-  { label: "Fish", color: "#5A2145", bg: "#F7DDED" },
-  { label: "Chicken", color: "#E6392E", bg: "#FFE0DA" },
-  { label: "Quick Dinner", color: "#7A3E1D", bg: "#FFE9D8" },
-  { label: "Jaggery", color: "#7A3E1D", bg: "#FFF0C1" },
-  { label: "Pitha", color: "#D94F70", bg: "#FFE2EA" },
-  { label: "No oven", color: "#5A2145", bg: "#F7DDED" },
-  { label: "Kid-friendly", color: "#FFB000", bg: "#FFF0C1" },
-  { label: "Low sugar", color: "#E6392E", bg: "#FFE0DA" },
-];
-
-const HARD_TO_FIND = [
-  "Joynagarer Moa",
-  "Narkel Naru",
-  "Patishapta",
-  "Malpoa",
-  "Labra",
-  "Shukto",
-  "Mochar Ghonto",
-  "Dhokar Dalna",
-];
-
-const HERO_CHIPS = [
-  { label: "Make it less sweet", color: "#D94F70", bg: "#FFE2EA" },
-  { label: "Scale for 12 people", color: "#FF6B00", bg: "#FFE7D1" },
-  { label: "Use pantry ingredients", color: "#2E9B57", bg: "#DFF3E6" },
-  { label: "Make it festive", color: "#FFB000", bg: "#FFF0C1" },
-  { label: "Make it eggless", color: "#5A2145", bg: "#F7DDED" },
-];
-
-const FALLBACK_RECIPES = [
-  {
-    name: "Nolen Gur Payesh",
-    region: "Bengali sweet",
-    time: "45 min",
-    occasion: "Winter",
-    href: "/recipes",
-  },
-  {
-    name: "Kolkata Chicken Rezala",
-    region: "Bengali",
-    time: "45 min",
-    occasion: "Dinner",
-    href: "/recipes",
-  },
-  {
-    name: "Patishapta",
-    region: "Pitha",
-    time: "50 min",
-    occasion: "Festive",
-    href: "/recipes",
-  },
-];
-
-function ClocheMark({ className = "" }: { className?: string }) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src="/brand/cf/logos/symbol-light.svg" alt="" aria-hidden className={`theme-app-asset ${className}`} />
-  );
-}
+const NEEDS = ["Weeknight dinner", "Chicken", "Vegetarian", "Festive", "Under 45 minutes", "Bengali", "Sweets", "Pantry-friendly"];
 
 export default function HomePage() {
   const { setOpen } = useAssistant();
   const { recipes } = useRecipes();
+  const published = useMemo(() => recipes.filter((recipe) => recipe.status !== "draft"), [recipes]);
+  const featured = published.find((recipe) => recipe.hero_image_url) || published[0] || null;
+  const popular = published.slice(0, 4);
 
-  const featured = useMemo(() => {
-    return (
-      recipes.find((recipe) => recipe.name.toLowerCase().includes("payesh")) ??
-      recipes.find((recipe) => recipe.name.toLowerCase().includes("rezala")) ??
-      recipes[0] ??
-      null
-    );
-  }, [recipes]);
-
-  const popular = useMemo(() => {
-    if (recipes.length === 0) return FALLBACK_RECIPES;
-    return recipes.slice(0, 3).map((recipe, index) => ({
-      name: recipe.name,
-      region: recipe.cuisine_tags[0] ?? recipe.category ?? "Recipe",
-      time: ["45 min", "35 min", "50 min"][index] ?? "40 min",
-      occasion: ["Home", "Dinner", "Festive"][index] ?? "Kitchen",
-      href: publicRecipeHref(recipe),
-      hero_image_url: recipe.hero_image_url,
-    }));
-  }, [recipes]);
-
-  function handleSubscribe(event: FormEvent<HTMLFormElement>) {
+  function subscribe(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
   }
 
   return (
-    <div className="heritage-home -mx-4 -my-6 bg-background text-foreground sm:-mx-6">
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <section className="heritage-frame grid min-h-[560px] gap-8 overflow-hidden rounded-[22px] border border-border bg-surface-muted p-6 sm:p-10 lg:grid-cols-[1fr_440px] lg:items-center">
-          <div className="max-w-2xl space-y-6">
-            <span className="inline-flex rounded-full bg-[#D94F70] px-3 py-1 text-xs font-semibold text-white">
-              Indian and global recipes with Bengali roots
-            </span>
-            <h1 className="max-w-xl text-5xl font-bold leading-tight text-[#2A160F] sm:text-6xl">
-              Recipes with roots. Made for today&apos;s kitchen.
-            </h1>
-            <p className="max-w-xl text-lg text-[#6B4A3A]">
-              Explore Indian favorites, Bengali classics, traditional sweets, and global recipes - then adapt them to
-              your taste, diet, and pantry with CurryForward.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/recipes"><Button>Explore recipes</Button></Link>
-              <Button variant="secondary" onClick={() => setOpen(true)}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/brand/cf/icons/ui/ask.svg" alt="" className="h-5 w-5" /> Ask CurryForward
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {HERO_CHIPS.map((chip) => (
-                <button
-                  key={chip.label}
-                  type="button"
-                  onClick={() => setOpen(true)}
-                  className="rounded-full px-3 py-1.5 text-xs font-semibold"
-                  style={{ backgroundColor: chip.bg, color: chip.color }}
-                >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
+    <div className="-mx-4 -my-6 overflow-x-hidden bg-background text-foreground sm:-mx-6">
+      <section className="mx-auto grid max-w-[1280px] gap-10 px-4 py-12 sm:px-8 sm:py-16 lg:grid-cols-[minmax(0,1fr)_minmax(420px,.9fr)] lg:items-center lg:py-20">
+        <div className="max-w-2xl">
+          <p className="mb-5 text-sm font-semibold uppercase tracking-[.18em] text-brand">Recipes with roots</p>
+          <h1 className="text-[clamp(2.75rem,5vw,5.5rem)] leading-[1.01] tracking-[-.04em]">
+            Recipes with roots.<br />Made for today&apos;s kitchen.
+          </h1>
+          <p className="mt-6 max-w-xl text-lg leading-8 text-muted">Cook the original. Make it yours. Keep every version.</p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href="/recipes?published=1"><Button>Explore recipes</Button></Link>
+            <Button variant="secondary" onClick={() => setOpen(true)}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/cf/icons/ui/ask.svg" alt="" className="h-5 w-5" />
+              Ask CurryForward
+            </Button>
           </div>
-
-          <div className="relative flex min-h-[360px] items-center justify-center overflow-hidden rounded-md border border-[#FFD2AE] bg-[#FFF8F1]">
-            <div className="absolute left-8 top-8 rounded-md bg-[#FFE2EA] px-3 py-2 text-sm font-semibold text-[#8F2645] shadow-sm">
-              Bengali sweets
-            </div>
-            <div className="absolute bottom-8 left-8 rounded-md bg-[#DFF3E6] px-3 py-2 text-sm font-semibold text-[#2E9B57] shadow-sm">
-              Pantry swaps
-            </div>
-            <div className="absolute bottom-10 right-8 rounded-md bg-[#FFF0C1] px-3 py-2 text-sm font-semibold text-[#7A3E1D] shadow-sm">
-              Festive batch
-            </div>
-            <div className="absolute left-12 top-24 h-24 w-24 rounded-full border-8 border-[#FFB000]" aria-hidden />
-            <div className="absolute bottom-20 right-16 h-20 w-20 rounded-full border-8 border-[#2E9B57]" aria-hidden />
-            <div className="absolute right-16 top-14 h-14 w-14 rounded-full bg-[#FFE0DA]" aria-hidden />
-            <ClocheMark className="relative z-10 h-48 w-auto rounded-[2.5rem] drop-shadow-sm sm:h-56" />
-          </div>
-        </section>
-
-        <section id="bengali-sweets" className="py-14">
-          <div className="sweets-feature-panel grid gap-6 rounded-md border border-[#F0B8C7] bg-[#FFE2EA] p-5 sm:p-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-            <div>
-              <div className="mb-2 text-sm font-semibold uppercase text-[#D94F70]">Featured pillar</div>
-              <h2 className="sweets-feature-copy text-3xl font-bold text-[#2A160F]">Traditional Bengali sweets, brought forward.</h2>
-              <p className="sweets-feature-copy mt-3 text-[#6B4A3A]">
-                From patishapta and payesh to sandesh and nolen gur classics, discover sweets many of us miss outside
-                India - explained for modern kitchens.
-              </p>
-              <a href="#hard-to-find">
-                <Button className="mt-5 bg-[#D94F70] text-white hover:bg-[#B83B59]">Explore sweets</Button>
-              </a>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {SWEETS.map((sweet, index) => {
-                const accents = ["#D94F70", "#7A3E1D", "#FFB000", "#2E9B57"];
-                const accent = accents[index % accents.length];
-                return (
-                  <Link
-                    key={sweet}
-                    href={`/recipes?q=${encodeURIComponent(sweet)}`}
-                    className="rounded-md border border-white/70 bg-[#FFF8F1] p-4 font-semibold text-[#2A160F] shadow-sm transition hover:-translate-y-0.5"
-                    style={{ borderLeft: `5px solid ${accent}` }}
-                  >
-                    {sweet}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        <section className="py-4">
-          <div className="mb-5">
-            <h2 className="text-3xl font-bold text-[#2A160F]">Recipe pillars</h2>
-            <p className="mt-1 text-[#6B4A3A]">Broad enough for global recipes, rooted enough to feel unmistakable.</p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {PILLARS.map((pillar) => (
-              <Link
-                key={pillar.title}
-                href="/recipes"
-                className="rounded-md border border-[#FFD2AE] bg-[#FFF0DD] p-5 transition hover:-translate-y-0.5 hover:shadow-sm"
-                style={{ borderTop: `5px solid ${pillar.accent}` }}
-              >
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-md" style={{ backgroundColor: pillar.bg }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={pillar.icon} alt="" aria-hidden className="h-8 w-8" />
-                </div>
-                <div className="text-lg font-bold text-[#2A160F]">{pillar.title}</div>
-                <p className="mt-2 text-sm leading-6 text-[#6B4A3A]">{pillar.body}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="py-14">
-          <div className="rounded-md bg-[#2A160F] px-5 py-10 text-[#FFF8F1] sm:px-8">
-            <div className="mb-6 max-w-2xl">
-              <h2 className="text-3xl font-bold">Cook from tradition. Adapt with confidence.</h2>
-              <p className="mt-2 text-[#FFF0DD]">
-                Change spice, sweetness, servings, ingredients, and dietary needs without losing the original recipe.
-              </p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {CAPABILITIES.map((item) => (
-                <div key={item.title} className="rounded-md border border-white/15 bg-white/5 p-4">
-                  <div className="mb-3 h-1.5 rounded-full" style={{ backgroundColor: item.accent }} />
-                  <div className="font-bold text-white">{item.title}</div>
-                  <p className="mt-2 text-sm leading-6 text-[#FFF0DD]">{item.body}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="grid gap-6 py-4 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
-          <div>
-            <div className="mb-2 text-sm font-semibold uppercase text-[#FF6B00]">Under the cloche this week</div>
-            <h2 className="text-3xl font-bold text-[#2A160F]">{featured?.name ?? "Nolen Gur Payesh"}</h2>
-            <p className="mt-3 max-w-md text-[#6B4A3A]">
-              {featured?.intro ??
-                "A winter Bengali classic made with date palm jaggery, milk, and fragrant rice."}
-            </p>
-          </div>
-
-          <div className="rounded-md border border-[#FFD2AE] bg-[#FFF0DD] p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <span className="rounded-full bg-[#FFB000] px-3 py-1 text-xs font-bold text-[#2A160F]">Featured</span>
-              <ClocheMark className="h-9 w-auto" />
-            </div>
-            <h3 className="text-2xl font-bold text-[#2A160F]">{featured?.name ?? "Nolen Gur Payesh"}</h3>
-            <div className="mt-4 flex flex-wrap gap-2 text-sm">
-              <span className="rounded-full bg-[#FFF8F1] px-3 py-1 text-[#6B4A3A]">45 min</span>
-              <span className="badge-green rounded-full bg-[#DFF3E6] px-3 py-1 font-semibold text-[#2E9B57]">Comforting</span>
-              <span className="badge-pink rounded-full bg-[#FFE2EA] px-3 py-1 font-semibold text-[#D94F70]">
-                {featured?.cuisine_tags[0] ?? "Bengali"}
-              </span>
-            </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Link href={featured ? publicRecipeHref(featured) : "/recipes"}>
-                <Button className="bg-[#FF6B00] text-white hover:bg-[#E6392E]">View Recipe</Button>
-              </Link>
-              <Button className="border border-[#5A2145] bg-[#F7DDED] text-[#5A2145] hover:bg-[#EECBE1]" onClick={() => setOpen(true)}>
-                Adapt this recipe
-              </Button>
-            </div>
-          </div>
-        </section>
-
-        <section className="py-14">
-          <div className="mb-5">
-            <h2 className="text-3xl font-bold text-[#2A160F]">Find recipes by craving, occasion, or ingredient</h2>
-            <p className="mt-1 text-[#6B4A3A]">Discovery for Indian, Bengali, sweets, and global cooking in one place.</p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {DISCOVERY.map((chip) => (
-              <Link
-                key={chip.label}
-                href={`/recipes?q=${encodeURIComponent(chip.label)}`}
-                className="rounded-full border px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5"
-                style={{ backgroundColor: chip.bg, borderColor: chip.color, color: chip.color }}
-              >
-                {chip.label}
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section id="hard-to-find" className="grid gap-6 rounded-md border border-[#FFD2AE] bg-[#FFF0DD] p-5 sm:p-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-          <div>
-            <h2 className="text-3xl font-bold text-[#2A160F]">Hard-to-find classics from home</h2>
-            <p className="mt-3 text-[#6B4A3A]">
-              Some recipes rarely make it into restaurant menus or packaged sweets abroad. CurryForward documents them
-              clearly so they can survive in modern kitchens.
-            </p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {HARD_TO_FIND.map((item, index) => {
-              const accent = ["#7A3E1D", "#D94F70", "#2E9B57", "#FF6B00"][index % 4];
-              return (
-                <Link
-                  key={item}
-                  href={`/recipes?q=${encodeURIComponent(item)}`}
-                  className="rounded-md bg-[#FFF8F1] p-4 font-semibold text-[#2A160F] shadow-sm transition hover:-translate-y-0.5"
-                  style={{ borderLeft: `5px solid ${accent}` }}
-                >
-                  {item}
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="py-14">
-          <div className="mb-5">
-            <h2 className="text-3xl font-bold text-[#2A160F]">Popular starting points</h2>
-            <p className="mt-1 text-[#6B4A3A]">Recipes to cook as written, then adapt when your kitchen asks for it.</p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            {popular.map((recipe, index) => {
-              const imageUrl =
-                "hero_image_url" in recipe && typeof recipe.hero_image_url === "string"
-                  ? recipe.hero_image_url
-                  : null;
-              const recipeAccent = ["#D94F70", "#2E9B57", "#FF6B00"][index] ?? "#FF6B00";
-              return (
-                <Link
-                  key={recipe.name}
-                  href={recipe.href}
-                  className="recipe-card overflow-hidden rounded-md border border-[#FFD2AE] bg-[#FFF0DD] shadow-sm transition hover:-translate-y-0.5"
-                  style={{ borderTop: `5px solid ${recipeAccent}` }}
-                >
-                  {imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={imageUrl} alt="" className="food-image h-36 w-full object-cover" />
-                  ) : (
-                    <div className="flex h-36 items-center justify-center bg-[#FFF8F1]">
-                      <ClocheMark className="h-20 w-auto" />
-                    </div>
-                  )}
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="recipe-card-title font-bold text-[#2A160F]">{recipe.name}</div>
-                      <HeartIcon className="h-5 w-5" style={{ color: recipeAccent }} />
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                      <span className="badge-pink rounded-full bg-[#F7DDED] px-2 py-1 font-medium text-[#5A2145]">{recipe.region}</span>
-                      <span className="recipe-card-duration py-1 font-semibold text-[#B84600]">{recipe.time}</span>
-                      <span className="badge-mint rounded-full bg-[#DFF3E6] px-2 py-1 font-medium text-[#2E9B57]">{recipe.occasion}</span>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="pb-14">
-          <div className="rounded-md border border-[#FFD2AE] bg-[#FFF8F1] p-5 shadow-sm sm:p-8">
-            <div className="grid gap-6 lg:grid-cols-[1fr_420px] lg:items-center">
-              <div className="flex gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#FFE2EA]">
-                  <ClocheMark className="h-10 w-auto" />
-                </div>
-                <div>
-                  <h2 className="text-3xl font-bold text-[#2A160F]">Get a recipe from home every week</h2>
-                  <p className="mt-2 text-[#6B4A3A]">
-                    Bengali sweets, Indian classics, and practical recipe adaptations delivered with clear steps and
-                    modern kitchen notes.
-                  </p>
-                </div>
-              </div>
-              <form onSubmit={handleSubscribe} className="flex flex-col gap-3 sm:flex-row">
-                <Input
-                  type="email"
-                  required
-                  placeholder="Email address"
-                  className="border-[#FFD2AE] bg-[#FFF0DD]"
-                  aria-label="Email address"
-                />
-                <Button type="submit" className="bg-[#FF6B00] text-white hover:bg-[#E6392E]">
-                  Subscribe
-                </Button>
-              </form>
-            </div>
-          </div>
-        </section>
-
-        <footer className="flex flex-wrap items-center justify-between gap-4 rounded-t-md bg-[#2A160F] px-5 py-6 text-sm text-[#FFF8F1]">
-          <div className="flex items-center gap-2">
-            <ClocheMark className="h-8 w-auto" />
-            <span className="font-bold text-white">CurryForward</span>
-            <span className="text-[#FFF0DD]">Recipes with roots, adapted for today.</span>
-          </div>
-          <div className="flex flex-wrap gap-4">
-            <Link href="/recipes" className="hover:text-[#FFB000]">
-              Recipes
+        </div>
+        <div className="relative">
+          <FoodImage recipe={featured} className="aspect-[4/4.6] w-full rounded-[1.5rem] shadow-[0_24px_60px_rgb(58_42_35/.14)]" priority />
+          {featured && (
+            <Link href={publicRecipeHref(featured)} className="absolute inset-x-5 bottom-5 rounded-[14px] border border-white/50 bg-surface/95 p-4 shadow-lg backdrop-blur-sm transition hover:-translate-y-0.5">
+              <div className="text-xs font-semibold uppercase tracking-[.14em] text-brand">Under the cloche this week</div>
+              <div className="mt-1 text-lg font-semibold text-foreground">{featured.name}</div>
             </Link>
-            <a href="#bengali-sweets" className="hover:text-[#FFB000]">
-              Bengali Sweets
-            </a>
-            <a href="#hard-to-find" className="hover:text-[#FFB000]">
-              Classics
-            </a>
-            <button type="button" onClick={() => setOpen(true)} className="hover:text-[#FFB000]">
-              Ask
-            </button>
+          )}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-[1280px] px-4 py-12 sm:px-8">
+        <SectionHeading eyebrow="Explore" title="Find your way into the kitchen." action="View all recipes" href="/recipes?published=1" />
+        <div className="mt-7 flex snap-x gap-4 overflow-x-auto pb-3 sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-5">
+          {COLLECTIONS.map((collection, index) => (
+            <Link key={collection.title} href={`/recipes?published=1&q=${encodeURIComponent(collection.query)}`} className="group min-w-[78%] snap-start overflow-hidden rounded-[14px] border border-border bg-surface shadow-sm sm:min-w-0">
+              <FoodImage recipe={published[index]} className="aspect-[4/3] w-full transition duration-200 group-hover:scale-[1.025]" />
+              <div className="p-4">
+                <div className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={collection.icon} alt="" className="h-5 w-5" />
+                  <h3 className="text-lg font-semibold">{collection.title}</h3>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-muted">{collection.copy}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section id="bengali-sweets" className="mx-auto max-w-[1280px] px-4 py-14 sm:px-8">
+        <div className="grid overflow-hidden rounded-[1.5rem] bg-surface-muted lg:grid-cols-[1.05fr_.95fr] lg:items-center">
+          <FoodImage recipe={published.find((recipe) => recipe.name.toLowerCase().includes("bengali")) || published[1]} className="aspect-[4/3] h-full w-full" />
+          <div className="p-7 sm:p-10 lg:p-14">
+            <p className="text-sm font-semibold uppercase tracking-[.16em] text-success">Bengali kitchen</p>
+            <h2 className="mt-3 text-[clamp(1.9rem,3vw,2.75rem)] leading-tight">Traditional Bengali recipes, clearly preserved.</h2>
+            <p className="mt-5 max-w-xl leading-7 text-muted">Discover classics, sweets, techniques, and regional dishes with the context that helps you cook them confidently.</p>
+            <div className="mt-7 flex flex-col items-start gap-3 text-sm font-semibold">
+              <Link href="/recipes?published=1&q=Bengali" className="inline-flex min-h-11 items-center text-brand hover:underline">Explore Bengali classics →</Link>
+              <Link href="/recipes?published=1&q=Sweets" className="inline-flex min-h-11 items-center text-brand hover:underline">Discover Bengali sweets →</Link>
+              <Link href="/recipes?published=1&q=Techniques" className="inline-flex min-h-11 items-center text-brand hover:underline">Learn regional techniques →</Link>
+            </div>
           </div>
-        </footer>
-      </div>
+        </div>
+      </section>
+
+      <section className="border-y border-border bg-surface">
+        <div className="mx-auto grid max-w-[1280px] gap-10 px-4 py-16 sm:px-8 lg:grid-cols-[.8fr_1.2fr] lg:items-center">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[.16em] text-accent-hover">Recipe adaptation</p>
+            <h2 className="mt-3 text-[clamp(1.9rem,3vw,2.75rem)] leading-tight">Cook the original. Make it yours.</h2>
+            <p className="mt-5 max-w-lg leading-7 text-muted">Adjust sweetness, spice, serving size, ingredients, or dietary needs without losing the original recipe.</p>
+            <Button className="mt-7" onClick={() => setOpen(true)}>Adapt a recipe</Button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] sm:items-center">
+            {['Original recipe', 'Less sweet', 'Dairy-free', 'Party batch'].map((step, index) => (
+              <div key={step} className="contents">
+                <div className={`rounded-[14px] border p-4 ${index === 0 ? 'border-brand bg-brand-soft' : 'border-border bg-surface-muted'}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={index === 0 ? "/brand/cf/icons/ui/version.svg" : "/brand/cf/icons/ui/adapt.svg"} alt="" className="mb-3 h-5 w-5" />
+                  <div className="text-sm font-semibold text-foreground">{step}</div>
+                </div>
+                {index < 3 && <span className="hidden text-center text-xl text-muted sm:block" aria-hidden>→</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {featured && (
+        <section className="mx-auto max-w-[1280px] px-4 py-16 sm:px-8">
+          <div className="grid gap-8 lg:grid-cols-[1.15fr_.85fr] lg:items-center">
+            <FoodImage recipe={featured} className="aspect-[16/10] w-full rounded-[1.25rem]" />
+            <div className="lg:-ml-20 lg:rounded-[1.25rem] lg:border lg:border-border lg:bg-surface lg:p-10 lg:shadow-lg">
+              <p className="text-xs font-semibold uppercase tracking-[.16em] text-brand">Under the cloche this week</p>
+              <h2 className="mt-3 text-[clamp(2rem,3vw,3rem)] leading-tight">{featured.name}</h2>
+              {featured.intro && <p className="mt-4 line-clamp-3 leading-7 text-muted">{featured.intro}</p>}
+              <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted">
+                <span>{featured.category || "Recipe"}</span>
+                {featured.cuisine_tags[0] && <span>{featured.cuisine_tags[0]}</span>}
+              </div>
+              <div className="mt-7 flex flex-wrap gap-3">
+                <Link href={publicRecipeHref(featured)}><Button>View recipe</Button></Link>
+                <Button variant="secondary" onClick={() => setOpen(true)}>Adapt this recipe</Button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="mx-auto max-w-[1280px] px-4 py-12 sm:px-8">
+        <SectionHeading eyebrow="Browse by need" title="Start with what matters today." action="View all" href="/recipes?published=1" />
+        <div className="mt-6 flex gap-2 overflow-x-auto pb-2">
+          {NEEDS.map((need) => <Link key={need} href={`/recipes?published=1&q=${encodeURIComponent(need)}`} className="min-h-11 shrink-0 rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-brand hover:text-brand">{need}</Link>)}
+        </div>
+      </section>
+
+      {popular.length > 0 && (
+        <section className="mx-auto max-w-[1280px] px-4 py-16 sm:px-8">
+          <SectionHeading eyebrow="Popular recipes" title="Worth cooking next." action="Explore all" href="/recipes?published=1" />
+          <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {popular.map((recipe) => <RecipeTile key={recipe.recipe_id} recipe={recipe} />)}
+          </div>
+        </section>
+      )}
+
+      <section className="mx-auto max-w-[1280px] px-4 py-16 sm:px-8">
+        <div className="grid gap-7 rounded-[1.25rem] bg-surface-muted p-7 sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <h2 className="text-2xl sm:text-3xl">Keep a little more flavor in your week.</h2>
+            <p className="mt-3 max-w-2xl text-muted">Seasonal recipes, Bengali classics, and thoughtful adaptations, delivered occasionally.</p>
+          </div>
+          <form onSubmit={subscribe} className="w-full max-w-md">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <label htmlFor="newsletter-email" className="sr-only">Email address</label>
+              <input id="newsletter-email" type="email" required placeholder="Email address" className="min-h-11 flex-1 rounded-lg border border-border bg-surface px-4 text-foreground placeholder:text-muted" />
+              <Button type="submit">Subscribe</Button>
+            </div>
+            <p className="mt-2 text-xs text-muted">Occasional notes only. Unsubscribe whenever you like.</p>
+          </form>
+        </div>
+      </section>
     </div>
   );
+}
+
+function SectionHeading({ eyebrow, title, action, href }: { eyebrow: string; title: string; action: string; href: string }) {
+  return <div className="flex items-end justify-between gap-6"><div><p className="text-xs font-semibold uppercase tracking-[.16em] text-brand">{eyebrow}</p><h2 className="mt-2 text-[clamp(1.75rem,3vw,2.75rem)] leading-tight">{title}</h2></div><Link href={href} className="hidden min-h-11 shrink-0 items-center text-sm font-semibold text-brand hover:underline sm:inline-flex">{action} →</Link></div>;
+}
+
+function FoodImage({ recipe, className, priority = false }: { recipe?: RecipeSummary | null; className: string; priority?: boolean }) {
+  if (recipe?.hero_image_url) return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={recipe.hero_image_url} alt={recipe.name} fetchPriority={priority ? "high" : "auto"} className={`bg-surface-muted object-cover ${className}`} />
+  );
+  return (
+    <div className={`flex items-center justify-center bg-surface-muted ${className}`} aria-label="Recipe image unavailable">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brand/cf/logos/symbol-light.svg" alt="" className="theme-asset h-20 w-auto opacity-70" />
+    </div>
+  );
+}
+
+function RecipeTile({ recipe }: { recipe: RecipeSummary }) {
+  return <Link href={publicRecipeHref(recipe)} className="group overflow-hidden rounded-[14px] border border-border bg-surface shadow-sm"><FoodImage recipe={recipe} className="aspect-[4/3] w-full transition duration-200 group-hover:scale-[1.025]" /><div className="p-4"><h3 className="text-xl font-semibold leading-snug">{recipe.name}</h3><p className="mt-2 text-sm text-muted">{recipe.cuisine_tags[0] || recipe.category || "Recipe"}</p></div></Link>;
 }

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Link from "next/link";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { ToastProvider } from "@/context/ToastContext";
@@ -68,11 +69,22 @@ export default function RootLayout({
                 <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
                   {children}
                 </main>
-                <footer className="heritage-footer relative flex items-center justify-center gap-2 border-t border-border px-16 py-6 text-center text-xs text-muted">
-                  <span>Curry Forward · Recipes with roots, adapted for today.</span>
-                  <span className="absolute right-4">
-                    <AuthFooterControl />
-                  </span>
+                <footer className="heritage-footer relative border-t border-border bg-surface px-4 py-10 sm:px-6">
+                  <div className="mx-auto grid max-w-[1280px] gap-8 sm:grid-cols-[1fr_auto] sm:items-end">
+                    <div>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/brand/cf/logos/logo-primary-light.svg" alt="Curry Forward" className="footer-logo-light h-12 w-auto" />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/brand/cf/logos/logo-primary-dark.svg" alt="Curry Forward" className="footer-logo-dark hidden h-12 w-auto" />
+                      <p className="mt-4 text-sm text-muted">Recipes with roots, adapted for today.</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-muted">
+                      <Link href="/recipes?published=1" className="inline-flex min-h-11 items-center hover:text-brand">Recipes</Link>
+                      <Link href="/#bengali-sweets" className="inline-flex min-h-11 items-center hover:text-brand">Bengali Kitchen</Link>
+                      <Link href="/recipes?published=1&q=Collections" className="inline-flex min-h-11 items-center hover:text-brand">Collections</Link>
+                      <span><AuthFooterControl /></span>
+                    </div>
+                  </div>
                 </footer>
               </AssistantProvider>
             </RecipesProvider>

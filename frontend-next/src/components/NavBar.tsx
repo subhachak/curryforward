@@ -25,7 +25,7 @@ function RecipesMenu() {
     <div className="relative" onMouseEnter={openNow} onMouseLeave={closeSoon}>
       <Link
         href="/recipes?published=1"
-        className="text-sm font-medium text-foreground hover:text-brand-hover"
+        className="inline-flex min-h-11 items-center text-sm font-medium text-foreground hover:text-brand-hover"
       >
         Recipes
       </Link>
@@ -33,14 +33,14 @@ function RecipesMenu() {
         <div className="absolute left-0 top-full z-50 mt-2 w-48 rounded-lg border border-border bg-surface py-1.5 shadow-lg">
           <Link
             href="/recipes?published=1"
-            className="block px-3 py-1.5 text-sm text-foreground hover:bg-surface-muted"
+            className="block px-3 py-3 text-sm text-foreground hover:bg-surface-muted"
           >
             All recipes
           </Link>
-          <Link href="/#bengali-sweets" className="block px-3 py-1.5 text-sm text-foreground hover:bg-surface-muted">
+          <Link href="/#bengali-sweets" className="block px-3 py-3 text-sm text-foreground hover:bg-surface-muted">
             Bengali Sweets
           </Link>
-          <Link href="/#hard-to-find" className="block px-3 py-1.5 text-sm text-foreground hover:bg-surface-muted">
+          <Link href="/#hard-to-find" className="block px-3 py-3 text-sm text-foreground hover:bg-surface-muted">
             Classics
           </Link>
           <div className="my-1 border-t border-border" />
@@ -48,7 +48,7 @@ function RecipesMenu() {
             <Link
               key={c}
               href={`/recipes?published=1&category=${encodeURIComponent(c)}`}
-              className="block px-3 py-1.5 text-sm capitalize text-foreground hover:bg-surface-muted"
+              className="block px-3 py-3 text-sm capitalize text-foreground hover:bg-surface-muted"
             >
               {c}
             </Link>
@@ -70,7 +70,7 @@ function MobileMenu() {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Close menu" : "Open menu"}
-        className="flex h-8 w-8 shrink-0 items-center justify-center text-foreground"
+        className="flex h-11 w-11 shrink-0 items-center justify-center text-foreground"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           {open ? (
@@ -147,7 +147,7 @@ export function NavBar() {
   return (
     <header className="heritage-header sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur">
       <div className="relative mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-5 sm:px-6">
-        <Link href="/" className="flex shrink-0 items-center" aria-label="Curry Forward home">
+        <Link href="/" className="flex min-h-11 min-w-11 shrink-0 items-center justify-center" aria-label="Curry Forward home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/cf/logos/symbol-micro-light.svg" alt="Curry Forward" className="brand-logo-light brand-mobile h-10 w-10" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -159,7 +159,7 @@ export function NavBar() {
         </Link>
 
         <nav className="hidden items-center gap-5 sm:flex">
-          <Link href="/" className="text-sm font-medium text-foreground hover:text-brand-hover">
+          <Link href="/" className="inline-flex min-h-11 items-center text-sm font-medium text-foreground hover:text-brand-hover">
             Home
           </Link>
           <RecipesMenu />
@@ -167,7 +167,7 @@ export function NavBar() {
             href="/admin"
             aria-hidden={!showWorkspace}
             tabIndex={showWorkspace ? undefined : -1}
-            className={`text-sm font-medium text-foreground hover:text-brand-hover ${
+            className={`inline-flex min-h-11 items-center text-sm font-medium text-foreground hover:text-brand-hover ${
               showWorkspace ? "" : "pointer-events-none invisible"
             }`}
           >
