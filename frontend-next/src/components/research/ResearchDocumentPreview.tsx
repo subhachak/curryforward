@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import type { DragEvent, ReactNode } from "react";
+import { useRef, useState } from "react";
+import type { ChangeEvent, DragEvent, ReactNode } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { IconButton } from "@/components/ui/IconButton";
-import { CheckIcon, PlusIcon, RefreshIcon, SparklesIcon, XIcon } from "@/components/ui/icons";
+import { CheckIcon, PlusIcon, RefreshIcon, SparklesIcon, UploadIcon, XIcon } from "@/components/ui/icons";
 import { NutritionCard } from "@/components/NutritionCard";
 import { RecipeContent } from "@/components/RecipeContent";
 import { CopyAssistField } from "@/components/research/CopyAssistField";
 import { useRecipes } from "@/context/RecipesContext";
+import { useToast } from "@/context/ToastContext";
+import { api, ApiError } from "@/lib/api";
 import { smartUnitChoices } from "@/lib/ingredientUnits";
 import { estimatedYieldGramsFromComponents } from "@/lib/recipeNutrition";
 import type { Ingredient, PanConversion, RecipeResearchDetail, ResearchPatchPayload } from "@/lib/types";
@@ -419,6 +421,7 @@ export function ResearchDocumentPreview({
   highlightedFields = [],
   onClearHighlights,
 }: ResearchDocumentPreviewProps) {
+  const { push } = useToast();
   const { categories } = useRecipes();
   const highlightSet = new Set(highlightedFields);
   const isHighlighted = (fields: string[]) => fields.some((field) => highlightSet.has(field));
@@ -448,6 +451,10 @@ export function ResearchDocumentPreview({
   const [steps, setSteps] = useState<StepRow[]>(() => toStepRows(recipe));
   const [dragging, setDragging] = useState<DragState>(null);
   const [heroImageUrl, setHeroImageUrl] = useState(recipe.hero_image_url);
+  const [uploadingHero, setUploadingHero] = useState(false);
+  const [uploadingStep, setUploadingStep] = useState<number | null>(null);
+  const heroFileInputRef = useRef<HTMLInputElement | null>(null);
+  const stepFileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const nutritionIssues = recipe.nutrition?.nutrition_issues || [];
   const nutritionIssueForIngredient = (ingredientName: string) =>
     nutritionIssues.find((issue) => normalizeIssueName(issue.ingredient) === normalizeIssueName(ingredientName));
@@ -656,9 +663,42 @@ export function ResearchDocumentPreview({
       return next;
     });
   }
+  async function handleHeroImageSelected(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingHero(true);
+    try {
+      const { url } = await api.uploadImage(file);
+      setHeroImageUrl(url);
+      onCommit({ hero_image_url: url });
+    } catch (err) {
+      push(err instanceof ApiError ? err.message : "Image upload failed", "error");
+    } finally {
+      setUploadingHero(false);
+    }
+  }
   function handleHeroImageRemove() {
     setHeroImageUrl(null);
     onCommit({ hero_image_url: null });
+  }
+  async function handleStepImageSelected(idx: number, e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingStep(idx);
+    try {
+      const { url } = await api.uploadImage(file);
+      setSteps((rows) => {
+        const next = rows.map((s, i) => (i === idx ? { ...s, image_url: url } : s));
+        commitSteps(next);
+        return next;
+      });
+    } catch (err) {
+      push(err instanceof ApiError ? err.message : "Image upload failed", "error");
+    } finally {
+      setUploadingStep(null);
+    }
   }
 
   return (
@@ -718,6 +758,19 @@ export function ResearchDocumentPreview({
                   No image
                 </div>
               )}
+              <input
+                ref={heroFileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={handleHeroImageSelected}
+              />
+              <IconButton
+                label={heroImageUrl ? "Replace hero image" : "Upload hero image"}
+                icon={<UploadIcon />}
+                loading={uploadingHero}
+                onClick={() => heroFileInputRef.current?.click()}
+              />
               {heroImageUrl && (
                 <IconButton label="Remove hero image" icon={<XIcon />} variant="ghost" onClick={handleHeroImageRemove} />
               )}
@@ -1025,6 +1078,21 @@ export function ResearchDocumentPreview({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={step.image_url} alt="" className="h-16 w-16 rounded-md border border-border object-cover" />
                 ) : null}
+                <input
+                  ref={(el) => {
+                    stepFileInputRefs.current[si] = el;
+                  }}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(e) => handleStepImageSelected(si, e)}
+                />
+                <IconButton
+                  label={step.image_url ? "Replace step image" : "Add step image"}
+                  icon={<UploadIcon />}
+                  loading={uploadingStep === si}
+                  onClick={() => stepFileInputRefs.current[si]?.click()}
+                />
               </div>
             </div>
           ))}
