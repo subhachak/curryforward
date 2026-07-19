@@ -7,6 +7,7 @@ import { AutoResearchPanel } from "@/components/research/AutoResearchPanel";
 import { CopyAssistField } from "@/components/research/CopyAssistField";
 import { RecipeManagementTable } from "@/components/admin/RecipeManagementTable";
 import { TrashPanel } from "@/components/admin/TrashPanel";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { IconButton } from "@/components/ui/IconButton";
@@ -25,7 +26,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { useRecipes } from "@/context/RecipesContext";
 import { api, ApiError } from "@/lib/api";
-import { adminRecipeHref, adminRecipeRef, publicRecipeHref } from "@/lib/recipeLinks";
+import { adminRecipeHref, adminRecipeRef } from "@/lib/recipeLinks";
 import type {
   AdminAuditLog,
   AdminRecipeSummary,
@@ -463,8 +464,6 @@ export default function AdminPage() {
           publishedCount={publishedCount}
           draftCount={draftCount}
           pendingFeedbackCount={pendingFeedbackCount}
-          totalViews={totalViews}
-          totalDownloads={totalDownloads}
           trashCount={trash.length}
           auditLog={auditLog}
           loadingAnalytics={loadingAnalytics}
@@ -518,9 +517,8 @@ export default function AdminPage() {
       {activeTab === "analytics" && (
         <AnalyticsTab
           topRecipes={topRecipes}
-          draftCount={draftCount}
-          pendingFeedback={pendingFeedbackCount}
-          trashCount={trash.length}
+          totalViews={totalViews}
+          totalDownloads={totalDownloads}
           loadingAnalytics={loadingAnalytics}
           llmUsage={llmUsage}
           siteAnalytics={siteAnalytics}
@@ -542,8 +540,6 @@ function DashboardTab({
   publishedCount,
   draftCount,
   pendingFeedbackCount,
-  totalViews,
-  totalDownloads,
   trashCount,
   auditLog,
   loadingAnalytics,
@@ -553,8 +549,6 @@ function DashboardTab({
   publishedCount: number;
   draftCount: number;
   pendingFeedbackCount: number;
-  totalViews: number;
-  totalDownloads: number;
   trashCount: number;
   auditLog: AdminAuditLog[];
   loadingAnalytics: boolean;
@@ -568,7 +562,6 @@ function DashboardTab({
   const activeDrafts = [...drafts]
     .sort((a, b) => timestampValue(b.updated_at) - timestampValue(a.updated_at))
     .slice(0, 6);
-  const topRecipe = [...published].sort((a, b) => b.view_count + b.download_count - (a.view_count + a.download_count))[0];
 
   const attentionItems = [
     {
@@ -617,7 +610,7 @@ function DashboardTab({
           { label: "Published", value: publishedCount, detail: "Live now", tab: "recipes" as WorkspaceTab },
           { label: "Drafts", value: draftCount, detail: `${staleDrafts.length} stale`, tab: "recipes" as WorkspaceTab },
           { label: "Feedback", value: pendingFeedbackCount, detail: "Needs review", tab: "feedback" as WorkspaceTab },
-          { label: "Traffic", value: totalViews + totalDownloads, detail: "All-time actions", tab: "analytics" as WorkspaceTab },
+          { label: "Trash", value: trashCount, detail: "Ready for cleanup", tab: "trash" as WorkspaceTab },
         ].map((metric) => (
           <button key={metric.label} type="button" onClick={() => onNavigate(metric.tab)} className="bg-white p-4 text-left transition hover:bg-surface focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand/40">
             <span className="text-xs font-medium text-muted">{metric.label}</span>
@@ -632,7 +625,7 @@ function DashboardTab({
           <CardBody>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="font-semibold text-ink">Priority queue</div>
+                <div className="font-semibold text-ink">Needs attention</div>
                 <p className="text-xs text-muted">Only items that need action.</p>
               </div>
               <span className="rounded-full bg-warning/15 px-2 py-1 text-xs font-semibold text-warning">{openAttentionItems.length}</span>
@@ -690,37 +683,24 @@ function DashboardTab({
         </Card>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-        <Card className="bg-white">
-          <CardBody>
-            <div className="flex items-center justify-between gap-3">
-              <div className="font-semibold text-ink">Recent activity</div>
-              <button type="button" onClick={() => onNavigate("analytics")} className="text-xs font-semibold text-accent hover:underline">View analytics</button>
+      <Card className="bg-white">
+        <CardBody>
+          <div className="flex items-center justify-between gap-3">
+            <div className="font-semibold text-ink">Recent activity</div>
+            <button type="button" onClick={() => onNavigate("analytics")} className="text-xs font-semibold text-accent hover:underline">View analytics</button>
+          </div>
+          {loadingAnalytics ? <PageSpinner label="Loading activity..." /> : auditLog.length ? (
+            <div className="mt-3 divide-y divide-border">
+              {auditLog.slice(0, 4).map((row) => (
+                <div key={row.log_id} className="flex items-center justify-between gap-4 py-2.5 text-sm">
+                  <span className="capitalize text-foreground">{row.action.replaceAll("_", " ")}</span>
+                  <span className="shrink-0 text-xs text-muted">{formatDate(row.created_at)}</span>
+                </div>
+              ))}
             </div>
-            {loadingAnalytics ? <PageSpinner label="Loading activity..." /> : auditLog.length ? (
-              <div className="mt-3 divide-y divide-border">
-                {auditLog.slice(0, 4).map((row) => (
-                  <div key={row.log_id} className="flex items-center justify-between gap-4 py-2.5 text-sm">
-                    <span className="capitalize text-foreground">{row.action.replaceAll("_", " ")}</span>
-                    <span className="shrink-0 text-xs text-muted">{formatDate(row.created_at)}</span>
-                  </div>
-                ))}
-              </div>
-            ) : <div className="mt-4 text-sm text-muted">No activity yet.</div>}
-          </CardBody>
-        </Card>
-
-        <Card className="bg-white">
-          <CardBody>
-            <div className="font-semibold text-ink">Traffic</div>
-            <div className="mt-3 flex gap-6">
-              <DashboardFact label="Views" value={totalViews} />
-              <DashboardFact label="Downloads" value={totalDownloads} />
-            </div>
-            {topRecipe && <Link href={publicRecipeHref(topRecipe)} className="mt-4 block truncate border-t border-border pt-3 text-xs text-muted hover:text-accent">Top: {topRecipe.name}</Link>}
-          </CardBody>
-        </Card>
-      </div>
+          ) : <div className="mt-4 text-sm text-muted">No activity yet.</div>}
+        </CardBody>
+      </Card>
     </div>
   );
 }
@@ -858,44 +838,83 @@ function NewRecipeTab({
   onImport: (rows: RecipeImportRow[]) => void;
   onClear: () => void;
 }) {
+  const [mode, setMode] = useState<"ai" | "import">("ai");
+  const importActive = Boolean(preview || previewingImport);
+
   return (
     <div className="space-y-4">
-      <Card className="bg-white">
-        <CardBody className="space-y-4">
-          <form onSubmit={onSubmit} className="space-y-3">
-            <CopyAssistField
-              fieldLabel="new recipe research prompt"
-              value={prompt}
-              onChange={onPromptChange}
-              placeholder="A dish name, a longer description, or paste a draft recipe to refine..."
-              multiline
-              rows={8}
-            />
-            <div className="flex flex-wrap gap-2">
-              {promptExamples.map((example) => (
-                <button
-                  key={example}
-                  type="button"
-                  onClick={() => onPromptChange(example)}
-                  className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted transition-colors hover:bg-brand-soft hover:text-ink focus:outline-none focus:ring-2 focus:ring-brand/40"
-                >
-                  {example}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <IconButton
-                type="submit"
-                label="Start new draft"
-                icon={<SendIcon />}
-                size="md"
-                loading={starting}
-                disabled={!prompt.trim()}
+      <div
+        className="relative grid h-11 w-80 grid-cols-2 rounded-full border border-border bg-surface p-1 text-sm shadow-inner"
+        role="switch"
+        aria-checked={mode === "import"}
+        aria-label="Choose how to create a recipe"
+      >
+        <span
+          className={`absolute bottom-1 left-1 top-1 w-[calc(50%-0.25rem)] rounded-full bg-brand shadow-sm transition-transform duration-200 ${
+            mode === "import" ? "translate-x-full" : "translate-x-0"
+          }`}
+        />
+        <button
+          type="button"
+          onClick={() => setMode("ai")}
+          className={`relative z-10 whitespace-nowrap rounded-full px-3 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-brand/40 ${
+            mode === "ai" ? "text-ink" : "text-muted hover:text-foreground"
+          }`}
+          aria-pressed={mode === "ai"}
+        >
+          Create with AI
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("import")}
+          className={`relative z-10 whitespace-nowrap rounded-full px-3 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-brand/40 ${
+            mode === "import" ? "text-ink" : "text-muted hover:text-foreground"
+          }`}
+          aria-pressed={mode === "import"}
+        >
+          Import spreadsheet
+          {importActive && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent" />}
+        </button>
+      </div>
+
+      {mode === "ai" && (
+        <Card className="bg-white">
+          <CardBody className="space-y-4">
+            <form onSubmit={onSubmit} className="space-y-3">
+              <CopyAssistField
+                fieldLabel="new recipe research prompt"
+                value={prompt}
+                onChange={onPromptChange}
+                placeholder="A dish name, a longer description, or paste a draft recipe to refine..."
+                multiline
+                rows={8}
               />
-            </div>
-          </form>
-        </CardBody>
-      </Card>
+              <div className="flex flex-wrap gap-2">
+                {promptExamples.map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    onClick={() => onPromptChange(example)}
+                    className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted transition-colors hover:bg-brand-soft hover:text-ink focus:outline-none focus:ring-2 focus:ring-brand/40"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <IconButton
+                  type="submit"
+                  label="Start new draft"
+                  icon={<SendIcon />}
+                  size="md"
+                  loading={starting}
+                  disabled={!prompt.trim()}
+                />
+              </div>
+            </form>
+          </CardBody>
+        </Card>
+      )}
 
       {activeDraft && (
         <Card className="bg-white">
@@ -916,15 +935,17 @@ function NewRecipeTab({
         </Card>
       )}
 
-      <ImportTab
-        preview={preview}
-        status={importStatus}
-        previewing={previewingImport}
-        importing={importing}
-        onPreview={onPreview}
-        onImport={onImport}
-        onClear={onClear}
-      />
+      {mode === "import" && (
+        <ImportTab
+          preview={preview}
+          status={importStatus}
+          previewing={previewingImport}
+          importing={importing}
+          onPreview={onPreview}
+          onImport={onImport}
+          onClear={onClear}
+        />
+      )}
     </div>
   );
 }
@@ -1246,7 +1267,7 @@ function FeedbackReviewPanel({
             {items.map((item) => {
               const busy = pendingId === item.feedback_id;
               return (
-                <div key={item.feedback_id} className="rounded-md border border-border bg-surface p-3">
+                <div key={item.feedback_id} className="rounded-md border border-border bg-surface p-2.5 transition-colors hover:bg-surface-muted/60">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-3">
                       <input
@@ -1264,11 +1285,11 @@ function FeedbackReviewPanel({
                         aria-label={`Select feedback for ${item.recipe_name}`}
                       />
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-foreground">{item.recipe_name}</div>
-                        <div className="mt-1 text-xs text-muted">
-                          {item.author_name || "Anonymous"}
-                          {item.rating ? ` · ${item.rating}/5` : ""}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-sm font-medium text-foreground">{item.recipe_name}</span>
+                          {item.rating != null && <Badge tone="neutral">{item.rating}/5</Badge>}
                         </div>
+                        <div className="mt-1 text-xs text-muted">{item.author_name || "Anonymous"}</div>
                       </div>
                     </div>
                     <div className="flex gap-1.5">
@@ -1335,18 +1356,16 @@ function TrashTab({
 
 function AnalyticsTab({
   topRecipes,
-  draftCount,
-  pendingFeedback,
-  trashCount,
+  totalViews,
+  totalDownloads,
   loadingAnalytics,
   llmUsage,
   siteAnalytics,
   auditLog,
 }: {
   topRecipes: AdminRecipeSummary[];
-  draftCount: number;
-  pendingFeedback: number;
-  trashCount: number;
+  totalViews: number;
+  totalDownloads: number;
   loadingAnalytics: boolean;
   llmUsage: LLMUsageResponse | null;
   siteAnalytics: SiteAnalytics | null;
@@ -1379,7 +1398,11 @@ function AnalyticsTab({
       <Card className="bg-white xl:col-span-2">
         <CardBody>
           <div className="font-semibold">Recipe engagement</div>
-          <div className="mt-3 space-y-3">
+          <div className="mt-3 flex gap-6">
+            <DashboardFact label="Views" value={totalViews} />
+            <DashboardFact label="Downloads" value={totalDownloads} />
+          </div>
+          <div className="mt-4 space-y-3">
             {topRecipes.length > 0 ? (
               topRecipes.map((recipe) => (
                 <div
@@ -1406,23 +1429,13 @@ function AnalyticsTab({
       <Card className="bg-white">
         <CardBody>
           <div className="font-semibold">Users</div>
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <div className="rounded-md border border-border bg-surface p-3">
-              <div className="text-xs uppercase text-muted">Auth model</div>
-              <div className="mt-1 text-lg font-semibold text-ink">1 admin</div>
-            </div>
-            <div className="rounded-md border border-border bg-surface p-3">
-              <div className="text-xs uppercase text-muted">Guest accounts</div>
-              <div className="mt-1 text-lg font-semibold text-ink">Not tracked</div>
-            </div>
-          </div>
-          <p className="mt-3 text-sm text-muted">
-            User-level analytics need account/session instrumentation before this can show active users or retention.
+          <p className="mt-2 text-sm text-muted">
+            Single-admin auth today — no guest accounts or sessions to report yet.
           </p>
         </CardBody>
       </Card>
 
-      <Card className="bg-white xl:col-span-2">
+      <Card className="bg-white xl:col-span-3">
         <CardBody>
           <div className="font-semibold">Model usage</div>
           {loadingAnalytics ? (
@@ -1467,26 +1480,6 @@ function AnalyticsTab({
               </div>
             </>
           )}
-        </CardBody>
-      </Card>
-
-      <Card className="bg-white">
-        <CardBody>
-          <div className="font-semibold">Content operations</div>
-          <div className="mt-3 grid grid-cols-3 gap-3">
-            <div>
-              <div className="text-2xl font-bold text-ink">{pendingFeedback}</div>
-              <div className="text-xs text-muted">feedback</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-ink">{draftCount}</div>
-              <div className="text-xs text-muted">drafts</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-ink">{trashCount}</div>
-              <div className="text-xs text-muted">trashed</div>
-            </div>
-          </div>
         </CardBody>
       </Card>
 
@@ -1611,6 +1604,14 @@ function ModelsTab({
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-md border border-border bg-white px-3 py-2.5 text-xs text-muted">
+        <span className="font-semibold uppercase tracking-wide text-muted">Badges</span>
+        <span><strong className="font-medium text-foreground">public-facing</strong> — guests can trigger this</span>
+        <span><strong className="font-medium text-foreground">admin-only</strong> — internal moderation/cleanup</span>
+        <span><strong className="font-medium text-foreground">Anthropic-only</strong> — model choice restricted</span>
+        <span><strong className="font-medium text-foreground">import</strong> — spreadsheet mapping</span>
+        <span><strong className="font-medium text-foreground">cheap</strong> — a lower-cost model is recommended</span>
+      </div>
       {grouped.length ? grouped.map((group) => (
         <Card key={group.title} className="bg-white">
           <CardBody>

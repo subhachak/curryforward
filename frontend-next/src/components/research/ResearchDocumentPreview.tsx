@@ -429,7 +429,6 @@ export function ResearchDocumentPreview({
   const reviewBadge = (fields: string[]) =>
     isHighlighted(fields) ? <span className="text-xs font-medium text-accent-hover">Updated by AI</span> : null;
 
-  const [name, setName] = useState(recipe.name);
   const [category, setCategory] = useState(recipe.category ?? "");
   const [cuisineTags, setCuisineTags] = useState(recipe.cuisine_tags.join(", "));
   const initialServingSizeAmount = recipe.serving_size.amount != null ? String(recipe.serving_size.amount) : "";
@@ -703,20 +702,23 @@ export function ResearchDocumentPreview({
 
   return (
     <div className="space-y-6">
-      <Card className={highlightClass([
-        "name",
-        "category",
-        "cuisine_tags",
-        "base_servings_amount",
-        "base_servings_unit",
-        "serving_count",
-        "serving_size_amount",
-        "serving_size_unit",
-        "intro",
-        "history",
-        "prep_time_minutes",
-        "cook_time_minutes",
-      ])}>
+      <Card
+        id="section-details"
+        className={`scroll-mt-48 ${highlightClass([
+          "name",
+          "category",
+          "cuisine_tags",
+          "base_servings_amount",
+          "base_servings_unit",
+          "serving_count",
+          "serving_size_amount",
+          "serving_size_unit",
+          "intro",
+          "history",
+          "prep_time_minutes",
+          "cook_time_minutes",
+        ])}`}
+      >
         <CardBody className="space-y-4">
           <SectionHeader title="Recipe details">
             {reviewBadge([
@@ -735,14 +737,6 @@ export function ResearchDocumentPreview({
             ])}
             <RefineBox section="history" label="intro & history" onRefine={onRefine} />
           </SectionHeader>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Name</label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onBlur={() => onCommit({ name: name.trim() })}
-            />
-          </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Hero image</label>
             <div className="flex items-center gap-3">
@@ -903,7 +897,7 @@ export function ResearchDocumentPreview({
         </CardBody>
       </Card>
 
-      <Card className={highlightClass(["components"])}>
+      <Card id="section-ingredients" className={`scroll-mt-48 ${highlightClass(["components"])}`}>
         <CardBody className="space-y-4">
           <SectionHeader title="Components & ingredients">
             {nutritionIssues.length > 0 && (
@@ -1035,7 +1029,7 @@ export function ResearchDocumentPreview({
         </CardBody>
       </Card>
 
-      <Card className={highlightClass(["steps"])}>
+      <Card id="section-steps" className={`scroll-mt-48 ${highlightClass(["steps"])}`}>
         <CardBody className="space-y-3">
           <SectionHeader title="Steps">
             {reviewBadge(["steps"])}
@@ -1100,7 +1094,7 @@ export function ResearchDocumentPreview({
         </CardBody>
       </Card>
 
-      <Card className={highlightClass(["tips", "watch_outs", "suggested_utensils", "pan_conversions"])}>
+      <Card id="section-tips" className={`scroll-mt-48 ${highlightClass(["tips", "watch_outs", "suggested_utensils", "pan_conversions"])}`}>
         <CardBody className="space-y-4">
           <SectionHeader title="Tips & watch-outs">
             {reviewBadge(["tips", "watch_outs", "suggested_utensils", "pan_conversions"])}

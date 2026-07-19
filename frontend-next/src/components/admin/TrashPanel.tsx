@@ -156,7 +156,7 @@ export function TrashPanel({ recipes, onChanged }: TrashPanelProps) {
           {recipes.map((r) => {
             const busy = pendingId === r.recipe_id;
             return (
-              <div key={r.recipe_id} className="rounded-md border border-border bg-surface p-3">
+              <div key={r.recipe_id} className="rounded-md border border-border bg-surface p-2.5 transition-colors hover:bg-danger-soft/10">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex min-w-0 items-start gap-3">
                     <input

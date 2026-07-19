@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
@@ -29,6 +29,16 @@ interface RecipeManagementTableProps {
   onChanged: () => void;
 }
 
+type SortKey = "updated" | "name" | "status" | "completeness" | "views";
+
+const columns: { key: SortKey; label: string }[] = [
+  { key: "name", label: "Recipe" },
+  { key: "status", label: "Status" },
+  { key: "completeness", label: "Complete" },
+  { key: "views", label: "Engagement" },
+  { key: "updated", label: "Updated" },
+];
+
 export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTableProps) {
   const { push } = useToast();
   const router = useRouter();
@@ -36,7 +46,7 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
   const [bulkBusy, setBulkBusy] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy] = useState<"updated" | "name" | "status" | "completeness" | "views">("updated");
+  const [sortBy, setSortBy] = useState<SortKey>("updated");
 
   const sortedRecipes = useMemo(() => {
     const rows = [...recipes];
@@ -198,158 +208,197 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
               </Button>
             </div>
           )}
-          <label className="ml-auto inline-flex items-center gap-2 text-sm text-muted">
-            Sort by
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="rounded-md border border-border bg-white px-3 py-1.5 text-sm text-foreground focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40"
-            >
-              <option value="updated">Recently updated</option>
-              <option value="name">Name</option>
-              <option value="status">Status</option>
-              <option value="completeness">Most complete</option>
-              <option value="views">Most viewed</option>
-            </select>
-          </label>
         </div>
-        <div className="space-y-2">
-          {sortedRecipes.map((r) => {
-            const href = r.status === "published" ? publicRecipeHref(r) : adminRecipeHref(r);
-            const busy = pendingId === r.recipe_id;
-            const score = completenessScore(r);
-            const missing = completenessEntries(r).filter(([, complete]) => !complete).map(([label]) => label);
-            const menuItems: MenuItem[] = [
-              {
-                label: r.status === "published" ? "Create or open edit draft" : "Edit draft",
-                icon: <PencilIcon />,
-                onClick: () => editRecipe(r),
-              },
-              { label: "Duplicate as draft", icon: <CopyIcon />, onClick: () => copyRecipe(r) },
-              ...(r.status === "published"
-                ? [{ label: "Take down for servicing", icon: <EyeOffIcon />, onClick: () => unpublish(r) }]
-                : []),
-              {
-                label: "Move to Trash",
-                icon: <TrashIcon />,
-                onClick: () => setConfirmingDeleteId(r.recipe_id),
-                disabled: r.status === "published",
-                disabledReason: "Unpublish this recipe first",
-                danger: true,
-              },
-            ];
-            return (
-              <div key={r.version_id} className="rounded-md border border-border bg-white p-3 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex min-w-0 flex-1 gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(r.version_id)}
-                      onChange={(e) => {
-                        setSelectedIds((current) => {
-                          const next = new Set(current);
-                          if (e.target.checked) next.add(r.version_id);
-                          else next.delete(r.version_id);
-                          return next;
-                        });
-                      }}
-                      className="mt-6 h-4 w-4 shrink-0 rounded border-border accent-accent"
-                      aria-label={`Select ${r.name}`}
-                    />
-                    {r.hero_image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={r.hero_image_url}
-                        alt=""
-                        className="food-image h-16 w-16 shrink-0 rounded-md border border-border object-cover"
-                      />
-                    ) : (
-                      <div
-                        className="flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-border bg-gradient-to-br from-brand-soft to-accent-soft"
-                        aria-hidden
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src="/brand/cf/logos/symbol-light.svg" alt="" className="theme-asset h-8 w-auto opacity-80" />
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link href={href} className="text-base font-semibold text-ink hover:underline">
-                          {r.name}
-                        </Link>
-                        <Badge tone={r.status === "published" ? "success" : "warning"} className="uppercase">
-                          {r.status}
-                        </Badge>
-                        {r.category && <Badge tone="neutral">{r.category}</Badge>}
-                      </div>
-                      {r.intro && <p className="mt-1 line-clamp-2 text-sm text-muted">{r.intro}</p>}
-                      <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-muted">
-                        <span>{r.first_published_at ? `Published ${formatDate(r.first_published_at)}` : "Not published yet"}</span>
-                        <span>Updated {formatDate(r.updated_at)}</span>
-                        <span className="inline-flex items-center gap-1">
-                          <EyeIcon className="h-3.5 w-3.5" />
-                          {r.view_count}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <DownloadIcon className="h-3.5 w-3.5" />
-                          {r.download_count}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <HeartIcon className="h-3.5 w-3.5" fill={r.like_count > 0 ? "currentColor" : "none"} />
-                          {r.like_count}
-                        </span>
-                        <span
-                          className={`inline-flex items-center gap-1 font-medium ${score === 6 ? "text-success" : "text-warning"}`}
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                <th className="w-9 py-2 pr-2" />
+                {columns.map((col) => (
+                  <th key={col.key} className="py-2 pr-4 font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setSortBy(col.key)}
+                      className={`inline-flex items-center gap-1 transition-colors hover:text-foreground ${
+                        sortBy === col.key ? "text-ink" : ""
+                      }`}
+                    >
+                      {col.label}
+                      {sortBy === col.key && <span aria-hidden>↓</span>}
+                    </button>
+                  </th>
+                ))}
+                <th className="w-10 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {sortedRecipes.map((r) => {
+                const busy = pendingId === r.recipe_id;
+                const score = completenessScore(r);
+                const missing = completenessEntries(r).filter(([, complete]) => !complete).map(([label]) => label);
+                const menuItems: MenuItem[] = [
+                  {
+                    label: r.status === "published" ? "Create or open edit draft" : "Edit draft",
+                    icon: <PencilIcon />,
+                    onClick: () => editRecipe(r),
+                  },
+                  { label: "Duplicate as draft", icon: <CopyIcon />, onClick: () => copyRecipe(r) },
+                  ...(r.status === "published"
+                    ? [{ label: "Take down for servicing", icon: <EyeOffIcon />, onClick: () => unpublish(r) }]
+                    : []),
+                  {
+                    label: "Move to Trash",
+                    icon: <TrashIcon />,
+                    onClick: () => setConfirmingDeleteId(r.recipe_id),
+                    disabled: r.status === "published",
+                    disabledReason: "Unpublish this recipe first",
+                    danger: true,
+                  },
+                ];
+                return (
+                  <Fragment key={r.version_id}>
+                    <tr className="border-b border-border align-top last:border-0 hover:bg-surface-muted/60">
+                      <td className="py-2.5 pr-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(r.version_id)}
+                          onChange={(e) => {
+                            setSelectedIds((current) => {
+                              const next = new Set(current);
+                              if (e.target.checked) next.add(r.version_id);
+                              else next.delete(r.version_id);
+                              return next;
+                            });
+                          }}
+                          className="mt-1 h-4 w-4 shrink-0 rounded border-border accent-accent"
+                          aria-label={`Select ${r.name}`}
+                        />
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        <div className="flex min-w-0 items-start gap-3">
+                          {r.hero_image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={r.hero_image_url}
+                              alt=""
+                              className="food-image h-10 w-10 shrink-0 rounded-md border border-border object-cover"
+                            />
+                          ) : (
+                            <div
+                              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-gradient-to-br from-brand-soft to-accent-soft"
+                              aria-hidden
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src="/brand/cf/logos/symbol-light.svg" alt="" className="theme-asset h-5 w-auto opacity-80" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => editRecipe(r)}
+                              className="truncate text-left text-sm font-semibold text-ink hover:underline"
+                              title="Open in editor"
+                            >
+                              {r.name}
+                            </button>
+                            {r.status === "published" && (
+                              <Link
+                                href={publicRecipeHref(r)}
+                                className="ml-2 inline-flex items-center gap-0.5 text-xs text-muted hover:text-accent"
+                              >
+                                View live <EyeIcon className="h-3 w-3" />
+                              </Link>
+                            )}
+                            {r.intro && <p className="mt-0.5 line-clamp-1 text-xs text-muted">{r.intro}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge tone={r.status === "published" ? "success" : "warning"} className="uppercase">
+                            {r.status}
+                          </Badge>
+                          {r.category && <Badge tone="neutral">{r.category}</Badge>}
+                        </div>
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        <div
+                          className={`flex items-center gap-1.5 text-xs font-medium ${score === 6 ? "text-success" : "text-warning"}`}
                           title={missing.length ? `Missing: ${missing.join(", ")}` : "All recipe details complete"}
                         >
                           <span className="flex gap-0.5" aria-hidden>
                             {completenessEntries(r).map(([label, complete]) => (
-                              <span
-                                key={label}
-                                className={`h-2 w-2 rounded-full ${complete ? "bg-success" : "bg-border"}`}
-                              />
+                              <span key={label} className={`h-2 w-2 rounded-full ${complete ? "bg-success" : "bg-border"}`} />
                             ))}
                           </span>
-                          {score}/6 complete
-                          {missing.length > 0 && <span>· Missing {missing.join(", ")}</span>}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                    {busy && (
-                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent text-muted" />
+                          {score}/6
+                        </div>
+                      </td>
+                      <td className="py-2.5 pr-4 text-xs text-muted">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <span className="inline-flex items-center gap-1">
+                            <EyeIcon className="h-3.5 w-3.5" />
+                            {r.view_count}
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <DownloadIcon className="h-3.5 w-3.5" />
+                            {r.download_count}
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <HeartIcon className="h-3.5 w-3.5" fill={r.like_count > 0 ? "currentColor" : "none"} />
+                            {r.like_count}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 pr-4 text-xs text-muted">
+                        <div>{formatDate(r.updated_at)}</div>
+                        <div className="mt-0.5">{r.first_published_at ? `Published ${formatDate(r.first_published_at)}` : "Not published"}</div>
+                      </td>
+                      <td className="py-2.5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {busy && (
+                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent text-muted" />
+                          )}
+                          <MoreMenu items={menuItems} label={`More actions for ${r.name}`} />
+                        </div>
+                      </td>
+                    </tr>
+                    {confirmingDeleteId === r.recipe_id && (
+                      <tr className="border-b border-danger/30 bg-danger-soft/20 last:border-0">
+                        <td colSpan={columns.length + 2} className="px-2 py-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="text-sm">
+                              Move draft <strong>{r.name}</strong> to Trash? You can restore it later.
+                            </div>
+                            <div className="flex gap-1.5">
+                              <IconButton
+                                label="Cancel"
+                                icon={<XIcon />}
+                                variant="secondary"
+                                onClick={() => setConfirmingDeleteId(null)}
+                              />
+                              <IconButton
+                                label="Confirm move to Trash"
+                                icon={<CheckIcon />}
+                                variant="danger"
+                                loading={busy}
+                                onClick={() => del(r)}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                    <MoreMenu items={menuItems} label={`More actions for ${r.name}`} />
-                  </div>
-                </div>
-
-                {confirmingDeleteId === r.recipe_id && (
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger/40 bg-danger-soft/40 p-3">
-                    <div className="text-sm">
-                      Move draft <strong>{r.name}</strong> to Trash? You can restore it later.
-                    </div>
-                    <div className="flex gap-1.5">
-                      <IconButton
-                        label="Cancel"
-                        icon={<XIcon />}
-                        variant="secondary"
-                        onClick={() => setConfirmingDeleteId(null)}
-                      />
-                      <IconButton
-                        label="Confirm move to Trash"
-                        icon={<CheckIcon />}
-                        variant="danger"
-                        loading={busy}
-                        onClick={() => del(r)}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
+        <p className="mt-3 text-xs text-muted">
+          Complete = ingredients, steps, intro, timing, image, category — hover the dots on any row for what&rsquo;s missing.
+        </p>
       </CardBody>
     </Card>
   );

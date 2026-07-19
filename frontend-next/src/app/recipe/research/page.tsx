@@ -19,6 +19,13 @@ import type { ResearchPatchPayload, RecipeResearchDetail } from "@/lib/types";
 
 type WorkspaceMode = "edit" | "review";
 
+const sectionAnchors = [
+  { id: "section-details", label: "Details" },
+  { id: "section-ingredients", label: "Ingredients" },
+  { id: "section-steps", label: "Steps" },
+  { id: "section-tips", label: "Tips" },
+];
+
 function ResearchWorkspaceInner() {
   const { isAdmin, loading: authLoading } = useAuth();
   const { push } = useToast();
@@ -40,6 +47,12 @@ function ResearchWorkspaceInner() {
   const [wideEditing, setWideEditing] = useState(false);
   const [reviewHighlights, setReviewHighlights] = useState<string[]>([]);
   const [reviewNotes, setReviewNotes] = useState<string | null>(null);
+  const [titleDraft, setTitleDraft] = useState("");
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (recipe) setTitleDraft(recipe.name);
+  }, [recipe?.name, recipe?.version_id]);
 
   const load = useCallback(async () => {
     if (!recipeId) {
@@ -212,7 +225,21 @@ function ResearchWorkspaceInner() {
             <Link href="/admin" className="text-sm text-muted hover:underline">
               &larr; Back to Workspace
             </Link>
-            <h1 className="mt-2 truncate text-2xl font-bold text-ink">{recipe.name}</h1>
+            {isDraft ? (
+              <input
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={() => {
+                  const trimmed = titleDraft.trim();
+                  if (trimmed && trimmed !== recipe.name) void handleCommit({ name: trimmed });
+                  else setTitleDraft(recipe.name);
+                }}
+                aria-label="Recipe title"
+                className="-mx-1 mt-2 w-full max-w-xl truncate rounded-md border border-transparent bg-transparent px-1 text-2xl font-bold text-ink transition-colors hover:border-border focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25"
+              />
+            ) : (
+              <h1 className="mt-2 truncate text-2xl font-bold text-ink">{recipe.name}</h1>
+            )}
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
               <Badge tone={isDraft ? "neutral" : "success"}>{isDraft ? "Draft" : "Published"}</Badge>
               <span>{isDraft ? saveStatus === "saving" ? "Saving..." : saveStatus === "error" ? "Save failed" : "Saved" : "Read-only"}</span>
@@ -272,6 +299,22 @@ function ResearchWorkspaceInner() {
             )}
           </div>
         </div>
+        {isDraft && !previewMode && (
+          <nav className="mt-3 flex flex-wrap gap-1 border-t border-border pt-3" aria-label="Jump to section">
+            {sectionAnchors.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() =>
+                  document.getElementById(section.id)?.scrollIntoView({ behavior: "auto", block: "start" })
+                }
+                className="rounded-full px-3 py-1 text-xs font-medium text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+              >
+                {section.label}
+              </button>
+            ))}
+          </nav>
+        )}
       </div>
 
       {!isDraft && (
