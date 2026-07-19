@@ -12,15 +12,11 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { IconButton } from "@/components/ui/IconButton";
 import {
   CheckIcon,
-  CopyIcon,
-  DownloadIcon,
   EyeIcon,
-  HeartIcon,
   LogOutIcon,
   PlusIcon,
   SearchIcon,
   SendIcon,
-  SparklesIcon,
   UploadIcon,
   XIcon,
 } from "@/components/ui/icons";
@@ -48,19 +44,24 @@ type RecipeStatusFilter = "all" | "published" | "draft";
 type ImportStatus = { tone: "info" | "success" | "warning" | "error"; text: string } | null;
 
 const tabs: { id: WorkspaceTab; label: string }[] = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "recipes", label: "All recipes" },
-  { id: "research", label: "New Recipe" },
+  { id: "dashboard", label: "Overview" },
+  { id: "recipes", label: "Recipes" },
+  { id: "research", label: "Create recipe" },
   { id: "feedback", label: "Feedback" },
   { id: "trash", label: "Trash" },
   { id: "analytics", label: "Analytics" },
   { id: "models", label: "Models" },
 ];
 
+const navGroups: { label: string; tabs: WorkspaceTab[] }[] = [
+  { label: "Content", tabs: ["dashboard", "recipes", "research", "feedback"] },
+  { label: "Operations", tabs: ["analytics", "models", "trash"] },
+];
+
 const tabCopy: Record<WorkspaceTab, { title: string; description: string }> = {
   dashboard: {
-    title: "Dashboard",
-    description: "A quick operating view of drafts, feedback, traffic, and recent workspace activity.",
+    title: "Workspace overview",
+    description: "Here’s what needs attention across CurryForward.",
   },
   recipes: {
     title: "All recipes",
@@ -350,99 +351,101 @@ export default function AdminPage() {
   }
 
   const activeCopy = tabCopy[activeTab];
-  const workspaceQuery = workspaceSearch.trim().toLowerCase();
   const searchPlaceholder = getSearchPlaceholder(activeTab);
-  const actionResults = workspaceQuery
-    ? tabs.filter((tab) => `${tab.label} ${tabCopy[tab.id].title} ${tabCopy[tab.id].description}`.toLowerCase().includes(workspaceQuery))
-    : [];
-  const recipeResults = workspaceQuery
-    ? adminRecipes
-        .filter((recipe) =>
-          [recipe.name, recipe.category, recipe.status, recipe.lineage, recipe.intro]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase()
-            .includes(workspaceQuery)
-        )
-        .slice(0, 6)
-    : [];
+  const showSearch = ["recipes", "feedback", "trash", "models"].includes(activeTab);
+  const navCounts: Partial<Record<WorkspaceTab, number>> = {
+    recipes: adminRecipes.length,
+    feedback: pendingFeedbackCount,
+    trash: trash.length,
+  };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5">
-      <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-accent">CurryForward Workspace</div>
-            <h1 className="mt-1 text-2xl font-bold text-ink">Workspace</h1>
-            <p className="text-sm text-muted">A calm operating console for recipes, drafts, feedback, and models.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
-            >
+    <div className="mx-auto max-w-[1440px]">
+      <div className="grid gap-6 lg:grid-cols-[208px_minmax(0,1fr)]">
+        <aside className="rounded-xl border border-border bg-white p-3 shadow-sm lg:sticky lg:top-5 lg:flex lg:h-[calc(100vh-2.5rem)] lg:flex-col lg:self-start">
+          <div className="flex items-center justify-between px-2 py-2">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-accent">CurryForward</div>
+              <div className="mt-0.5 font-semibold text-ink">Workspace</div>
+            </div>
+            <Link href="/" aria-label="View live site" className="rounded-md p-2 text-muted transition hover:bg-surface-muted hover:text-ink">
               <EyeIcon className="h-4 w-4" />
-              View site
             </Link>
-            <Button variant="secondary" onClick={handleLogout}>
+          </div>
+
+          <nav className="mt-4 flex gap-2 overflow-x-auto lg:block lg:space-y-5 lg:overflow-visible" aria-label="Workspace navigation">
+            {navGroups.map((group) => (
+              <div key={group.label} className="shrink-0">
+                <div className="mb-1 hidden px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted lg:block">{group.label}</div>
+                <div className="flex gap-1 lg:flex-col">
+                  {group.tabs.map((tabId) => {
+                    const tab = tabs.find((item) => item.id === tabId)!;
+                    const count = navCounts[tab.id];
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveTab(tab.id);
+                          setWorkspaceSearch("");
+                        }}
+                        className={`flex items-center justify-between gap-3 whitespace-nowrap rounded-md px-3 py-2 text-left text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand/40 ${
+                          activeTab === tab.id ? "bg-ink text-white" : "text-muted hover:bg-surface-muted hover:text-foreground"
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        {count !== undefined && count > 0 && (
+                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${activeTab === tab.id ? "bg-white/15 text-white" : "bg-surface-muted text-muted"}`}>
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </nav>
+
+          <div className="mt-auto hidden border-t border-border pt-3 lg:block">
+            <button type="button" onClick={handleLogout} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted hover:bg-surface-muted hover:text-foreground">
               <LogOutIcon className="h-4 w-4" />
               Sign out
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-        <StatTile label="Total recipes" value={adminRecipes.length} helper="All content" accent="bg-accent" icon={<CopyIcon />} />
-        <StatTile label="Published" value={publishedCount} helper="Live recipes" accent="bg-success" icon={<CheckIcon />} />
-        <StatTile label="Drafts" value={draftCount} helper="In progress" accent="bg-warning" icon={<SparklesIcon />} />
-        <StatTile label="Needs review" value={pendingFeedbackCount} helper="Feedback" accent="bg-danger" icon={<HeartIcon />} />
-        <StatTile label="Views" value={totalViews} helper="All time" accent="bg-brand" icon={<EyeIcon />} />
-        <StatTile label="Downloads" value={totalDownloads} helper="All time" accent="bg-ink" icon={<DownloadIcon />} />
-      </div>
-
-      <div className="sticky top-0 z-20 rounded-lg border border-border bg-white/95 p-3 shadow-sm backdrop-blur">
-        <label className="flex items-center gap-2 rounded-md border border-border bg-white px-3 py-2 text-sm text-muted shadow-sm">
-          <SearchIcon className="h-4 w-4" />
-          <input
-            value={workspaceSearch}
-            onChange={(e) => setWorkspaceSearch(e.target.value)}
-            className="min-w-0 flex-1 bg-transparent text-foreground placeholder:text-muted focus:outline-none"
-            placeholder={searchPlaceholder}
-            aria-label="Search workspace"
-          />
-          <span className="rounded border border-border bg-surface-muted px-1.5 py-0.5 text-[10px] font-semibold">⌘K</span>
-        </label>
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-[220px_1fr]">
-        <aside className="rounded-lg border border-border bg-white p-2 shadow-sm lg:sticky lg:top-20 lg:self-start">
-          <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">Workspace</div>
-          <div className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`whitespace-nowrap rounded-md px-3 py-2 text-left text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand/40 ${
-                activeTab === tab.id
-                  ? "bg-ink text-background shadow-sm"
-                  : "text-muted hover:bg-surface-muted hover:text-foreground"
-              }`}
-            >
-              {tab.label}
             </button>
-          ))}
           </div>
         </aside>
 
-        <main className="min-w-0 space-y-4">
-          <div>
+        <main className="min-w-0 space-y-5 py-1">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-5">
             <div>
-              <h2 className="text-xl font-bold text-ink">{activeCopy.title}</h2>
-              <p className="text-sm text-muted">{activeCopy.description}</p>
+              <h1 className="text-2xl font-bold tracking-tight text-ink">{activeCopy.title}</h1>
+              <p className="mt-1 max-w-2xl text-sm text-muted">{activeCopy.description}</p>
             </div>
+            {activeTab !== "research" && (
+              <Button onClick={() => setActiveTab("research")}>
+                <PlusIcon className="h-4 w-4" />
+                New recipe
+              </Button>
+            )}
           </div>
+
+          {showSearch && (
+            <label className="flex max-w-xl items-center gap-2 rounded-md border border-border bg-white px-3 py-2.5 text-sm text-muted shadow-sm focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/30">
+              <SearchIcon className="h-4 w-4" />
+              <input
+                value={workspaceSearch}
+                onChange={(e) => setWorkspaceSearch(e.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-foreground placeholder:text-muted focus:outline-none"
+                placeholder={searchPlaceholder}
+                aria-label={searchPlaceholder}
+              />
+              {workspaceSearch && (
+                <button type="button" onClick={() => setWorkspaceSearch("")} aria-label="Clear search" className="rounded p-1 hover:bg-surface-muted">
+                  <XIcon className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </label>
+          )}
 
           {activeTab === "recipes" && (
             <RecipeFilterBar
@@ -451,19 +454,6 @@ export default function AdminPage() {
               categories={categories}
               onStatusChange={setStatusFilter}
               onCategoryChange={setCategoryFilter}
-              onStartResearch={() => setActiveTab("research")}
-            />
-          )}
-
-          {activeTab === "dashboard" && workspaceQuery && (
-            <WorkspaceSearchResults
-              query={workspaceSearch}
-              actions={actionResults}
-              recipes={recipeResults}
-              onNavigate={(tab) => {
-                setActiveTab(tab);
-                if (tab !== "recipes") setWorkspaceSearch("");
-              }}
             />
           )}
 
@@ -547,36 +537,6 @@ export default function AdminPage() {
   );
 }
 
-function StatTile({
-  label,
-  value,
-  helper,
-  accent,
-  icon,
-}: {
-  label: string;
-  value: number;
-  helper: string;
-  accent: string;
-  icon: ReactNode;
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-lg border border-border bg-white p-3 shadow-sm">
-      <div className={`absolute inset-x-0 top-0 h-1 ${accent}`} />
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
-          <div className="mt-1 text-2xl font-bold text-ink">{value}</div>
-          <div className="mt-1 text-xs text-muted">{helper}</div>
-        </div>
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-surface-muted text-ink">
-          <span className="h-4 w-4">{icon}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function DashboardTab({
   recipes,
   publishedCount,
@@ -602,16 +562,12 @@ function DashboardTab({
 }) {
   const drafts = recipes.filter((recipe) => recipe.status === "draft");
   const published = recipes.filter((recipe) => recipe.status === "published");
-  const missingHero = recipes.filter((recipe) => !recipe.hero_image_url);
   const publishedMissingHero = published.filter((recipe) => !recipe.hero_image_url);
   const missingIntro = recipes.filter((recipe) => !recipe.intro?.trim());
   const staleDrafts = drafts.filter((recipe) => isOlderThanDays(recipe.updated_at, 14));
   const activeDrafts = [...drafts]
     .sort((a, b) => timestampValue(b.updated_at) - timestampValue(a.updated_at))
     .slice(0, 6);
-  const highTrafficMissingHero = publishedMissingHero
-    .filter((recipe) => recipe.view_count + recipe.download_count > 0)
-    .sort((a, b) => b.view_count + b.download_count - (a.view_count + a.download_count));
   const topRecipe = [...published].sort((a, b) => b.view_count + b.download_count - (a.view_count + a.download_count))[0];
 
   const attentionItems = [
@@ -652,255 +608,119 @@ function DashboardTab({
     },
   ];
 
-  const nextActions = [
-    draftCount
-      ? {
-          title: "Review active drafts",
-          body: `${draftCount} draft${draftCount === 1 ? "" : "s"} can be checked for publish readiness.`,
-          tab: "recipes" as WorkspaceTab,
-        }
-      : null,
-    highTrafficMissingHero.length
-      ? {
-          title: "Add images to visible recipes",
-          body: `${highTrafficMissingHero.length} live recipe${highTrafficMissingHero.length === 1 ? "" : "s"} with traffic need hero images.`,
-          tab: "recipes" as WorkspaceTab,
-        }
-      : null,
-    pendingFeedbackCount
-      ? {
-          title: "Clear feedback queue",
-          body: `${pendingFeedbackCount} review${pendingFeedbackCount === 1 ? "" : "s"} are waiting for moderation.`,
-          tab: "feedback" as WorkspaceTab,
-        }
-      : null,
-    !draftCount
-      ? {
-          title: "Start a new recipe",
-          body: "Research, paste, or import a new recipe draft.",
-          tab: "research" as WorkspaceTab,
-        }
-      : null,
-  ].filter(Boolean) as { title: string; body: string; tab: WorkspaceTab }[];
-
-  const healthItems = [
-    { label: "Published library", value: publishedCount, helper: "Live recipe pages", tone: "text-success", tab: "recipes" as WorkspaceTab },
-    { label: "Draft backlog", value: draftCount, helper: "Recipes in progress", tone: "text-warning", tab: "recipes" as WorkspaceTab },
-    { label: "Missing hero images", value: missingHero.length, helper: "Live and draft records", tone: "text-warning", tab: "recipes" as WorkspaceTab },
-    { label: "Stale drafts", value: staleDrafts.length, helper: "No update in 14 days", tone: "text-danger", tab: "recipes" as WorkspaceTab },
-  ];
+  const openAttentionItems = attentionItems.filter((item) => item.value > 0);
 
   return (
-    <div className="space-y-4">
-      <Card className="bg-white">
-        <CardBody className="space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold text-ink">Needs your attention</h3>
-              <p className="text-sm text-muted">The work most likely to improve the site right now.</p>
-            </div>
-            <Button size="sm" variant="secondary" onClick={() => onNavigate("research")}>
-              <PlusIcon className="h-3.5 w-3.5" />
-              New recipe
-            </Button>
-          </div>
-          <div className="grid gap-3">
-            {attentionItems.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => onNavigate(item.tab)}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface p-3 text-left transition-colors hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
-              >
-                <span>
-                  <span className="block font-semibold text-foreground">{item.label}</span>
-                  <span className="block text-sm text-muted">{item.detail}</span>
-                </span>
-                <span
-                  className={`rounded-full px-3 py-1 text-sm font-semibold ${
-                    item.value
-                      ? item.tone === "danger"
-                        ? "bg-danger/10 text-danger"
-                        : "bg-warning/15 text-warning"
-                      : "bg-success/10 text-success"
-                  }`}
-                >
-                  {item.value || "Clear"}
-                </span>
-              </button>
-            ))}
-          </div>
-        </CardBody>
-      </Card>
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-sm lg:grid-cols-4">
+        {[
+          { label: "Published", value: publishedCount, detail: "Live now", tab: "recipes" as WorkspaceTab },
+          { label: "Drafts", value: draftCount, detail: `${staleDrafts.length} stale`, tab: "recipes" as WorkspaceTab },
+          { label: "Feedback", value: pendingFeedbackCount, detail: "Needs review", tab: "feedback" as WorkspaceTab },
+          { label: "Traffic", value: totalViews + totalDownloads, detail: "All-time actions", tab: "analytics" as WorkspaceTab },
+        ].map((metric) => (
+          <button key={metric.label} type="button" onClick={() => onNavigate(metric.tab)} className="bg-white p-4 text-left transition hover:bg-surface focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand/40">
+            <span className="text-xs font-medium text-muted">{metric.label}</span>
+            <span className="mt-1 block text-2xl font-bold text-ink">{metric.value}</span>
+            <span className="mt-0.5 block text-xs text-muted">{metric.detail}</span>
+          </button>
+        ))}
+      </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">
         <Card className="bg-white">
           <CardBody>
-            <div className="font-semibold text-ink">Next best actions</div>
-            <div className="mt-4 grid gap-3">
-              {nextActions.length ? (
-                nextActions.slice(0, 3).map((action) => (
-                  <button
-                    key={action.title}
-                    type="button"
-                    onClick={() => onNavigate(action.tab)}
-                    className="rounded-md border border-border bg-surface p-3 text-left transition-colors hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
-                  >
-                    <span className="block text-sm font-semibold text-foreground">{action.title}</span>
-                    <span className="mt-1 block text-sm text-muted">{action.body}</span>
-                  </button>
-                ))
-              ) : (
-                <EmptyState
-                  icon={<CheckIcon />}
-                  title="Workspace looks clear"
-                  body="No urgent work is waiting. This is a good moment to start a new recipe or review analytics."
-                />
-              )}
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="font-semibold text-ink">Priority queue</div>
+                <p className="text-xs text-muted">Only items that need action.</p>
+              </div>
+              <span className="rounded-full bg-warning/15 px-2 py-1 text-xs font-semibold text-warning">{openAttentionItems.length}</span>
             </div>
+            {openAttentionItems.length ? (
+              <div className="mt-4 divide-y divide-border">
+                {openAttentionItems.slice(0, 4).map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => onNavigate(item.tab)}
+                  className="flex w-full items-center justify-between gap-3 py-3 text-left first:pt-0 last:pb-0 hover:text-accent focus:outline-none"
+                >
+                  <span>
+                    <span className="block text-sm font-medium text-foreground">{item.label}</span>
+                    <span className="mt-0.5 block text-xs text-muted">{item.detail}</span>
+                  </span>
+                  <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${item.tone === "danger" ? "bg-danger/10 text-danger" : "bg-warning/15 text-warning"}`}>{item.value}</span>
+                </button>
+              ))}
+              </div>
+            ) : (
+              <div className="mt-6 text-sm text-muted">Everything is clear. No action needed.</div>
+            )}
           </CardBody>
         </Card>
 
         <Card className="bg-white">
           <CardBody>
-            <div className="font-semibold text-ink">Traffic snapshot</div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <DashboardFact label="Views" value={totalViews} />
-              <DashboardFact label="Downloads" value={totalDownloads} />
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="font-semibold text-ink">Continue working</div>
+                <p className="text-xs text-muted">Your most recently updated drafts.</p>
+              </div>
+              <button type="button" onClick={() => onNavigate("recipes")} className="text-xs font-semibold text-accent hover:underline">View all</button>
             </div>
-            {topRecipe ? (
-              <Link
-                href={publicRecipeHref(topRecipe)}
-                className="mt-3 block rounded-md border border-border bg-surface p-3 text-sm transition-colors hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
-              >
-                <span className="block font-semibold text-foreground">Top recipe</span>
-                <span className="mt-1 block text-muted">
-                  {topRecipe.name} · {topRecipe.view_count + topRecipe.download_count} interactions
-                </span>
-              </Link>
+            {activeDrafts.length ? (
+              <div className="mt-4 divide-y divide-border">
+                {activeDrafts.slice(0, 5).map((recipe) => (
+                  <Link key={recipe.version_id} href={adminRecipeHref(recipe)} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0 hover:text-accent">
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-foreground">{recipe.name}</span>
+                      <span className="mt-0.5 block text-xs text-muted">Updated {formatDate(recipe.updated_at)}</span>
+                    </span>
+                    <span className="hidden shrink-0 gap-1 sm:flex">
+                      {draftBadges(recipe).slice(0, 2).map((badge) => <span key={badge} className="rounded-full bg-surface-muted px-2 py-1 text-[10px] font-medium text-muted">{badge}</span>)}
+                    </span>
+                  </Link>
+                ))}
+              </div>
             ) : (
-              <div className="mt-3 rounded-md border border-border bg-surface p-3 text-sm text-muted">Publish recipes to build traffic data.</div>
+              <div className="mt-6 text-sm text-muted">No active drafts.</div>
             )}
           </CardBody>
         </Card>
       </div>
 
-      <Card className="bg-white">
-        <CardBody>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="font-semibold text-ink">Active draft queue</div>
-              <p className="text-sm text-muted">Newest drafts and what they need before they become publish candidates.</p>
-            </div>
-            <Button size="sm" variant="secondary" onClick={() => onNavigate("recipes")}>
-              View all drafts
-            </Button>
-          </div>
-          {activeDrafts.length ? (
-            <div className="mt-4 grid gap-3">
-              {activeDrafts.map((recipe) => (
-                <Link
-                  key={recipe.recipe_id}
-                  href={adminRecipeHref(recipe)}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface p-3 transition-colors hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
-                >
-                  <span>
-                    <span className="block font-semibold text-foreground">{recipe.name}</span>
-                    <span className="block text-xs text-muted">
-                      {recipe.category || "No category"} · Updated {formatDate(recipe.updated_at)}
-                    </span>
-                  </span>
-                  <span className="flex flex-wrap gap-2">
-                    {draftBadges(recipe).map((badge) => (
-                      <span key={badge} className="rounded-full bg-surface-muted px-2 py-1 text-xs font-semibold text-muted">
-                        {badge}
-                      </span>
-                    ))}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={<SparklesIcon />}
-              title="No active drafts"
-              body="Start from research, pasted notes, or a spreadsheet import when you are ready to add more recipes."
-            />
-          )}
-        </CardBody>
-      </Card>
-
-      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+      <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
         <Card className="bg-white">
           <CardBody>
-            <div className="font-semibold text-ink">Start something</div>
-            <div className="mt-4 grid gap-2">
-              <Button className="justify-start" onClick={() => onNavigate("research")}>
-                <PlusIcon className="h-4 w-4" />
-                Create or research recipe
-              </Button>
-              <Button variant="secondary" className="justify-start" onClick={() => onNavigate("research")}>
-                <UploadIcon className="h-4 w-4" />
-                Import spreadsheet
-              </Button>
-              <Button variant="secondary" className="justify-start" onClick={() => onNavigate("recipes")}>
-                <CopyIcon className="h-4 w-4" />
-                Manage recipes
-              </Button>
-              <Button variant="secondary" className="justify-start" onClick={() => onNavigate("analytics")}>
-                <EyeIcon className="h-4 w-4" />
-                Open analytics
-              </Button>
+            <div className="flex items-center justify-between gap-3">
+              <div className="font-semibold text-ink">Recent activity</div>
+              <button type="button" onClick={() => onNavigate("analytics")} className="text-xs font-semibold text-accent hover:underline">View analytics</button>
             </div>
+            {loadingAnalytics ? <PageSpinner label="Loading activity..." /> : auditLog.length ? (
+              <div className="mt-3 divide-y divide-border">
+                {auditLog.slice(0, 4).map((row) => (
+                  <div key={row.log_id} className="flex items-center justify-between gap-4 py-2.5 text-sm">
+                    <span className="capitalize text-foreground">{row.action.replaceAll("_", " ")}</span>
+                    <span className="shrink-0 text-xs text-muted">{formatDate(row.created_at)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : <div className="mt-4 text-sm text-muted">No activity yet.</div>}
           </CardBody>
         </Card>
 
         <Card className="bg-white">
           <CardBody>
-            <div className="font-semibold text-ink">Content health</div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {healthItems.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => onNavigate(item.tab)}
-                  className="rounded-md border border-border bg-surface p-3 text-left transition-colors hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
-                >
-                  <span className={`block text-2xl font-bold ${item.value ? item.tone : "text-success"}`}>{item.value}</span>
-                  <span className="mt-1 block text-xs font-semibold uppercase tracking-wide text-muted">{item.label}</span>
-                  <span className="mt-1 block text-xs text-muted">{item.helper}</span>
-                </button>
-              ))}
+            <div className="font-semibold text-ink">Traffic</div>
+            <div className="mt-3 flex gap-6">
+              <DashboardFact label="Views" value={totalViews} />
+              <DashboardFact label="Downloads" value={totalDownloads} />
             </div>
+            {topRecipe && <Link href={publicRecipeHref(topRecipe)} className="mt-4 block truncate border-t border-border pt-3 text-xs text-muted hover:text-accent">Top: {topRecipe.name}</Link>}
           </CardBody>
         </Card>
       </div>
-
-      <Card className="bg-white">
-        <CardBody>
-          <div className="font-semibold text-ink">Recent activity</div>
-          {loadingAnalytics ? (
-            <PageSpinner label="Loading activity..." />
-          ) : auditLog.length ? (
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {auditLog.slice(0, 6).map((row) => (
-                <div key={row.log_id} className="rounded-md border border-border bg-surface p-3">
-                  <div className="text-sm font-medium capitalize text-foreground">{row.action.replaceAll("_", " ")}</div>
-                  <div className="mt-1 text-xs text-muted">
-                    {[row.target_type, row.target_id].filter(Boolean).join(" · ") || "workspace"} · {formatDate(row.created_at)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={<CheckIcon />}
-              title="No activity yet"
-              body="Admin changes, imports, model updates, and moderation actions will appear here."
-            />
-          )}
-        </CardBody>
-      </Card>
     </div>
   );
 }
@@ -941,14 +761,12 @@ function RecipeFilterBar({
   categories,
   onStatusChange,
   onCategoryChange,
-  onStartResearch,
 }: {
   statusFilter: RecipeStatusFilter;
   categoryFilter: string;
   categories: string[];
   onStatusChange: (value: RecipeStatusFilter) => void;
   onCategoryChange: (value: string) => void;
-  onStartResearch: () => void;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-white p-3 shadow-sm">
@@ -978,78 +796,7 @@ function RecipeFilterBar({
           ))}
         </select>
       </div>
-      <Button size="sm" onClick={onStartResearch}>
-        <PlusIcon className="h-3.5 w-3.5" />
-        New recipe
-      </Button>
     </div>
-  );
-}
-
-function WorkspaceSearchResults({
-  query,
-  actions,
-  recipes,
-  onNavigate,
-}: {
-  query: string;
-  actions: { id: WorkspaceTab; label: string }[];
-  recipes: AdminRecipeSummary[];
-  onNavigate: (tab: WorkspaceTab) => void;
-}) {
-  return (
-    <Card className="bg-white">
-      <CardBody>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="font-semibold text-ink">Search results</div>
-          <div className="text-xs text-muted">for “{query}”</div>
-        </div>
-        <div className="mt-3 grid gap-4 md:grid-cols-2">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted">Actions</div>
-            <div className="mt-2 space-y-2">
-              {actions.length ? (
-                actions.map((action) => (
-                  <button
-                    key={action.id}
-                    type="button"
-                    onClick={() => onNavigate(action.id)}
-                    className="flex w-full items-center justify-between rounded-md border border-border bg-surface px-3 py-2 text-left text-sm transition-colors hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
-                  >
-                    <span className="font-medium text-foreground">{action.label}</span>
-                    <span className="text-xs text-muted">{tabCopy[action.id].title}</span>
-                  </button>
-                ))
-              ) : (
-                <div className="rounded-md border border-border bg-surface p-3 text-sm text-muted">No matching actions.</div>
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted">Recipes</div>
-            <div className="mt-2 space-y-2">
-              {recipes.length ? (
-                recipes.map((recipe) => (
-                  <Link
-                    key={recipe.recipe_id}
-                    href={recipe.status === "published" ? publicRecipeHref(recipe) : adminRecipeHref(recipe)}
-                    className="block rounded-md border border-border bg-surface px-3 py-2 text-sm transition-colors hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand/40"
-                  >
-                    <div className="font-medium text-foreground">{recipe.name}</div>
-                    <div className="text-xs text-muted">
-                      {recipe.status}
-                      {recipe.category ? ` · ${recipe.category}` : ""}
-                    </div>
-                  </Link>
-                ))
-              ) : (
-                <div className="rounded-md border border-border bg-surface p-3 text-sm text-muted">No matching recipes.</div>
-              )}
-            </div>
-          </div>
-        </div>
-      </CardBody>
-    </Card>
   );
 }
 
@@ -1075,14 +822,8 @@ function RecipesTab({
   }
 
   return (
-    <div className="space-y-4">
-      <Card className="bg-white">
-        <CardBody>
-          <div className="text-sm text-muted">
-            Showing {recipes.length} of {totalRecipes} recipes.
-          </div>
-        </CardBody>
-      </Card>
+    <div className="space-y-3">
+      <div className="text-xs text-muted">Showing {recipes.length} of {totalRecipes}</div>
       <RecipeManagementTable recipes={recipes} onChanged={onRecipesChanged} />
     </div>
   );
@@ -1121,23 +862,6 @@ function NewRecipeTab({
     <div className="space-y-4">
       <Card className="bg-white">
         <CardBody className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold text-ink">Create recipe draft</h2>
-            <p className="text-sm text-muted">Choose a starting point, then refine the draft before publishing.</p>
-          </div>
-          <div className="grid gap-3 md:grid-cols-4">
-            {[
-              ["Describe a dish", "Start from a dish name or idea."],
-              ["Paste a recipe", "Turn rough notes into a structured draft."],
-              ["Import spreadsheet", "Map workbook tabs into draft recipes."],
-              ["Research from web", "Ask the agent to build from sources."],
-            ].map(([title, body]) => (
-              <div key={title} className="rounded-md border border-border bg-surface p-3">
-                <div className="text-sm font-semibold text-foreground">{title}</div>
-                <div className="mt-1 text-xs text-muted">{body}</div>
-              </div>
-            ))}
-          </div>
           <form onSubmit={onSubmit} className="space-y-3">
             <CopyAssistField
               fieldLabel="new recipe research prompt"

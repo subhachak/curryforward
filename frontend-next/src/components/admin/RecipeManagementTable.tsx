@@ -171,11 +171,6 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
   return (
     <Card className="bg-white">
       <CardBody>
-        <div className="mb-1 font-semibold">Recipes ({recipes.length})</div>
-        <div className="mb-3 text-xs text-muted">
-          Published recipes are live. Take down a recipe for servicing to hide it from guests and return it to draft.
-          Edits create a draft copy; duplicates are always drafts.
-        </div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-surface p-2">
           <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
             <input
