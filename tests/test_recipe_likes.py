@@ -56,9 +56,15 @@ def test_guest_can_like_and_unlike_published_recipe():
     assert r.json()["like_count"] == 1
 
 
-def test_admin_can_like_recipe_and_it_counts_the_same_as_guest():
+def test_admin_like_and_unlike_do_not_change_engagement_count():
     recipe_id = _create_and_publish()
+    client.post(f"/api/recipes/{recipe_id}/like")
+
     r = client.post(f"/api/recipes/{recipe_id}/like", headers=ADMIN_HEADERS)
+    assert r.status_code == 200
+    assert r.json()["like_count"] == 1
+
+    r = client.delete(f"/api/recipes/{recipe_id}/like", headers=ADMIN_HEADERS)
     assert r.status_code == 200
     assert r.json()["like_count"] == 1
 
@@ -79,11 +85,11 @@ def test_guest_cannot_like_draft_recipe():
     assert r.status_code == 404
 
 
-def test_admin_can_like_own_draft_recipe():
+def test_admin_can_use_like_endpoint_on_draft_without_changing_count():
     created = client.post("/api/recipes", json=NEW_RECIPE, headers=ADMIN_HEADERS).json()
     r = client.post(f"/api/recipes/{created['recipe_id']}/like", headers=ADMIN_HEADERS)
     assert r.status_code == 200
-    assert r.json()["like_count"] == 1
+    assert r.json()["like_count"] == 0
 
 
 def test_like_count_appears_in_detail_and_list_responses():

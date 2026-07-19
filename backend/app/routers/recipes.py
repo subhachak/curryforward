@@ -352,19 +352,21 @@ def get_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depend
 
 @router.post("/recipes/{recipe_id}/like")
 def like_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
-    """Open to guests and admins alike — liking is a deliberate, explicit
-    click (unlike views, which fire just from visiting a page), so unlike
-    the view/download counters, admin's own likes count the same as
-    anyone's. No accounts exist for guests, so there's no real per-visitor
-    dedup — the frontend uses localStorage to keep its own toggle honest
-    for normal use; this endpoint just adjusts the shared count."""
+    """Admins may use the public UI, but their activity must not change
+    engagement analytics. No accounts exist for guests, so there's no real
+    per-visitor dedup — the frontend uses localStorage to keep its own toggle
+    honest for normal use; this endpoint just adjusts the shared count."""
     version = _visible_recipe_or_404(recipe_id, db, role)
+    if role == "admin":
+        return {"like_count": _like_count(db, version.recipe_id)}
     return {"like_count": _adjust_like_count(db, version.recipe_id, 1)}
 
 
 @router.delete("/recipes/{recipe_id}/like")
 def unlike_recipe(recipe_id: str, db: Session = Depends(get_db), role: str = Depends(get_role)):
     version = _visible_recipe_or_404(recipe_id, db, role)
+    if role == "admin":
+        return {"like_count": _like_count(db, version.recipe_id)}
     return {"like_count": _adjust_like_count(db, version.recipe_id, -1)}
 
 
