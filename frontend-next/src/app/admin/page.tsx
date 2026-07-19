@@ -106,7 +106,7 @@ const modelGroups = [
   {
     title: "Recipe creation",
     description: "Draft generation, research planning, and broader recipe edits.",
-    keys: ["recipe_draft", "gap_generation", "research_plan", "auto_research_crew", "recipe_wide_edit"],
+    keys: ["recipe_draft", "gap_generation", "research_plan", "auto_research_crew", "recipe_wide_edit", "admin_assistant"],
   },
   {
     title: "Admin cleanup",
@@ -1542,6 +1542,7 @@ function ModelsTab({
 }) {
   const { push } = useToast();
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   async function update(key: string, model: string) {
     setSavingKey(key);
@@ -1553,6 +1554,26 @@ function ModelsTab({
       push(e instanceof ApiError ? e.message : "Could not update model default", "error");
     } finally {
       setSavingKey(null);
+    }
+  }
+
+  async function applyPreset(pick: (setting: LLMSettingsResponse["settings"][number]) => string) {
+    if (!settings) return;
+    setBulkBusy(true);
+    try {
+      const changes = settings.settings.filter((setting) => pick(setting) !== setting.model);
+      for (const setting of changes) {
+        await api.updateLLMSetting(setting.key, pick(setting));
+      }
+      push(
+        changes.length ? `Updated ${changes.length} model setting${changes.length === 1 ? "" : "s"}` : "Already up to date",
+        changes.length ? "success" : "info"
+      );
+      onChanged();
+    } catch (e) {
+      push(e instanceof ApiError ? e.message : "Bulk update failed", "error");
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -1568,6 +1589,17 @@ function ModelsTab({
 
   const byKey = new Map(settings.settings.map((setting) => [setting.key, setting]));
   const groupedKeys = new Set(modelGroups.flatMap((group) => group.keys));
+  const providerStatus = Array.from(new Set(settings.models.map((model) => model.provider ?? "Other"))).map(
+    (provider) => ({
+      provider,
+      available: settings.models.some((model) => (model.provider ?? "Other") === provider && model.available !== false),
+    })
+  );
+  const models = settings.models;
+  function cheapestModelFor(key: string) {
+    const pool = isAnthropicOnlyTask(key) ? models.filter((m) => m.id.startsWith("anthropic/")) : models;
+    return (pool.find((m) => m.available !== false) ?? pool[0])?.id;
+  }
   const q = searchQuery.trim().toLowerCase();
   const grouped = [
     ...modelGroups.map((group) => ({
@@ -1604,6 +1636,24 @@ function ModelsTab({
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-white px-3 py-2.5">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+          <span className="font-semibold uppercase tracking-wide text-muted">Providers</span>
+          {providerStatus.map((p) => (
+            <span key={p.provider} className={p.available ? "text-foreground" : "text-danger"}>
+              {p.provider} {p.available ? "✓" : "✗ missing key"}
+            </span>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" loading={bulkBusy} onClick={() => applyPreset((setting) => setting.default_model)}>
+            Reset all to recommended
+          </Button>
+          <Button size="sm" variant="secondary" loading={bulkBusy} onClick={() => applyPreset((setting) => cheapestModelFor(setting.key) ?? setting.model)}>
+            Set all to cheapest available
+          </Button>
+        </div>
+      </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-md border border-border bg-white px-3 py-2.5 text-xs text-muted">
         <span className="font-semibold uppercase tracking-wide text-muted">Badges</span>
         <span><strong className="font-medium text-foreground">public-facing</strong> — guests can trigger this</span>
@@ -1691,7 +1741,7 @@ function modelBadges(key: string) {
   if (key === "recipe_context_chat" || key === "recipe_customize") badges.push("public-facing");
   if (key.includes("import")) badges.push("import");
   if (isAnthropicOnlyTask(key)) badges.push("Anthropic-only");
-  if (key.includes("moderation") || key.includes("rewrite") || key.includes("extraction")) badges.push("admin-only");
+  if (key.includes("moderation") || key.includes("rewrite") || key.includes("extraction") || key.includes("admin")) badges.push("admin-only");
   if (key.includes("plan") || key.includes("flash_lite")) badges.push("cheap");
   return badges;
 }
