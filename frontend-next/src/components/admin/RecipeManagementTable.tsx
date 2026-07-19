@@ -51,7 +51,7 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
   }, [recipes, sortBy]);
 
   const selectedRecipes = useMemo(
-    () => recipes.filter((recipe) => selectedIds.has(recipe.recipe_id)),
+    () => recipes.filter((recipe) => selectedIds.has(recipe.version_id)),
     [recipes, selectedIds]
   );
   const allSelected = recipes.length > 0 && selectedRecipes.length === recipes.length;
@@ -181,7 +181,7 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
             <input
               type="checkbox"
               checked={allSelected}
-              onChange={(e) => setSelectedIds(e.target.checked ? new Set(recipes.map((recipe) => recipe.recipe_id)) : new Set())}
+              onChange={(e) => setSelectedIds(e.target.checked ? new Set(recipes.map((recipe) => recipe.version_id)) : new Set())}
               className="h-4 w-4 rounded border-border accent-accent"
             />
             Select all
@@ -244,17 +244,17 @@ export function RecipeManagementTable({ recipes, onChanged }: RecipeManagementTa
               },
             ];
             return (
-              <div key={r.recipe_id} className="rounded-md border border-border bg-white p-3 shadow-sm">
+              <div key={r.version_id} className="rounded-md border border-border bg-white p-3 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex min-w-0 flex-1 gap-3">
                     <input
                       type="checkbox"
-                      checked={selectedIds.has(r.recipe_id)}
+                      checked={selectedIds.has(r.version_id)}
                       onChange={(e) => {
                         setSelectedIds((current) => {
                           const next = new Set(current);
-                          if (e.target.checked) next.add(r.recipe_id);
-                          else next.delete(r.recipe_id);
+                          if (e.target.checked) next.add(r.version_id);
+                          else next.delete(r.version_id);
                           return next;
                         });
                       }}
