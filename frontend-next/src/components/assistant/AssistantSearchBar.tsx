@@ -8,9 +8,9 @@ import { useRecipes } from "@/context/RecipesContext";
 import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
 import { looksLikeCreateRequest, looksLikeDraftPaste, searchRecipes } from "@/lib/assistantHeuristics";
-import { publicRecipeHref } from "@/lib/recipeLinks";
+import { adminRecipeHref, publicRecipeHref } from "@/lib/recipeLinks";
 import { RefreshIcon, SearchIcon, SendIcon, XIcon } from "@/components/ui/icons";
-import type { ChatHistoryTurn, DraftRecipeResult } from "@/lib/types";
+import type { ChatHistoryTurn, DraftRecipeResult, RecipeSummary } from "@/lib/types";
 
 interface Message {
   id: number;
@@ -131,6 +131,7 @@ export function AssistantSearchBar() {
   const [researchAssistantHistory, setResearchAssistantHistory] = useState<ChatHistoryTurn[]>([]);
   const [draftSession, setDraftSession] = useState<DraftSession | null>(null);
   const [routeRecipeId, setRouteRecipeId] = useState<string | null>(null);
+  const openingRecipeRef = useRef(false);
 
   const nextId = useRef(0);
   const prevTargetId = useRef<string | null>(null);
@@ -336,6 +337,23 @@ export function AssistantSearchBar() {
     }
   }
 
+  async function openRecipe(r: RecipeSummary) {
+    if (!isAdmin) {
+      goTo(publicRecipeHref(r));
+      return;
+    }
+    if (openingRecipeRef.current) return;
+    openingRecipeRef.current = true;
+    try {
+      const result = await api.createEditDraft(r.recipe_id);
+      goTo(adminRecipeHref(result.draft));
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Couldn't open the editor", "error");
+    } finally {
+      openingRecipeRef.current = false;
+    }
+  }
+
   function handleSearch(message: string) {
     const matches = searchRecipes(message, recipes);
     if (matches.length === 0) {
@@ -365,11 +383,12 @@ export function AssistantSearchBar() {
           <button
             key={r.recipe_id}
             className="block w-full rounded-md border border-[#E8D3B8] bg-white px-3 py-2 text-left text-sm hover:bg-[#FFF8F1]"
-            onClick={() => goTo(publicRecipeHref(r))}
+            onClick={() => openRecipe(r)}
           >
             <span className="font-semibold text-[#2E1B14]">{r.name}</span>
             <span className="mt-0.5 block text-xs text-[#8A7564]">
               {[r.category, ...r.cuisine_tags].filter(Boolean).slice(0, 3).join(" · ") || "Recipe"}
+              {isAdmin ? " · Edit" : ""}
             </span>
           </button>
         ))}

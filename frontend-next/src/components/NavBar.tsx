@@ -6,6 +6,7 @@ import { useRecipes } from "@/context/RecipesContext";
 import { useAuth } from "@/context/AuthContext";
 import { AssistantSearchBar } from "@/components/assistant/AssistantSearchBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { PlusIcon } from "@/components/ui/icons";
 
 function RecipesMenu() {
   const { recipes } = useRecipes();
@@ -176,6 +177,17 @@ export function NavBar() {
         </nav>
 
         <AssistantSearchBar />
+
+        {showWorkspace && (
+          <Link
+            href="/admin?tab=research"
+            aria-label="New recipe"
+            title="New recipe"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-foreground transition-colors hover:bg-surface-muted"
+          >
+            <PlusIcon className="h-4 w-4" />
+          </Link>
+        )}
 
         <ThemeToggle />
         <MobileMenu />

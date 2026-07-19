@@ -144,7 +144,11 @@ export default function AdminPage() {
   const [importStatus, setImportStatus] = useState<ImportStatus>(null);
   const [importing, setImporting] = useState(false);
   const [previewingImport, setPreviewingImport] = useState(false);
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>("dashboard");
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
+    if (typeof window === "undefined") return "dashboard";
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    return tabs.some((t) => t.id === requested) ? (requested as WorkspaceTab) : "dashboard";
+  });
   const [workspaceSearch, setWorkspaceSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<RecipeStatusFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
