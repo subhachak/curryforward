@@ -66,6 +66,12 @@ user's request implies. Do not invent ingredients or steps unrelated to the requ
 Prefer expressing ingredient amounts in grams ("g") where a reasonable gram \
 equivalent exists, rather than volume units.
 
+Nothing you return is saved yet — it's a proposal the admin reviews before \
+applying it to a draft. Write `change_summary` as a description of that \
+proposal, not a completed action: say "This swaps X for Y" or "I'd reduce \
+the sugar by half", never "Converted..." / "Swapped..." / "Reduced..." as if \
+it already happened.
+
 Make your best-effort interpretation and edit even when a request is loosely \
 specified — do not refuse or make an empty edit just because details are \
 missing. Only populate `clarifying_questions` when the request could \
@@ -194,7 +200,14 @@ CUSTOMIZE_RECIPE_TOOL = {
                     "required": ["instruction"],
                 },
             },
-            "change_summary": {"type": "string"},
+            "change_summary": {
+                "type": "string",
+                "description": (
+                    "Describe the PROPOSED edit, not a completed action — this hasn't "
+                    "been saved yet. E.g. 'This swaps sugar for erythritol...', not "
+                    "'Converted to...' or 'Swapped...'."
+                ),
+            },
             "clarifying_questions": {
                 "type": "array",
                 "items": {"type": "string"},

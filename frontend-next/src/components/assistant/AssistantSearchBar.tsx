@@ -124,15 +124,28 @@ function ProposalPanel({
   onApply: () => void;
   onRefine: (message: string) => void;
 }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [customText, setCustomText] = useState("");
 
-  function submitCustom(e: FormEvent) {
+  function toggle(prompt: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(prompt)) next.delete(prompt);
+      else next.add(prompt);
+      return next;
+    });
+  }
+
+  function submitCombined(e: FormEvent) {
     e.preventDefault();
-    const trimmed = customText.trim();
-    if (!trimmed) return;
-    onRefine(trimmed);
+    const parts = [...selected, customText.trim()].filter(Boolean);
+    if (parts.length === 0) return;
+    onRefine(parts.join(" "));
+    setSelected(new Set());
     setCustomText("");
   }
+
+  const hasSelection = selected.size > 0 || customText.trim().length > 0;
 
   return (
     <div className="space-y-2">
@@ -146,31 +159,40 @@ function ProposalPanel({
       <div className="space-y-1.5 border-t border-[#E8D3B8] pt-2">
         {refinePrompts.length > 0 && (
           <>
-            <div className="text-xs font-medium text-[#8A7564]">Refine further</div>
+            <div className="text-xs font-medium text-[#8A7564]">Refine further — select any that apply</div>
             <div className="flex flex-wrap gap-1.5">
-              {refinePrompts.map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  className="rounded-full border border-[#E8D3B8] px-2.5 py-1 text-xs text-[#5A2145] hover:bg-[#FFF8F1]"
-                  onClick={() => onRefine(prompt)}
-                >
-                  {prompt}
-                </button>
-              ))}
+              {refinePrompts.map((prompt) => {
+                const isSelected = selected.has(prompt);
+                return (
+                  <button
+                    key={prompt}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => toggle(prompt)}
+                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                      isSelected
+                        ? "border-brand bg-brand text-white"
+                        : "border-[#E8D3B8] text-[#5A2145] hover:bg-[#FFF8F1]"
+                    }`}
+                  >
+                    {isSelected ? "✓ " : ""}
+                    {prompt}
+                  </button>
+                );
+              })}
             </div>
           </>
         )}
-        <form onSubmit={submitCustom} className="flex gap-1.5">
+        <form onSubmit={submitCombined} className="flex gap-1.5">
           <input
             value={customText}
             onChange={(e) => setCustomText(e.target.value)}
-            placeholder={refinePrompts.length > 0 ? "Or type your own..." : "Ask for a different change..."}
+            placeholder={refinePrompts.length > 0 ? "Add your own, or send what's selected..." : "Ask for a different change..."}
             className="min-w-0 flex-1 rounded-md border border-[#E8D3B8] bg-white px-2 py-1 text-xs focus:border-brand focus:outline-none"
           />
           <button
             type="submit"
-            disabled={!customText.trim()}
+            disabled={!hasSelection}
             aria-label="Send refinement"
             className="rounded-md border border-[#E8D3B8] px-2 py-1 text-xs font-medium text-[#5A2145] disabled:opacity-50"
           >
