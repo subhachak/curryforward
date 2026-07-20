@@ -395,12 +395,14 @@ export default function AdminPage() {
                           setWorkspaceSearch("");
                         }}
                         className={`flex items-center justify-between gap-3 whitespace-nowrap rounded-md px-3 py-2 text-left text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand/40 ${
-                          activeTab === tab.id ? "bg-ink text-white" : "text-muted hover:bg-surface-muted hover:text-foreground"
+                          activeTab === tab.id
+                            ? "bg-ink text-white dark:text-[#211411]"
+                            : "text-muted hover:bg-surface-muted hover:text-foreground"
                         }`}
                       >
                         <span>{tab.label}</span>
                         {count !== undefined && count > 0 && (
-                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${activeTab === tab.id ? "bg-white/15 text-white" : "bg-surface-muted text-muted"}`}>
+                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${activeTab === tab.id ? "bg-black/10 text-current" : "bg-surface-muted text-muted"}`}>
                             {count}
                           </span>
                         )}
@@ -862,7 +864,7 @@ function NewRecipeTab({
           type="button"
           onClick={() => setMode("ai")}
           className={`relative z-10 whitespace-nowrap rounded-full px-3 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-brand/40 ${
-            mode === "ai" ? "text-ink" : "text-muted hover:text-foreground"
+            mode === "ai" ? "text-white dark:text-[#211411]" : "text-muted hover:text-foreground"
           }`}
           aria-pressed={mode === "ai"}
         >
@@ -872,7 +874,7 @@ function NewRecipeTab({
           type="button"
           onClick={() => setMode("import")}
           className={`relative z-10 whitespace-nowrap rounded-full px-3 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-brand/40 ${
-            mode === "import" ? "text-ink" : "text-muted hover:text-foreground"
+            mode === "import" ? "text-white dark:text-[#211411]" : "text-muted hover:text-foreground"
           }`}
           aria-pressed={mode === "import"}
         >

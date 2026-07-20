@@ -9,7 +9,7 @@ import { useToast } from "@/context/ToastContext";
 import { api, ApiError } from "@/lib/api";
 import { looksLikeCreateRequest, looksLikeDraftPaste, searchRecipes } from "@/lib/assistantHeuristics";
 import { adminRecipeHref, publicRecipeHref } from "@/lib/recipeLinks";
-import { RefreshIcon, SearchIcon, SendIcon, XIcon } from "@/components/ui/icons";
+import { RefreshIcon, SendIcon, SparklesIcon, XIcon } from "@/components/ui/icons";
 import type { ChatHistoryTurn, ChatProposal, DraftRecipeResult, RecipeSummary } from "@/lib/types";
 
 interface Message {
@@ -151,7 +151,7 @@ function ProposalPanel({
     <div className="space-y-2">
       <button
         type="button"
-        className="rounded-md bg-brand px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-hover"
+        className="rounded-md bg-brand px-2.5 py-1 text-xs font-medium text-white dark:text-[#211411] hover:bg-brand-hover"
         onClick={onApply}
       >
         Apply this to a draft →
@@ -171,7 +171,7 @@ function ProposalPanel({
                     onClick={() => toggle(prompt)}
                     className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
                       isSelected
-                        ? "border-brand bg-brand text-white"
+                        ? "border-brand bg-brand text-white dark:text-[#211411]"
                         : "border-[#E8D3B8] text-[#5A2145] hover:bg-[#FFF8F1]"
                     }`}
                   >
@@ -560,7 +560,7 @@ export function AssistantSearchBar() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              className="rounded-md bg-brand px-2.5 py-1 text-xs font-medium text-ink hover:bg-brand-hover"
+              className="rounded-md bg-brand px-2.5 py-1 text-xs font-medium text-white dark:text-[#211411] hover:bg-brand-hover"
               onClick={() => handleSaveDraft(result)}
             >
               Save recipe
@@ -621,7 +621,7 @@ export function AssistantSearchBar() {
     <>
       <form onSubmit={handleHeaderSubmit} className="ml-auto min-w-0 flex-1 max-w-sm">
         <div className="relative">
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <SparklesIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             value={headerInput}
             onChange={(e) => setHeaderInput(e.target.value)}
@@ -634,8 +634,7 @@ export function AssistantSearchBar() {
             title="Open Ask CurryForward"
             className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg bg-surface-muted text-brand hover:bg-brand-soft"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/cf/icons/ui/ask.svg" alt="" className="h-4 w-4" />
+            <SparklesIcon className="h-4 w-4" />
           </button>
         </div>
       </form>

@@ -214,7 +214,7 @@ export function AutoResearchPanel({ recipe, onComplete }: AutoResearchPanelProps
                     <span
                       className={`relative z-10 mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full ${
                         done
-                          ? "bg-brand text-white"
+                          ? "bg-brand text-white dark:text-[#211411]"
                           : running
                             ? "border-2 border-accent bg-accent-soft"
                             : "border border-border bg-surface"

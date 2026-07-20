@@ -267,7 +267,7 @@ function ResearchWorkspaceInner() {
                     type="button"
                     onClick={() => setMode("edit")}
                     className={`relative z-10 rounded-full px-3 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-brand/40 ${
-                      !previewMode ? "text-ink" : "text-muted hover:text-foreground"
+                      !previewMode ? "text-white dark:text-[#211411]" : "text-muted hover:text-foreground"
                     }`}
                     aria-pressed={!previewMode}
                   >
@@ -277,7 +277,7 @@ function ResearchWorkspaceInner() {
                     type="button"
                     onClick={() => setMode("review")}
                     className={`relative z-10 rounded-full px-3 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-brand/40 ${
-                      previewMode ? "text-ink" : "text-muted hover:text-foreground"
+                      previewMode ? "text-white dark:text-[#211411]" : "text-muted hover:text-foreground"
                     }`}
                     aria-pressed={previewMode}
                   >

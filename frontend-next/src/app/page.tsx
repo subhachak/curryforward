@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useMemo } from "react";
 import { Button } from "@/components/ui/Button";
+import { SparklesIcon } from "@/components/ui/icons";
 import { useAssistant } from "@/context/AssistantContext";
 import { useRecipes } from "@/context/RecipesContext";
 import { publicRecipeHref } from "@/lib/recipeLinks";
@@ -41,8 +42,7 @@ export default function HomePage() {
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/recipes?published=1"><Button>Explore recipes</Button></Link>
             <Button variant="secondary" onClick={() => setOpen(true)}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/cf/icons/ui/ask.svg" alt="" className="h-5 w-5" />
+              <SparklesIcon className="h-5 w-5" />
               Ask CurryForward
             </Button>
           </div>

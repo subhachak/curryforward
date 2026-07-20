@@ -11,7 +11,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
-import { DownloadIcon, RefreshIcon } from "@/components/ui/icons";
+import { DownloadIcon, RefreshIcon, SparklesIcon } from "@/components/ui/icons";
 import { LikeButton } from "@/components/LikeButton";
 import { RecipeSeo } from "@/components/RecipeSeo";
 import { PageSpinner } from "@/components/ui/Spinner";
@@ -170,8 +170,7 @@ function RecipeDetailInner() {
               className="bg-[#FF6B00] text-white shadow-[0_8px_18px_rgba(255,107,0,0.22)] hover:bg-[#E6462D]"
               onClick={() => setOpen(true)}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/cf/icons/ui/ask.svg" alt="" className="h-5 w-5" />
+              <SparklesIcon className="h-5 w-5" />
               Ask CurryForward
             </Button>
             <LikeButton key={recipe.recipe_id} recipeId={recipe.recipe_id} likeCount={recipe.like_count} />

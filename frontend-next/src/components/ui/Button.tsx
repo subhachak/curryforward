@@ -8,7 +8,7 @@ const variantClasses: Record<Variant, string> = {
   accent: "bg-accent text-[#3A2A23] hover:bg-accent-hover disabled:bg-accent/50",
   secondary: "bg-surface text-foreground border border-border hover:bg-surface-muted disabled:opacity-50",
   ghost: "bg-transparent text-foreground hover:bg-surface-muted disabled:opacity-50",
-  danger: "bg-danger text-white hover:bg-danger/90 disabled:bg-danger/50",
+  danger: "bg-danger text-white dark:text-[#211411] hover:bg-danger/90 disabled:bg-danger/50",
 };
 
 const sizeClasses: Record<Size, string> = {
