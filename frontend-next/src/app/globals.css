@@ -1,6 +1,14 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap");
 @import "tailwindcss";
 
+/* This app's theme is a manually-toggled `data-theme` attribute (see
+   ThemeToggle.tsx), not the OS-level color scheme. Without this, Tailwind's
+   `dark:` variant defaults to `@media (prefers-color-scheme: dark)`, which
+   is a different, unrelated signal — `dark:` classes would activate based
+   on the visitor's OS setting instead of the theme they actually chose on
+   the site, causing wrong-theme text/background combinations. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   color-scheme: light;
   --cf-font-display: "Playfair Display", Georgia, serif;
