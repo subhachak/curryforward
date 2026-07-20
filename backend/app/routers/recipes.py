@@ -41,6 +41,7 @@ from ..services.recipe_versions import (
     create_manual_recipe,
     current_head_query,
     fork_recipe_version,
+    get_or_create_edit_draft,
 )
 
 router = APIRouter(prefix="/api")
@@ -280,6 +281,12 @@ class HistoryTurn(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     history: list[HistoryTurn] = []
+
+
+class ChatApplyRequest(BaseModel):
+    components: list[dict]
+    steps: list[dict]
+    change_summary: str | None = None
 
 
 class DraftRequest(BaseModel):
@@ -615,7 +622,10 @@ def chat_customize(
     """
     Conversational customization.
     - Guest: read-only contextual Q&A about the current published recipe.
-    - Admin: creates a NEW VERSION (linear update), persisted, same recipe_id.
+    - Admin: proposes a change (LLM call only, no DB write). The reply reads
+      like the guest Q&A; the frontend offers a CTA that calls /chat/apply
+      to actually write the change, and only ever to a draft — never
+      straight to a published recipe. See /chat/apply below.
     """
     current = current_head_query(db, recipe_id).first()
     if not current or ((current.status or "published") != "published" and role != "admin"):
@@ -648,7 +658,47 @@ def chat_customize(
         )
     record_llm_usage(task="recipe_customize", model=model, role=role)
 
-    new_version = create_chat_edit_version(current, result, db)
+    components = normalize_components_to_grams(result["components"])
+    changed = components != (current.components or []) or result["steps"] != (current.steps or [])
+    return {
+        "reply": result.get("change_summary") or "Here's a proposed change — apply it to review in the editor.",
+        "persisted": False,
+        "proposal": {"components": components, "steps": result["steps"]} if changed else None,
+        "clarifying_questions": result.get("clarifying_questions") or [],
+    }
+
+
+@router.post("/recipes/{recipe_id}/chat/apply")
+def chat_customize_apply(
+    recipe_id: str,
+    req: ChatApplyRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    role: str = Depends(require_admin),
+):
+    """Writes a previously proposed chat customization to a draft — the
+    published recipe's current head is never touched here (get_or_create_edit_draft
+    forks a linked draft for it if needed), matching how every other admin
+    edit surface works: propose, review in the editor, publish explicitly."""
+    current = current_head_query(db, recipe_id).first()
+    if not current:
+        raise HTTPException(404, "Recipe not found")
+
+    draft, created, _note = get_or_create_edit_draft(current, db)
+    if created:
+        db.add(draft)
+
+    new_version = create_chat_edit_version(
+        draft,
+        {"components": req.components, "steps": req.steps, "change_summary": req.change_summary or ""},
+        db,
+    )
+    changed_fields = []
+    if new_version.components != (draft.components or []):
+        changed_fields.append("components")
+    if new_version.steps != (draft.steps or []):
+        changed_fields.append("steps")
+
     db.add(new_version)
     audit_admin_action(
         db,
@@ -656,10 +706,15 @@ def chat_customize(
         target_type="recipe",
         target_id=recipe_id,
         request=request,
-        details={"new_version_id": new_version.version_id},
+        details={"new_version_id": new_version.version_id, "draft_recipe_id": draft.recipe_id, "draft_created": created},
     )
     db.commit()
-    return {"change_summary": result.get("change_summary", ""), "new_version": new_version.to_dict(), "persisted": True}
+    db.refresh(new_version)
+    return {
+        "recipe": new_version.to_research_dict(),
+        "changed_fields": changed_fields,
+        "review_notes": req.change_summary,
+    }
 
 
 @router.post("/recipes/{recipe_id}/fork")

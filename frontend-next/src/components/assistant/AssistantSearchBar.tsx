@@ -10,7 +10,7 @@ import { api, ApiError } from "@/lib/api";
 import { looksLikeCreateRequest, looksLikeDraftPaste, searchRecipes } from "@/lib/assistantHeuristics";
 import { adminRecipeHref, publicRecipeHref } from "@/lib/recipeLinks";
 import { RefreshIcon, SearchIcon, SendIcon, XIcon } from "@/components/ui/icons";
-import type { ChatHistoryTurn, DraftRecipeResult, RecipeSummary } from "@/lib/types";
+import type { ChatHistoryTurn, ChatProposal, DraftRecipeResult, RecipeSummary } from "@/lib/types";
 
 interface Message {
   id: number;
@@ -115,6 +115,73 @@ function MarkdownMessage({ text }: { text: string }) {
   return <div className="space-y-2 leading-relaxed">{blocks.length ? blocks : text}</div>;
 }
 
+function ProposalPanel({
+  refinePrompts,
+  onApply,
+  onRefine,
+}: {
+  refinePrompts: string[];
+  onApply: () => void;
+  onRefine: (message: string) => void;
+}) {
+  const [customText, setCustomText] = useState("");
+
+  function submitCustom(e: FormEvent) {
+    e.preventDefault();
+    const trimmed = customText.trim();
+    if (!trimmed) return;
+    onRefine(trimmed);
+    setCustomText("");
+  }
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        className="rounded-md bg-brand px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-hover"
+        onClick={onApply}
+      >
+        Apply this to a draft →
+      </button>
+      <div className="space-y-1.5 border-t border-[#E8D3B8] pt-2">
+        {refinePrompts.length > 0 && (
+          <>
+            <div className="text-xs font-medium text-[#8A7564]">Refine further</div>
+            <div className="flex flex-wrap gap-1.5">
+              {refinePrompts.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  className="rounded-full border border-[#E8D3B8] px-2.5 py-1 text-xs text-[#5A2145] hover:bg-[#FFF8F1]"
+                  onClick={() => onRefine(prompt)}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        <form onSubmit={submitCustom} className="flex gap-1.5">
+          <input
+            value={customText}
+            onChange={(e) => setCustomText(e.target.value)}
+            placeholder={refinePrompts.length > 0 ? "Or type your own..." : "Ask for a different change..."}
+            className="min-w-0 flex-1 rounded-md border border-[#E8D3B8] bg-white px-2 py-1 text-xs focus:border-brand focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={!customText.trim()}
+            aria-label="Send refinement"
+            className="rounded-md border border-[#E8D3B8] px-2 py-1 text-xs font-medium text-[#5A2145] disabled:opacity-50"
+          >
+            →
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function AssistantSearchBar() {
   const { open, setOpen, target } = useAssistant();
   const { isAdmin } = useAuth();
@@ -132,6 +199,7 @@ export function AssistantSearchBar() {
   const [draftSession, setDraftSession] = useState<DraftSession | null>(null);
   const [routeRecipeId, setRouteRecipeId] = useState<string | null>(null);
   const openingRecipeRef = useRef(false);
+  const applyingProposalRef = useRef(false);
 
   const nextId = useRef(0);
   const prevTargetId = useRef<string | null>(null);
@@ -316,22 +384,43 @@ export function AssistantSearchBar() {
     }
   }
 
+  async function applyProposal(recipeId: string, proposal: ChatProposal, changeSummary: string) {
+    if (applyingProposalRef.current) return;
+    applyingProposalRef.current = true;
+    try {
+      const result = await api.applyChatCustomization(recipeId, proposal, changeSummary);
+      const highlight = encodeURIComponent(result.changed_fields.join(","));
+      goTo(`${adminRecipeHref(result.recipe)}&highlight=${highlight}`);
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Couldn't create the draft", "error");
+    } finally {
+      applyingProposalRef.current = false;
+    }
+  }
+
   async function handleCustomize(message: string) {
     if (!target) return;
     try {
       const result = await api.chat(target.recipe.recipe_id, message, chatHistory);
-      const summary = result.reply || result.change_summary || "Done.";
-      addMessage("assistant", summary);
+      const summary = result.reply || "Done.";
+      addMessage(
+        "assistant",
+        <div className="space-y-2">
+          <div>{summary}</div>
+          {isAdmin && result.proposal && (
+            <ProposalPanel
+              refinePrompts={result.clarifying_questions || []}
+              onApply={() => applyProposal(target.recipe.recipe_id, result.proposal!, summary)}
+              onRefine={(refinement) => sendMessage(refinement)}
+            />
+          )}
+        </div>
+      );
       setChatHistory((prev) => [
         ...prev,
         { role: "user", content: message },
         { role: "assistant", content: summary },
       ]);
-      if (result.persisted) {
-        target.onPersisted();
-      } else if (result.new_version) {
-        target.onPreview(result.new_version);
-      }
     } catch (e) {
       addMessage("assistant", e instanceof ApiError ? e.message : "Something went wrong with that change.");
     }

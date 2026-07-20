@@ -32,7 +32,7 @@ from ..services.ingredient_canonical import normalize_components_to_grams
 from ..services.recipe_identity import current_head_identity_query, ensure_recipe_identity, generate_admin_ref
 from ..services.llm_settings import available_models, get_llm_settings, resolve_task_model, set_llm_setting
 from ..services.llm_usage import record_llm_usage
-from ..services.recipe_versions import fork_recipe_version
+from ..services.recipe_versions import get_or_create_edit_draft
 
 router = APIRouter(prefix="/api/admin")
 
@@ -921,71 +921,26 @@ def create_edit_draft(
     )
     if not current:
         raise HTTPException(404, "Recipe not found")
-    if (current.status or "published") == "draft":
-        ensure_recipe_identity(current, db)
-        audit_admin_action(
-            db,
-            action="draft_opened",
-            target_type="recipe",
-            target_id=recipe_id,
-            request=request,
-            details={"created": False},
-        )
-        db.commit()
-        return {
-            "draft": current.to_research_dict(),
-            "created": False,
-            "note": "This draft is editable in place.",
-        }
 
-    existing = (
-        db.query(RecipeVersion)
-        .filter(
-            RecipeVersion.parent_version_id == current.version_id,
-            RecipeVersion.status == "draft",
-            RecipeVersion.source == "revision_draft",
-            RecipeVersion.is_current_head == True,  # noqa: E712
-            RecipeVersion.deleted_at.is_(None),
-        )
-        .order_by(RecipeVersion.updated_at.desc())
-        .first()
-    )
-    if existing:
-        ensure_recipe_identity(existing, db)
-        audit_admin_action(
-            db,
-            action="edit_draft_opened",
-            target_type="recipe",
-            target_id=recipe_id,
-            request=request,
-            details={"draft_recipe_id": existing.recipe_id, "created": False},
-        )
-        db.commit()
-        return {
-            "draft": existing.to_research_dict(),
-            "created": False,
-            "note": "Opened an existing draft copy of the published recipe.",
-        }
-
-    draft = fork_recipe_version(current)
-    draft.name = f"{current.name} (draft edit)"
-    draft.source = "revision_draft"
-    ensure_recipe_identity(draft, db)
-    db.add(draft)
+    draft, created, note = get_or_create_edit_draft(current, db)
+    if draft is current:
+        action, details = "draft_opened", {"created": False}
+    elif not created:
+        action, details = "edit_draft_opened", {"draft_recipe_id": draft.recipe_id, "created": False}
+    else:
+        action, details = "edit_draft_created", {"draft_recipe_id": draft.recipe_id}
+    if created:
+        db.add(draft)
     audit_admin_action(
         db,
-        action="edit_draft_created",
+        action=action,
         target_type="recipe",
         target_id=recipe_id,
         request=request,
-        details={"draft_recipe_id": draft.recipe_id},
+        details=details,
     )
     db.commit()
-    return {
-        "draft": draft.to_research_dict(),
-        "created": True,
-        "note": "Created a draft copy. The published recipe remains live until you choose how to publish this draft.",
-    }
+    return {"draft": draft.to_research_dict(), "created": created, "note": note}
 
 
 @router.get("/recipes/trash")

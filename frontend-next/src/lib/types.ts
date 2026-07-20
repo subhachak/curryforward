@@ -393,11 +393,22 @@ export type ResearchPatchPayload = Partial<{
   model: string | null;
 }>;
 
+export interface ChatProposal {
+  components: RecipeComponent[];
+  steps: RecipeStep[];
+}
+
 export interface ChatResult {
-  change_summary?: string;
   reply?: string;
-  new_version?: RecipeDetail;
   persisted: boolean;
+  proposal?: ChatProposal | null;
+  clarifying_questions?: string[];
+}
+
+export interface ChatApplyResult {
+  recipe: RecipeResearchDetail;
+  changed_fields: string[];
+  review_notes: string | null;
 }
 
 export interface RecipeUpsertRequest {

@@ -133,3 +133,36 @@ def fork_recipe_version(current: RecipeVersion) -> RecipeVersion:
 
 def current_head_query(db: Session, recipe_id: str):
     return current_head_identity_query(db, recipe_id)
+
+
+def get_or_create_edit_draft(current: RecipeVersion, db: Session) -> tuple[RecipeVersion, bool, str]:
+    """Idempotent "start editing" entry point shared by the admin dashboard's
+    edit-draft action and the chat-customize apply flow. Draft recipes are
+    edited in place; published recipes get (or reuse) a linked revision-draft
+    working copy. Returns (draft, created, note); does not commit — the
+    caller decides what to audit-log and when to flush/commit."""
+    if (current.status or "published") == "draft":
+        ensure_recipe_identity(current, db)
+        return current, False, "This draft is editable in place."
+
+    existing = (
+        db.query(RecipeVersion)
+        .filter(
+            RecipeVersion.parent_version_id == current.version_id,
+            RecipeVersion.status == "draft",
+            RecipeVersion.source == "revision_draft",
+            RecipeVersion.is_current_head == True,  # noqa: E712
+            RecipeVersion.deleted_at.is_(None),
+        )
+        .order_by(RecipeVersion.updated_at.desc())
+        .first()
+    )
+    if existing:
+        ensure_recipe_identity(existing, db)
+        return existing, False, "Opened an existing draft copy of the published recipe."
+
+    draft = fork_recipe_version(current)
+    draft.name = f"{current.name} (draft edit)"
+    draft.source = "revision_draft"
+    ensure_recipe_identity(draft, db)
+    return draft, True, "Created a draft copy. The published recipe remains live until you choose how to publish this draft."

@@ -45,7 +45,10 @@ function ResearchWorkspaceInner() {
   const [mode, setMode] = useState<WorkspaceMode>("edit");
   const [wideEditPrompt, setWideEditPrompt] = useState("");
   const [wideEditing, setWideEditing] = useState(false);
-  const [reviewHighlights, setReviewHighlights] = useState<string[]>([]);
+  const [reviewHighlights, setReviewHighlights] = useState<string[]>(() => {
+    const highlight = searchParams.get("highlight");
+    return highlight ? highlight.split(",").filter(Boolean) : [];
+  });
   const [reviewNotes, setReviewNotes] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState("");
 

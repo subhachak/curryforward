@@ -3,7 +3,9 @@ import type {
   AdminAssistantResult,
   AdminAuditLog,
   AutoResearchPlan,
+  ChatApplyResult,
   ChatHistoryTurn,
+  ChatProposal,
   ChatResult,
   CopyRewriteResult,
   DraftRecipeResult,
@@ -83,6 +85,11 @@ export const api = {
     apiFetch<ChatResult>(`/recipes/${recipeId}/chat`, {
       method: "POST",
       body: JSON.stringify({ message, history }),
+    }),
+  applyChatCustomization: (recipeId: string, proposal: ChatProposal, changeSummary: string) =>
+    apiFetch<ChatApplyResult>(`/recipes/${recipeId}/chat/apply`, {
+      method: "POST",
+      body: JSON.stringify({ ...proposal, change_summary: changeSummary }),
     }),
   draftRecipe: (message: string, history: ChatHistoryTurn[] = [], draft: DraftRecipeResult | null = null) =>
     apiFetch<DraftRecipeResult>("/recipes/draft", {

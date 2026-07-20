@@ -65,6 +65,17 @@ Keep ingredient_ids stable for unchanged ingredients. Only modify what the \
 user's request implies. Do not invent ingredients or steps unrelated to the request. \
 Prefer expressing ingredient amounts in grams ("g") where a reasonable gram \
 equivalent exists, rather than volume units.
+
+Make your best-effort interpretation and edit even when a request is loosely \
+specified — do not refuse or make an empty edit just because details are \
+missing. Only populate `clarifying_questions` when the request could \
+reasonably be interpreted in genuinely different ways that would lead to a \
+different edit (e.g. "make it healthier" — lower fat? lower sugar? more \
+vegetables?). In that case, still make your best single interpretation AND \
+list up to 3 short follow-up questions the admin could tap to steer it \
+differently. For clear, unambiguous requests (e.g. "scale to 8 servings", \
+"swap butter for oil"), leave `clarifying_questions` empty — most requests \
+should leave it empty.
 """
 
 
@@ -129,6 +140,7 @@ class CustomizedRecipeResult(BaseModel):
     components: list[CustomizedComponent] | None = None
     steps: list[CustomizedStep] | None = None
     change_summary: str = ""
+    clarifying_questions: list[str] = Field(default_factory=list)
 
     def as_payload(self, current_version: dict) -> dict:
         payload = self.model_dump(exclude_none=True)
@@ -183,6 +195,15 @@ CUSTOMIZE_RECIPE_TOOL = {
                 },
             },
             "change_summary": {"type": "string"},
+            "clarifying_questions": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "0-3 short follow-up questions to offer the admin, ONLY if this "
+                    "request was genuinely ambiguous in a way that would change the "
+                    "edit. Leave empty for clear, unambiguous requests — most requests."
+                ),
+            },
         },
         "required": ["change_summary"],
     },
