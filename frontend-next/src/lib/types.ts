@@ -398,11 +398,22 @@ export interface ChatProposal {
   steps: RecipeStep[];
 }
 
+export interface ClarifyingOption {
+  label: string;
+  recommended?: boolean;
+}
+
+export interface ClarifyingQuestion {
+  prompt: string;
+  multi_select: boolean;
+  options: ClarifyingOption[];
+}
+
 export interface ChatResult {
   reply?: string;
   persisted: boolean;
   proposal?: ChatProposal | null;
-  clarifying_questions?: string[];
+  clarifying_questions?: ClarifyingQuestion[];
 }
 
 export interface ChatApplyResult {

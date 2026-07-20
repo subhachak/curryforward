@@ -10,7 +10,7 @@ import { api, ApiError } from "@/lib/api";
 import { looksLikeCreateRequest, looksLikeDraftPaste, searchRecipes } from "@/lib/assistantHeuristics";
 import { adminRecipeHref, publicRecipeHref } from "@/lib/recipeLinks";
 import { RefreshIcon, SendIcon, SparklesIcon, XIcon } from "@/components/ui/icons";
-import type { ChatHistoryTurn, ChatProposal, DraftRecipeResult, RecipeSummary } from "@/lib/types";
+import type { ChatHistoryTurn, ChatProposal, ClarifyingQuestion, DraftRecipeResult, RecipeSummary } from "@/lib/types";
 
 interface Message {
   id: number;
@@ -116,39 +116,65 @@ function MarkdownMessage({ text }: { text: string }) {
 }
 
 function ProposalPanel({
-  refinePrompts,
+  refineGroups,
   onApply,
   onRefine,
 }: {
-  refinePrompts: string[];
+  refineGroups: ClarifyingQuestion[];
   onApply: () => void;
   onRefine: (message: string) => void;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Single-select groups default to whichever option the LLM marked
+  // recommended (or the first option, if none was) — a radio group with
+  // nothing picked reads as broken, and the recommendation is meant to be
+  // a sensible default the admin can just go with.
+  const [singleSelected, setSingleSelected] = useState<Record<number, string>>(() => {
+    const initial: Record<number, string> = {};
+    refineGroups.forEach((group, i) => {
+      if (!group.multi_select) {
+        const preferred = group.options.find((option) => option.recommended) ?? group.options[0];
+        if (preferred) initial[i] = preferred.label;
+      }
+    });
+    return initial;
+  });
+  const [multiSelected, setMultiSelected] = useState<Record<number, Set<string>>>({});
   const [customText, setCustomText] = useState("");
+  const hasContent =
+    Object.keys(singleSelected).length > 0 ||
+    Object.values(multiSelected).some((set) => set.size > 0) ||
+    customText.trim().length > 0;
 
-  function toggle(prompt: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(prompt)) next.delete(prompt);
-      else next.add(prompt);
+  function toggleMulti(groupIndex: number, label: string) {
+    setMultiSelected((prev) => {
+      const next = { ...prev };
+      const set = new Set(next[groupIndex] ?? []);
+      if (set.has(label)) set.delete(label);
+      else set.add(label);
+      next[groupIndex] = set;
       return next;
     });
   }
 
   function submitCombined(e: FormEvent) {
     e.preventDefault();
-    const parts = [...selected, customText.trim()].filter(Boolean);
+    const parts: string[] = [];
+    refineGroups.forEach((group, i) => {
+      if (group.multi_select) {
+        multiSelected[i]?.forEach((label) => parts.push(label));
+      } else if (singleSelected[i]) {
+        parts.push(singleSelected[i]);
+      }
+    });
+    const trimmedCustom = customText.trim();
+    if (trimmedCustom) parts.push(trimmedCustom);
     if (parts.length === 0) return;
-    onRefine(parts.join(" "));
-    setSelected(new Set());
+    onRefine(parts.join(". "));
     setCustomText("");
   }
 
-  const hasSelection = selected.size > 0 || customText.trim().length > 0;
-
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <button
         type="button"
         className="rounded-md bg-brand px-2.5 py-1 text-xs font-medium text-white dark:text-[#211411] hover:bg-brand-hover"
@@ -156,50 +182,61 @@ function ProposalPanel({
       >
         Apply this to a draft →
       </button>
-      <div className="space-y-1.5 border-t border-[#E8D3B8] pt-2">
-        {refinePrompts.length > 0 && (
-          <>
-            <div className="text-xs font-medium text-[#8A7564]">Refine further — select any that apply</div>
-            <div className="flex flex-wrap gap-1.5">
-              {refinePrompts.map((prompt) => {
-                const isSelected = selected.has(prompt);
-                return (
-                  <button
-                    key={prompt}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => toggle(prompt)}
-                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                      isSelected
-                        ? "border-brand bg-brand text-white dark:text-[#211411]"
-                        : "border-[#E8D3B8] text-[#5A2145] hover:bg-[#FFF8F1]"
-                    }`}
-                  >
-                    {isSelected ? "✓ " : ""}
-                    {prompt}
-                  </button>
-                );
-              })}
+      {refineGroups.length > 0 && (
+        <div className="space-y-3 border-t border-border pt-2">
+          {refineGroups.map((group, gi) => (
+            <div key={`${group.prompt}-${gi}`} className="space-y-1">
+              <div className="text-xs font-medium text-muted">{group.prompt}</div>
+              <div className="flex flex-col items-start gap-1">
+                {group.options.map((option) => {
+                  const checked = group.multi_select
+                    ? (multiSelected[gi]?.has(option.label) ?? false)
+                    : singleSelected[gi] === option.label;
+                  return (
+                    <label key={option.label} className="flex cursor-pointer items-center gap-2 text-xs text-foreground">
+                      <input
+                        type={group.multi_select ? "checkbox" : "radio"}
+                        name={`refine-group-${gi}`}
+                        checked={checked}
+                        onChange={() =>
+                          group.multi_select
+                            ? toggleMulti(gi, option.label)
+                            : setSingleSelected((prev) => ({ ...prev, [gi]: option.label }))
+                        }
+                        className="h-3.5 w-3.5 shrink-0 accent-brand"
+                      />
+                      <span>
+                        {option.label}
+                        {option.recommended && (
+                          <span className="ml-1.5 rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-medium text-brand-hover">
+                            Recommended
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
-          </>
-        )}
-        <form onSubmit={submitCombined} className="flex gap-1.5">
-          <input
-            value={customText}
-            onChange={(e) => setCustomText(e.target.value)}
-            placeholder={refinePrompts.length > 0 ? "Add your own, or send what's selected..." : "Ask for a different change..."}
-            className="min-w-0 flex-1 rounded-md border border-[#E8D3B8] bg-white px-2 py-1 text-xs focus:border-brand focus:outline-none"
-          />
-          <button
-            type="submit"
-            disabled={!hasSelection}
-            aria-label="Send refinement"
-            className="rounded-md border border-[#E8D3B8] px-2 py-1 text-xs font-medium text-[#5A2145] disabled:opacity-50"
-          >
-            →
-          </button>
-        </form>
-      </div>
+          ))}
+        </div>
+      )}
+      <form onSubmit={submitCombined} className="flex gap-1.5">
+        <input
+          value={customText}
+          onChange={(e) => setCustomText(e.target.value)}
+          placeholder={refineGroups.length > 0 ? "Or add your own..." : "Ask for a different change..."}
+          className="min-w-0 flex-1 rounded-md border border-border bg-surface px-2 py-1 text-xs focus:border-brand focus:outline-none"
+        />
+        <button
+          type="submit"
+          disabled={!hasContent}
+          aria-label="Send refinement"
+          className="rounded-md border border-border px-2 py-1 text-xs font-medium text-foreground hover:bg-surface-muted disabled:opacity-50"
+        >
+          →
+        </button>
+      </form>
     </div>
   );
 }
@@ -431,7 +468,7 @@ export function AssistantSearchBar() {
           <div>{summary}</div>
           {isAdmin && result.proposal && (
             <ProposalPanel
-              refinePrompts={result.clarifying_questions || []}
+              refineGroups={result.clarifying_questions || []}
               onApply={() => applyProposal(target.recipe.recipe_id, result.proposal!, summary)}
               onRefine={(refinement) => sendMessage(refinement)}
             />
